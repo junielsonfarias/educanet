@@ -66,11 +66,16 @@ export default function StudentsList() {
   const isAdminOrSupervisor =
     currentUser?.role === 'admin' || currentUser?.role === 'supervisor'
 
-  const filteredStudents = students.filter(
-    (student) =>
-      student.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      student.registration.toLowerCase().includes(searchTerm.toLowerCase()),
-  )
+  const filteredStudents = students.filter((student) => {
+    // Safety check for student object and required fields
+    if (!student) return false
+    const name = student.name || ''
+    const registration = student.registration || ''
+    return (
+      name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      registration.toLowerCase().includes(searchTerm.toLowerCase())
+    )
+  })
 
   const handleCreate = (data: any, initialEnrollment: any) => {
     addStudent(data, initialEnrollment)
@@ -180,8 +185,10 @@ export default function StudentsList() {
                   </TableRow>
                 ) : (
                   filteredStudents.map((student) => {
-                    const activeEnrollment = student.enrollments.find(
-                      (e) => e.status === 'Cursando',
+                    // Safe access to enrollments to avoid TypeError
+                    const enrollments = student.enrollments || []
+                    const activeEnrollment = enrollments.find(
+                      (e) => e && e.status === 'Cursando',
                     )
                     const displayGrade = activeEnrollment
                       ? activeEnrollment.grade
@@ -189,30 +196,31 @@ export default function StudentsList() {
                     const displayStatus = activeEnrollment
                       ? activeEnrollment.status
                       : student.status
+                    const studentName = student.name || 'Sem Nome'
+                    const studentId = student.id
+                    const studentRegistration = student.registration || '-'
 
                     return (
                       <TableRow
-                        key={student.id}
+                        key={studentId}
                         className="cursor-pointer hover:bg-muted/50"
-                        onClick={() =>
-                          navigate(`/pessoas/alunos/${student.id}`)
-                        }
+                        onClick={() => navigate(`/pessoas/alunos/${studentId}`)}
                       >
                         <TableCell>
                           <Avatar className="h-9 w-9">
                             <AvatarImage
-                              src={`https://img.usecurling.com/ppl/thumbnail?seed=${student.id}`}
+                              src={`https://img.usecurling.com/ppl/thumbnail?seed=${studentId}`}
                             />
                             <AvatarFallback>
-                              {student.name.substring(0, 2).toUpperCase()}
+                              {studentName.substring(0, 2).toUpperCase()}
                             </AvatarFallback>
                           </Avatar>
                         </TableCell>
                         <TableCell className="font-medium">
-                          {student.name}
+                          {studentName}
                         </TableCell>
                         <TableCell className="text-muted-foreground font-mono text-sm">
-                          {student.registration}
+                          {studentRegistration}
                         </TableCell>
                         <TableCell>{displayGrade || '-'}</TableCell>
                         <TableCell>
@@ -249,7 +257,7 @@ export default function StudentsList() {
                                 className="gap-2"
                                 onClick={(e) => {
                                   e.stopPropagation()
-                                  navigate(`/pessoas/alunos/${student.id}`)
+                                  navigate(`/pessoas/alunos/${studentId}`)
                                 }}
                               >
                                 <User className="h-4 w-4" /> Perfil Completo
@@ -276,7 +284,7 @@ export default function StudentsList() {
                                     className="text-destructive"
                                     onClick={(e) => {
                                       e.stopPropagation()
-                                      setDeleteId(student.id)
+                                      setDeleteId(studentId)
                                     }}
                                   >
                                     Excluir
