@@ -31,11 +31,34 @@ export const StudentProvider = ({
       try {
         const parsed = JSON.parse(stored)
         if (Array.isArray(parsed)) {
-          // Robust data sanitization to ensure arrays exist
-          const sanitized = parsed.map((s) => ({
+          // Robust data sanitization to ensure arrays and objects exist
+          const sanitized = parsed.map((s: any) => ({
             ...s,
             enrollments: Array.isArray(s.enrollments) ? s.enrollments : [],
             projectIds: Array.isArray(s.projectIds) ? s.projectIds : [],
+            // Ensure nested objects exist to prevent crashes
+            address: s.address || {
+              street: '',
+              number: '',
+              neighborhood: '',
+              city: '',
+              state: '',
+              zipCode: '',
+            },
+            contacts: s.contacts || {
+              phone: '',
+              email: '',
+            },
+            social: s.social || {
+              bolsaFamilia: false,
+              nis: '',
+            },
+            transport: s.transport || {
+              uses: false,
+            },
+            health: s.health || {
+              hasSpecialNeeds: false,
+            },
           }))
           setStudents(sanitized)
         } else {

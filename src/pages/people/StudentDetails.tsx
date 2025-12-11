@@ -355,12 +355,12 @@ export default function StudentDetails() {
                 {student.address ? (
                   <>
                     <p className="font-medium">
-                      {student.address.street}, {student.address.number} -{' '}
-                      {student.address.neighborhood}
+                      {student.address?.street}, {student.address?.number} -{' '}
+                      {student.address?.neighborhood}
                     </p>
                     <p className="text-sm text-muted-foreground">
-                      {student.address.city}/{student.address.state} - CEP:{' '}
-                      {student.address.zipCode}
+                      {student.address?.city}/{student.address?.state} - CEP:{' '}
+                      {student.address?.zipCode}
                     </p>
                   </>
                 ) : (
