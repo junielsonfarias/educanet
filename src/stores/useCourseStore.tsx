@@ -19,6 +19,7 @@ interface CourseContextType {
     subject: Omit<Subject, 'id'>,
   ) => void
   addEvaluationRule: (rule: Omit<EvaluationRule, 'id'>) => void
+  updateEvaluationRule: (id: string, rule: Partial<EvaluationRule>) => void
   getCourse: (id: string) => Course | undefined
 }
 
@@ -112,6 +113,12 @@ export const CourseProvider = ({ children }: { children: React.ReactNode }) => {
     setEvaluationRules((prev) => [...prev, newRule])
   }
 
+  const updateEvaluationRule = (id: string, data: Partial<EvaluationRule>) => {
+    setEvaluationRules((prev) =>
+      prev.map((r) => (r.id === id ? { ...r, ...data } : r)),
+    )
+  }
+
   const getCourse = (id: string) => courses.find((c) => c.id === id)
 
   return (
@@ -123,6 +130,7 @@ export const CourseProvider = ({ children }: { children: React.ReactNode }) => {
         addGrade,
         addSubject,
         addEvaluationRule,
+        updateEvaluationRule,
         getCourse,
       }}
     >

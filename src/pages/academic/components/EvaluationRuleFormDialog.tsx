@@ -29,6 +29,7 @@ import {
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
+import { Checkbox } from '@/components/ui/checkbox'
 import { EvaluationRule } from '@/lib/mock-data'
 
 const ruleSchema = z.object({
@@ -40,6 +41,9 @@ const ruleSchema = z.object({
   passingGrade: z.coerce.number().min(0).max(100).optional(),
   minDependencyGrade: z.coerce.number().min(0).max(100).optional(),
   minAttendance: z.coerce.number().min(0).max(100).optional(),
+  formula: z.string().optional(),
+  isStandard: z.boolean().default(false),
+  periodCount: z.coerce.number().min(1).max(10).optional(),
 })
 
 interface EvaluationRuleFormDialogProps {
@@ -66,6 +70,9 @@ export function EvaluationRuleFormDialog({
       passingGrade: 6.0,
       minDependencyGrade: 4.0,
       minAttendance: 75,
+      formula: '',
+      isStandard: false,
+      periodCount: 4,
     },
   })
 
@@ -81,6 +88,9 @@ export function EvaluationRuleFormDialog({
           passingGrade: initialData.passingGrade ?? 6.0,
           minDependencyGrade: initialData.minDependencyGrade ?? 4.0,
           minAttendance: initialData.minAttendance ?? 75,
+          formula: initialData.formula ?? '',
+          isStandard: initialData.isStandard ?? false,
+          periodCount: initialData.periodCount ?? 4,
         })
       } else {
         form.reset({
@@ -92,6 +102,9 @@ export function EvaluationRuleFormDialog({
           passingGrade: 6.0,
           minDependencyGrade: 4.0,
           minAttendance: 75,
+          formula: '',
+          isStandard: false,
+          periodCount: 4,
         })
       }
     }
@@ -100,19 +113,25 @@ export function EvaluationRuleFormDialog({
   const watchType = form.watch('type')
 
   const handleSubmit = (data: z.infer<typeof ruleSchema>) => {
-    onSubmit(data)
+    // If ID exists in initialData, we might need to include it in the submit,
+    // but the parent handles it.
+    if (initialData) {
+      onSubmit({ ...data, id: initialData.id })
+    } else {
+      onSubmit(data)
+    }
     onOpenChange(false)
   }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>
             {initialData ? 'Editar Regra' : 'Nova Regra de Avaliação'}
           </DialogTitle>
           <DialogDescription>
-            Defina os critérios de aprovação, reprovação e dependência.
+            Defina os critérios de aprovação, cálculo e dependência.
           </DialogDescription>
         </DialogHeader>
 
@@ -178,9 +197,78 @@ export function EvaluationRuleFormDialog({
               )}
             />
 
+            <FormField
+              control={form.control}
+              name="isStandard"
+              render={({ field }) => (
+                <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4">
+                  <FormControl>
+                    <Checkbox
+                      checked={field.value}
+                      onCheckedChange={field.onChange}
+                    />
+                  </FormControl>
+                  <div className="space-y-1 leading-none">
+                    <FormLabel>Definir como Regra Padrão</FormLabel>
+                    <FormDescription>
+                      Esta regra poderá ser rapidamente associada a novas
+                      séries.
+                    </FormDescription>
+                  </div>
+                </FormItem>
+              )}
+            />
+
             {watchType === 'numeric' && (
-              <div className="space-y-4 border rounded-md p-4">
-                <h4 className="font-medium text-sm">Escala de Notas</h4>
+              <div className="space-y-4 border rounded-md p-4 bg-muted/5">
+                <h4 className="font-medium text-sm text-primary">
+                  Configurações de Cálculo
+                </h4>
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="periodCount"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Quantidade de Avaliações</FormLabel>
+                        <FormControl>
+                          <Input type="number" {...field} />
+                        </FormControl>
+                        <FormDescription>
+                          Número de períodos/bimestres no ano.
+                        </FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <div className="col-span-2">
+                    <FormField
+                      control={form.control}
+                      name="formula"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Fórmula de Cálculo Final</FormLabel>
+                          <FormControl>
+                            <Textarea
+                              placeholder="Ex: (eval1 + eval2 + eval3 + eval4) / 4"
+                              className="font-mono"
+                              {...field}
+                            />
+                          </FormControl>
+                          <FormDescription>
+                            Use <code>eval1</code>, <code>eval2</code>, etc.
+                            para representar as notas de cada período. Operações
+                            permitidas: +, -, *, /, (). As notas de recuperação
+                            substituirão automaticamente as notas originais se
+                            forem maiores.
+                          </FormDescription>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                </div>
+
                 <div className="grid grid-cols-2 gap-4">
                   <FormField
                     control={form.control}
@@ -210,7 +298,7 @@ export function EvaluationRuleFormDialog({
                   />
                 </div>
 
-                <h4 className="font-medium text-sm pt-2">
+                <h4 className="font-medium text-sm pt-2 text-primary">
                   Critérios de Aprovação
                 </h4>
                 <div className="grid grid-cols-2 gap-4">
@@ -224,8 +312,7 @@ export function EvaluationRuleFormDialog({
                           <Input type="number" step="0.1" {...field} />
                         </FormControl>
                         <FormDescription>
-                          Abaixo desta nota (e acima da nota de dependência), o
-                          aluno entra em recuperação/dependência.
+                          Abaixo desta nota, entra em dependência.
                         </FormDescription>
                         <FormMessage />
                       </FormItem>
@@ -241,8 +328,7 @@ export function EvaluationRuleFormDialog({
                           <Input type="number" step="0.1" {...field} />
                         </FormControl>
                         <FormDescription>
-                          Abaixo desta nota, o aluno é reprovado direto na
-                          disciplina.
+                          Abaixo desta nota, reprovação direta.
                         </FormDescription>
                         <FormMessage />
                       </FormItem>

@@ -72,6 +72,9 @@ export interface EvaluationRule {
   passingGrade?: number // Min grade to pass (e.g., 6.0)
   minDependencyGrade?: number // Min grade to be eligible for dependency (e.g., 4.0)
   minAttendance?: number // Min attendance percentage (e.g., 75)
+  formula?: string // Custom formula (e.g., "(eval1 + eval2)/2")
+  isStandard?: boolean // Is this a standard rule template?
+  periodCount?: number // Number of evaluations/periods expected
 }
 
 export interface Grade {
@@ -116,6 +119,7 @@ export interface Assessment {
   subjectId: string
   periodId: string
   type: 'numeric' | 'descriptive'
+  category?: 'regular' | 'recuperation' // New field to distinguish regular vs recovery exams
   value: number | string // Grade or text
   date: string
 }
@@ -125,14 +129,18 @@ export interface Assessment {
 export const mockEvaluationRules: EvaluationRule[] = [
   {
     id: 'rule1',
-    name: 'Nota Numérica (0-10)',
+    name: 'Nota Numérica (0-10) Padrão',
     type: 'numeric',
-    description: 'Avaliação baseada em notas de 0 a 10 com média 6.0.',
+    description:
+      'Média aritmética simples das 4 avaliações bimestrais. Média 6.0.',
     minGrade: 0,
     maxGrade: 10,
     passingGrade: 6.0,
     minDependencyGrade: 4.0,
     minAttendance: 75,
+    formula: '(eval1 + eval2 + eval3 + eval4) / 4',
+    isStandard: true,
+    periodCount: 4,
   },
   {
     id: 'rule2',
@@ -140,6 +148,21 @@ export const mockEvaluationRules: EvaluationRule[] = [
     type: 'descriptive',
     description: 'Avaliação qualitativa através de relatórios semestrais.',
     minAttendance: 75,
+    isStandard: true,
+  },
+  {
+    id: 'rule3',
+    name: 'Média Ponderada Fundamental II',
+    type: 'numeric',
+    description: '1º e 3º Bimestres peso 2, 2º e 4º Bimestres peso 3.',
+    minGrade: 0,
+    maxGrade: 10,
+    passingGrade: 6.0,
+    minDependencyGrade: 4.0,
+    minAttendance: 75,
+    formula: '((eval1 * 2) + (eval2 * 3) + (eval3 * 2) + (eval4 * 3)) / 10',
+    isStandard: false,
+    periodCount: 4,
   },
 ]
 
@@ -434,8 +457,22 @@ export const mockAssessments: Assessment[] = [
     subjectId: 's10',
     periodId: 'p1',
     type: 'numeric',
-    value: 8.5,
+    category: 'regular',
+    value: 5.5, // Low grade
     date: '2024-04-10',
+  },
+  {
+    id: 'as1_rec',
+    studentId: '1',
+    schoolId: '1',
+    yearId: 'y2024',
+    classroomId: 'cl1',
+    subjectId: 's10',
+    periodId: 'p1',
+    type: 'numeric',
+    category: 'recuperation',
+    value: 8.0, // Recovery grade
+    date: '2024-04-15',
   },
   {
     id: 'as2',
@@ -446,6 +483,7 @@ export const mockAssessments: Assessment[] = [
     subjectId: 's10',
     periodId: 'p2',
     type: 'numeric',
+    category: 'regular',
     value: 7.0,
     date: '2024-06-20',
   },

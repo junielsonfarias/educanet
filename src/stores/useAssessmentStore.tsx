@@ -36,12 +36,14 @@ export const AssessmentProvider = ({
   }, [assessments])
 
   const addAssessment = (data: Omit<Assessment, 'id'>) => {
-    // Check if assessment already exists for this student/subject/period
+    // Check if assessment already exists for this student/subject/period AND category
+    const category = data.category || 'regular'
     const existingIndex = assessments.findIndex(
       (a) =>
         a.studentId === data.studentId &&
         a.subjectId === data.subjectId &&
-        a.periodId === data.periodId,
+        a.periodId === data.periodId &&
+        (a.category || 'regular') === category,
     )
 
     if (existingIndex >= 0) {
@@ -57,6 +59,7 @@ export const AssessmentProvider = ({
       // Create new
       const newAssessment: Assessment = {
         ...data,
+        category, // ensure category is set
         id: Math.random().toString(36).substr(2, 9),
       }
       setAssessments((prev) => [...prev, newAssessment])

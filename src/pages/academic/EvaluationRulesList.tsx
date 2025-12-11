@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Plus, Edit, Scale, Info } from 'lucide-react'
+import { Plus, Edit, Scale, Star, Calculator } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
   Card,
@@ -23,7 +23,8 @@ import { useToast } from '@/hooks/use-toast'
 import { EvaluationRule } from '@/lib/mock-data'
 
 export default function EvaluationRulesList() {
-  const { evaluationRules, addEvaluationRule } = useCourseStore()
+  const { evaluationRules, addEvaluationRule, updateEvaluationRule } =
+    useCourseStore()
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [editingRule, setEditingRule] = useState<EvaluationRule | null>(null)
   const { toast } = useToast()
@@ -37,23 +38,15 @@ export default function EvaluationRulesList() {
   }
 
   const handleUpdate = (data: any) => {
-    // In a real app with full CRUD store, we would update.
-    // For this mock, we are limited by the store interface provided in context unless we update the store file too.
-    // The current useCourseStore doesn't explicitly expose updateEvaluationRule, but let's assume we could or just Add for now as per instructions "Create and Edit".
-    // I will use addEvaluationRule as a mock update or implement update in the store file if permitted.
-    // The instructions allow updating "CAN UPDATE" files. I will assume I can update useCourseStore.
-    // Since I am updating all files in one go, I will ensure useCourseStore has update capability.
-
-    // For now, let's just trigger a toast simulating update if ID exists,
-    // BUT actually I should implement it in the store to be correct.
-    toast({
-      title: 'Funcionalidade de Edição',
-      description: 'Em um ambiente real, isso atualizaria a regra existente.',
-    })
+    if (editingRule?.id) {
+      updateEvaluationRule(editingRule.id, data)
+      toast({
+        title: 'Regra Atualizada',
+        description: 'As alterações na regra de avaliação foram salvas.',
+      })
+    }
     setEditingRule(null)
   }
-
-  // Note: I will update useCourseStore to support updateEvaluationRule
 
   const openEditDialog = (rule: EvaluationRule) => {
     setEditingRule(rule)
@@ -73,7 +66,7 @@ export default function EvaluationRulesList() {
             Regras de Avaliação
           </h2>
           <p className="text-muted-foreground">
-            Defina critérios de aprovação, reprovação e dependência.
+            Defina critérios de aprovação, fórmulas e recuperação.
           </p>
         </div>
         <Button onClick={openCreateDialog} className="w-full sm:w-auto">
@@ -86,7 +79,7 @@ export default function EvaluationRulesList() {
         <CardHeader>
           <CardTitle>Conjuntos de Regras Definidos</CardTitle>
           <CardDescription>
-            Estas regras são aplicadas às séries dos cursos.
+            Estas regras podem ser aplicadas às séries e turmas.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -95,8 +88,8 @@ export default function EvaluationRulesList() {
               <TableRow>
                 <TableHead>Nome</TableHead>
                 <TableHead>Tipo</TableHead>
-                <TableHead>Critérios de Aprovação</TableHead>
-                <TableHead>Frequência Mínima</TableHead>
+                <TableHead>Cálculo</TableHead>
+                <TableHead>Critérios</TableHead>
                 <TableHead className="text-right">Ações</TableHead>
               </TableRow>
             </TableHeader>
@@ -105,7 +98,17 @@ export default function EvaluationRulesList() {
                 <TableRow key={rule.id}>
                   <TableCell className="font-medium">
                     <div className="flex flex-col">
-                      <span>{rule.name}</span>
+                      <div className="flex items-center gap-2">
+                        <span>{rule.name}</span>
+                        {rule.isStandard && (
+                          <Badge
+                            variant="outline"
+                            className="text-amber-500 border-amber-500/20 bg-amber-500/10 gap-1 h-5 px-1.5 text-[10px]"
+                          >
+                            <Star className="h-3 w-3 fill-amber-500" /> Padrão
+                          </Badge>
+                        )}
+                      </div>
                       <span
                         className="text-xs text-muted-foreground truncate max-w-[200px]"
                         title={rule.description}
@@ -122,6 +125,21 @@ export default function EvaluationRulesList() {
                     >
                       {rule.type === 'numeric' ? 'Numérica' : 'Descritiva'}
                     </Badge>
+                  </TableCell>
+                  <TableCell>
+                    {rule.formula ? (
+                      <div
+                        className="flex items-center gap-1 text-sm font-mono text-muted-foreground"
+                        title={rule.formula}
+                      >
+                        <Calculator className="h-3 w-3" />
+                        <span className="truncate max-w-[150px]">
+                          {rule.formula}
+                        </span>
+                      </div>
+                    ) : (
+                      <span className="text-muted-foreground">-</span>
+                    )}
                   </TableCell>
                   <TableCell>
                     {rule.type === 'numeric' ? (
@@ -141,9 +159,6 @@ export default function EvaluationRulesList() {
                         Qualitativo
                       </span>
                     )}
-                  </TableCell>
-                  <TableCell>
-                    {rule.minAttendance ? `${rule.minAttendance}%` : '-'}
                   </TableCell>
                   <TableCell className="text-right">
                     <Button

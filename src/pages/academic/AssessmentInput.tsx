@@ -27,6 +27,7 @@ import {
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
+import { Badge } from '@/components/ui/badge'
 import { useToast } from '@/hooks/use-toast'
 import useSchoolStore from '@/stores/useSchoolStore'
 import useCourseStore from '@/stores/useCourseStore'
@@ -39,6 +40,7 @@ const filterSchema = z.object({
   classId: z.string().min(1, 'Selecione a turma'),
   periodId: z.string().min(1, 'Selecione o período'),
   subjectId: z.string().min(1, 'Selecione a disciplina'),
+  category: z.enum(['regular', 'recuperation']).default('regular'),
 })
 
 export default function AssessmentInput() {
@@ -62,6 +64,7 @@ export default function AssessmentInput() {
       classId: '',
       periodId: '',
       subjectId: '',
+      category: 'regular',
     },
   })
 
@@ -93,17 +96,10 @@ export default function AssessmentInput() {
 
     // Load existing grades
     const currentGrades: Record<string, number | string> = {}
-    const enrolledStudents = students.filter((s) =>
-      s.enrollments.some(
-        (e) => e.status === 'Cursando' && e.schoolId === data.schoolId, // Simplification: assuming matching school is enough for mock
-      ),
-    ) // In real app, match classId directly via enrollment.grade or explicit linkage
 
-    // Better student filter for mock:
-    // Since mockStudents[0].grade = '5º Ano A', let's match by gradeName/classId roughly
+    // Simplification for mock: match by school
     const classStudents = students.filter((s) => {
       const enrollment = s.enrollments.find((e) => e.status === 'Cursando')
-      // Mock matching logic:
       return enrollment && enrollment.schoolId === data.schoolId
     })
 
@@ -113,7 +109,8 @@ export default function AssessmentInput() {
           a.studentId === student.id &&
           a.classroomId === data.classId &&
           a.subjectId === data.subjectId &&
-          a.periodId === data.periodId,
+          a.periodId === data.periodId &&
+          (a.category || 'regular') === data.category,
       )
       if (assessment) {
         currentGrades[student.id] = assessment.value
@@ -129,7 +126,6 @@ export default function AssessmentInput() {
   const handleSave = () => {
     const values = form.getValues()
 
-    // Filter students again (same logic as above)
     const classStudents = students.filter((s) => {
       const enrollment = s.enrollments.find((e) => e.status === 'Cursando')
       return enrollment && enrollment.schoolId === values.schoolId
@@ -146,6 +142,7 @@ export default function AssessmentInput() {
           periodId: values.periodId,
           subjectId: values.subjectId,
           type: evaluationRule?.type || 'numeric',
+          category: values.category,
           value: value,
           date: new Date().toISOString().split('T')[0],
         })
@@ -160,8 +157,6 @@ export default function AssessmentInput() {
 
   const filteredStudents = selectedClass
     ? students.filter((s) => {
-        // Mock filtering: in real app, query enrollment by classId
-        // Here we assume if school matches, they are potentially in the class (simplified)
         return s.enrollments.some(
           (e) => e.schoolId === schoolId && e.status === 'Cursando',
         )
@@ -243,34 +238,6 @@ export default function AssessmentInput() {
               />
               <FormField
                 control={form.control}
-                name="periodId"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Período (Bimestre)</FormLabel>
-                    <Select
-                      onValueChange={field.onChange}
-                      value={field.value}
-                      disabled={!academicYearId}
-                    >
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Selecione..." />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {periods.map((p) => (
-                          <SelectItem key={p.id} value={p.id}>
-                            {p.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
                 name="classId"
                 render={({ field }) => (
                   <FormItem>
@@ -325,7 +292,60 @@ export default function AssessmentInput() {
                   </FormItem>
                 )}
               />
-              <div className="flex items-end">
+              <FormField
+                control={form.control}
+                name="periodId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Período (Bimestre)</FormLabel>
+                    <Select
+                      onValueChange={field.onChange}
+                      value={field.value}
+                      disabled={!academicYearId}
+                    >
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Selecione..." />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {periods.map((p) => (
+                          <SelectItem key={p.id} value={p.id}>
+                            {p.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="category"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Tipo de Lançamento</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Selecione..." />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="regular">
+                          Avaliação Regular
+                        </SelectItem>
+                        <SelectItem value="recuperation">
+                          Recuperação
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <div className="flex items-end col-span-1 md:col-span-2 lg:col-span-3">
                 <Button type="submit" className="w-full">
                   Carregar Diário
                 </Button>
@@ -338,9 +358,22 @@ export default function AssessmentInput() {
       {selectedClass && selectedSubject && (
         <Card className="animate-fade-in-up">
           <CardHeader>
-            <CardTitle className="flex justify-between">
+            <CardTitle className="flex justify-between items-center">
               <span>Lançamento: {selectedSubject.name}</span>
-              <Badge>{evaluationRule?.name}</Badge>
+              <div className="flex gap-2">
+                <Badge variant="secondary">{evaluationRule?.name}</Badge>
+                <Badge
+                  variant={
+                    form.getValues('category') === 'regular'
+                      ? 'default'
+                      : 'destructive'
+                  }
+                >
+                  {form.getValues('category') === 'regular'
+                    ? 'Regular'
+                    : 'Recuperação'}
+                </Badge>
+              </div>
             </CardTitle>
             <CardDescription>
               {selectedClass.name} -{' '}

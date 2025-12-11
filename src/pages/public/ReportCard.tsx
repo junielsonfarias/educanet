@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Search, Printer, Download } from 'lucide-react'
+import { Search, Printer } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
@@ -18,56 +18,166 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { Badge } from '@/components/ui/badge'
+import useStudentStore from '@/stores/useStudentStore'
+import useAssessmentStore from '@/stores/useAssessmentStore'
+import useCourseStore from '@/stores/useCourseStore'
+import useSchoolStore from '@/stores/useSchoolStore'
+import { EvaluationRule } from '@/lib/mock-data'
 
 export default function ReportCard() {
   const [searchId, setSearchId] = useState('')
   const [result, setResult] = useState<any>(null)
 
+  const { students } = useStudentStore()
+  const { assessments } = useAssessmentStore()
+  const { courses, evaluationRules } = useCourseStore()
+  const { schools } = useSchoolStore()
+
+  const calculateFinalGrade = (evaluations: number[], rule: EvaluationRule) => {
+    if (!rule.formula) return null
+
+    try {
+      // Create context variables: eval1, eval2, etc.
+      const context: Record<string, number> = {}
+      evaluations.forEach((val, index) => {
+        context[`eval${index + 1}`] = val
+      })
+
+      // Simple and safe parser for basic arithmetic expressions
+      // Using Function constructor with limited scope for demo purposes
+      // In production, use a math expression parser library
+      const formula = rule.formula
+      const keys = Object.keys(context)
+      const values = Object.values(context)
+
+      // Ensure all required variables are present (assuming up to periodCount)
+      const periodCount = rule.periodCount || 4
+      for (let i = 1; i <= periodCount; i++) {
+        if (context[`eval${i}`] === undefined) {
+          // If a grade is missing, we can treat as 0 or null.
+          // Treating as 0 for calculation safety
+          return 0
+        }
+      }
+
+      const func = new Function(...keys, `return ${formula};`)
+      return func(...values)
+    } catch (e) {
+      console.error('Error calculating grade', e)
+      return 0
+    }
+  }
+
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault()
-    // Mock search
-    if (searchId) {
-      setResult({
-        name: 'João da Silva',
-        school: 'Escola Municipal Monteiro Lobato',
-        grade: '5º Ano A',
-        year: 2024,
-        grades: [
-          {
-            subject: 'Matemática',
-            b1: 7.5,
-            b2: 8.0,
-            b3: 7.0,
-            b4: 8.5,
-            final: 7.8,
-          },
-          {
-            subject: 'Português',
-            b1: 8.0,
-            b2: 8.5,
-            b3: 8.0,
-            b4: 9.0,
-            final: 8.4,
-          },
-          {
-            subject: 'História',
-            b1: 9.0,
-            b2: 9.0,
-            b3: 8.5,
-            b4: 9.5,
-            final: 9.0,
-          },
-          {
-            subject: 'Ciências',
-            b1: 7.0,
-            b2: 7.5,
-            b3: 7.0,
-            b4: 8.0,
-            final: 7.4,
-          },
-        ],
-      })
+
+    // Find Student
+    const student = students.find((s) => s.registration === searchId)
+    if (!student) {
+      setResult(null)
+      return
     }
+
+    const enrollment = student.enrollments.find((e) => e.status === 'Cursando')
+    if (!enrollment) {
+      setResult(null)
+      return
+    }
+
+    const school = schools.find((s) => s.id === enrollment.schoolId)
+    const academicYear = school?.academicYears.find(
+      (y) => y.name === enrollment.year.toString(),
+    )
+    // Assuming simple mock matching for class
+    // In real app, enrollment links to classId
+    const classroom = academicYear?.classes.find(
+      (c) => c.name === enrollment.grade,
+    )
+
+    // Find Course Structure
+    const allGrades = courses.flatMap((c) =>
+      c.grades.map((g) => ({ ...g, courseId: c.id })),
+    )
+    const grade = allGrades.find(
+      (g) =>
+        g.name === enrollment.grade ||
+        (classroom && g.id === classroom.gradeId),
+    )
+
+    if (!grade) return
+
+    const rule = evaluationRules.find((r) => r.id === grade.evaluationRuleId)
+    if (!rule) return
+
+    // Process Grades
+    const reportCardGrades = grade.subjects.map((subject) => {
+      const subjectAssessments = assessments.filter(
+        (a) => a.studentId === student.id && a.subjectId === subject.id,
+      )
+
+      // Group by period (assuming 4 periods for now based on mock data)
+      const periods = academicYear?.periods || []
+      const periodGrades: number[] = []
+
+      periods.forEach((period) => {
+        // Find regular assessment
+        const regular = subjectAssessments.find(
+          (a) =>
+            a.periodId === period.id &&
+            (a.category === 'regular' || !a.category),
+        )
+        // Find recuperation assessment
+        const recuperation = subjectAssessments.find(
+          (a) => a.periodId === period.id && a.category === 'recuperation',
+        )
+
+        // Logic: Substitute lowest evaluation grade with higher recuperation grade
+        let finalValue = 0
+        const regValue = regular ? Number(regular.value) : 0
+        const recValue = recuperation ? Number(recuperation.value) : 0
+
+        // If recuperation is higher, use it. Otherwise use regular.
+        if (recValue > regValue) {
+          finalValue = recValue
+        } else {
+          finalValue = regValue
+        }
+
+        periodGrades.push(finalValue)
+      })
+
+      // Calculate Final based on Formula
+      let finalGrade = 0
+      if (rule.type === 'numeric' && rule.formula) {
+        finalGrade = calculateFinalGrade(periodGrades, rule) || 0
+      } else if (rule.type === 'numeric') {
+        // Fallback average
+        const sum = periodGrades.reduce((a, b) => a + b, 0)
+        finalGrade = periodGrades.length > 0 ? sum / periodGrades.length : 0
+      }
+
+      return {
+        subject: subject.name,
+        periods: periodGrades,
+        final: finalGrade,
+        passing: finalGrade >= (rule.passingGrade || 6.0),
+      }
+    })
+
+    setResult({
+      name: student.name,
+      school: school?.name,
+      grade: enrollment.grade,
+      year: enrollment.year,
+      ruleName: rule.name,
+      grades: reportCardGrades,
+      periodNames: academicYear?.periods.map((p) => p.name) || [
+        '1º Bim',
+        '2º Bim',
+        '3º Bim',
+        '4º Bim',
+      ],
+    })
   }
 
   return (
@@ -125,10 +235,11 @@ export default function ReportCard() {
                   <TableHeader className="bg-muted/50">
                     <TableRow>
                       <TableHead className="font-bold">Disciplina</TableHead>
-                      <TableHead className="text-center">1º Bim</TableHead>
-                      <TableHead className="text-center">2º Bim</TableHead>
-                      <TableHead className="text-center">3º Bim</TableHead>
-                      <TableHead className="text-center">4º Bim</TableHead>
+                      {result.periodNames.map((p: string) => (
+                        <TableHead key={p} className="text-center">
+                          {p}
+                        </TableHead>
+                      ))}
                       <TableHead className="text-center font-bold">
                         Média Final
                       </TableHead>
@@ -141,39 +252,33 @@ export default function ReportCard() {
                         <TableCell className="font-medium">
                           {grade.subject}
                         </TableCell>
-                        <TableCell className="text-center">
-                          {grade.b1.toFixed(1)}
-                        </TableCell>
-                        <TableCell className="text-center">
-                          {grade.b2.toFixed(1)}
-                        </TableCell>
-                        <TableCell className="text-center">
-                          {grade.b3.toFixed(1)}
-                        </TableCell>
-                        <TableCell className="text-center">
-                          {grade.b4.toFixed(1)}
-                        </TableCell>
+                        {grade.periods.map((p: number, idx: number) => (
+                          <TableCell key={idx} className="text-center">
+                            {p.toFixed(1)}
+                          </TableCell>
+                        ))}
                         <TableCell className="text-center font-bold bg-muted/20">
                           {grade.final.toFixed(1)}
                         </TableCell>
                         <TableCell className="text-center">
                           <Badge
-                            variant={
-                              grade.final >= 6 ? 'default' : 'destructive'
-                            }
+                            variant={grade.passing ? 'default' : 'destructive'}
                             className={
-                              grade.final >= 6
+                              grade.passing
                                 ? 'bg-green-600 hover:bg-green-700'
                                 : ''
                             }
                           >
-                            {grade.final >= 6 ? 'Aprovado' : 'Recuperação'}
+                            {grade.passing ? 'Aprovado' : 'Recuperação'}
                           </Badge>
                         </TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
                 </Table>
+              </div>
+              <div className="mt-4 text-xs text-muted-foreground text-center">
+                * Regra de Avaliação Aplicada: {result.ruleName}
               </div>
             </CardContent>
           </Card>
