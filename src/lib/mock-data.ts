@@ -12,15 +12,14 @@ export interface Classroom {
   name: string
   shift: 'Matutino' | 'Vespertino' | 'Noturno' | 'Integral'
   gradeId: string
-  gradeName?: string // Helper for display
-  studentCount?: number // Helper
-  // Enhanced fields
+  gradeName?: string
+  studentCount?: number
   acronym?: string
   operatingHours?: string
   minStudents?: number
   operatingDays?: string[]
   isMultiGrade?: boolean
-  maxDependencySubjects?: number // New field: Max subjects allowed for dependency
+  maxDependencySubjects?: number
 }
 
 export interface AcademicYear {
@@ -41,9 +40,8 @@ export interface School {
   phone: string
   director: string
   status: 'active' | 'inactive'
-  logo?: string // New field for School Logo
+  logo?: string
   academicYears: AcademicYear[]
-  // New INEP/Censo fields
   inepCode?: string
   administrativeDependency?: 'Federal' | 'Estadual' | 'Municipal' | 'Privada'
   locationType?: 'Urbana' | 'Rural'
@@ -68,14 +66,14 @@ export interface EvaluationRule {
   name: string
   type: 'numeric' | 'descriptive'
   description: string
-  minGrade?: number // Scale Min (e.g., 0)
-  maxGrade?: number // Scale Max (e.g., 10)
-  passingGrade?: number // Min grade to pass (e.g., 6.0)
-  minDependencyGrade?: number // Min grade to be eligible for dependency (e.g., 4.0)
-  minAttendance?: number // Min attendance percentage (e.g., 75)
-  formula?: string // Custom formula (e.g., "(eval1 + eval2)/2")
-  isStandard?: boolean // Is this a standard rule template?
-  periodCount?: number // Number of evaluations/periods expected
+  minGrade?: number
+  maxGrade?: number
+  passingGrade?: number
+  minDependencyGrade?: number
+  minAttendance?: number
+  formula?: string
+  isStandard?: boolean
+  periodCount?: number
 }
 
 export interface Grade {
@@ -108,7 +106,6 @@ export interface Teacher {
   phone: string
   status: 'active' | 'inactive'
   allocations: TeacherAllocation[]
-  // New fields
   cpf?: string
   employmentBond?: 'Contratado' | 'Efetivo'
   admissionDate?: string
@@ -116,7 +113,6 @@ export interface Teacher {
   academicBackground?: string
 }
 
-// Assessment Data Types
 export interface AssessmentType {
   id: string
   name: string
@@ -133,13 +129,12 @@ export interface Assessment {
   subjectId: string
   periodId: string
   type: 'numeric' | 'descriptive'
-  category?: 'regular' | 'recuperation' // New field to distinguish regular vs recovery exams
-  value: number | string // Grade or text
+  category?: 'regular' | 'recuperation'
+  value: number | string
   date: string
   assessmentTypeId?: string
 }
 
-// General Settings
 export interface GeneralSettings {
   municipalityName: string
   educationSecretaryName: string
@@ -151,8 +146,6 @@ export const initialSettings: GeneralSettings = {
   municipalityName: 'Prefeitura Municipal',
   educationSecretaryName: 'Secretaria Municipal de Educação',
 }
-
-// Mock Data Initialization
 
 export const mockEvaluationRules: EvaluationRule[] = [
   {
@@ -514,7 +507,7 @@ export const mockAssessments: Assessment[] = [
     periodId: 'p1',
     type: 'numeric',
     category: 'regular',
-    value: 5.5, // Low grade
+    value: 5.5,
     date: '2024-04-10',
     assessmentTypeId: 'at1',
   },
@@ -528,7 +521,7 @@ export const mockAssessments: Assessment[] = [
     periodId: 'p1',
     type: 'numeric',
     category: 'recuperation',
-    value: 8.0, // Recovery grade
+    value: 8.0,
     date: '2024-04-15',
     assessmentTypeId: 'at1',
   },
@@ -544,6 +537,21 @@ export const mockAssessments: Assessment[] = [
     category: 'regular',
     value: 7.0,
     date: '2024-06-20',
+    assessmentTypeId: 'at1',
+  },
+  // Add History assessment for testing
+  {
+    id: 'as3',
+    studentId: '1',
+    schoolId: '1',
+    yearId: 'y2024',
+    classroomId: 'cl1',
+    subjectId: 's11',
+    periodId: 'p1',
+    type: 'numeric',
+    category: 'regular',
+    value: 9.5,
+    date: '2024-04-12',
     assessmentTypeId: 'at1',
   },
 ]

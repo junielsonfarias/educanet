@@ -8,18 +8,13 @@ import {
   Calendar,
   Edit,
   Trash2,
-  MapPin,
-  Bus,
-  HeartPulse,
-  Users,
-  Plus,
-  Trophy,
-  Filter,
-  FileText,
   Printer,
-  ArrowRightLeft,
+  FileText,
   Briefcase,
   Book,
+  ArrowRightLeft,
+  Plus,
+  Trophy,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
@@ -33,10 +28,8 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
 import useStudentStore from '@/stores/useStudentStore'
-import useSchoolStore from '@/stores/useSchoolStore'
 import useProjectStore from '@/stores/useProjectStore'
 import useUserStore from '@/stores/useUserStore'
-import useAssessmentStore from '@/stores/useAssessmentStore'
 import { useState } from 'react'
 import { StudentFormDialog } from './components/StudentFormDialog'
 import { EnrollmentFormDialog } from './components/EnrollmentFormDialog'
@@ -68,12 +61,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog'
+import { StudentInfoCard } from './components/StudentInfoCard'
+import { StudentPerformanceCard } from './components/StudentPerformanceCard'
 
 export default function StudentDetails() {
   const { id } = useParams<{ id: string }>()
@@ -87,10 +76,8 @@ export default function StudentDetails() {
     addProjectEnrollment,
     removeProjectEnrollment,
   } = useStudentStore()
-  const { schools } = useSchoolStore()
   const { projects } = useProjectStore()
   const { currentUser } = useUserStore()
-  const { getStudentAssessments, assessmentTypes } = useAssessmentStore()
   const { toast } = useToast()
 
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
@@ -99,13 +86,9 @@ export default function StudentDetails() {
   const [isTransferDialogOpen, setIsTransferDialogOpen] = useState(false)
   const [deleteId, setDeleteId] = useState<string | null>(null)
 
-  // Enrollment List State
   const [enrollmentSort, setEnrollmentSort] = useState<'year' | 'status'>(
     'year',
   )
-  const [selectedEnrollmentId, setSelectedEnrollmentId] = useState<
-    string | null
-  >(null)
 
   const student = getStudent(id || '')
   const isAdminOrSupervisor =
@@ -121,8 +104,6 @@ export default function StudentDetails() {
       </div>
     )
   }
-
-  const assessments = getStudentAssessments(student.id)
 
   const handleUpdate = (data: any) => {
     updateStudent(student.id, data)
@@ -170,15 +151,9 @@ export default function StudentDetails() {
     destination: string,
     notes?: string,
   ) => {
-    // Determine status
     const newStatus = 'Transferido'
+    updateStudent(student.id, { status: newStatus })
 
-    // Update Student Status
-    updateStudent(student.id, {
-      status: newStatus,
-    })
-
-    // Update active enrollment status
     const activeEnrollment = student.enrollments.find(
       (e) => e.status === 'Cursando',
     )
@@ -187,29 +162,17 @@ export default function StudentDetails() {
         status: 'Transferido',
       })
     }
-
     toast({
       title: 'Processo Iniciado',
-      description: `Transferência para ${destination} registrada. Status alterado para Transferido.`,
+      description: `Transferência para ${destination} registrada.`,
     })
   }
 
   const generateDocument = (docName: string) => {
     toast({
       title: 'Gerando Documento',
-      description: `O documento "${docName}" está sendo gerado e será baixado em breve.`,
+      description: `O documento "${docName}" está sendo gerado.`,
     })
-    // Mock download delay
-    setTimeout(() => {
-      toast({
-        title: 'Download Concluído',
-        description: `O arquivo ${docName}.pdf foi baixado com sucesso.`,
-      })
-    }, 2000)
-  }
-
-  const getSchoolName = (schoolId: string) => {
-    return schools.find((s) => s.id === schoolId)?.name || 'Escola desconhecida'
   }
 
   const getProjectName = (projectId: string) => {
@@ -218,50 +181,10 @@ export default function StudentDetails() {
   }
 
   const enrollments = student.enrollments || []
-
-  // Sort enrollments
   const sortedEnrollments = [...enrollments].sort((a, b) => {
-    if (enrollmentSort === 'year') {
-      return b.year - a.year
-    }
+    if (enrollmentSort === 'year') return b.year - a.year
     return a.status.localeCompare(b.status)
   })
-
-  // Calculate Consolidated Performance for an enrollment
-  const getEnrollmentPerformance = (enrollment: any) => {
-    // Only include assessments from same school year AND where type does not exclude from average
-    const relevantAssessments = assessments.filter((a) => {
-      if (a.schoolId !== enrollment.schoolId) return false
-      // Check type exclusion
-      if (a.assessmentTypeId) {
-        const type = assessmentTypes.find((t) => t.id === a.assessmentTypeId)
-        if (type?.excludeFromAverage) return false
-      }
-      return true
-    })
-
-    const subjects: Record<string, { total: number; count: number }> = {}
-    relevantAssessments.forEach((a) => {
-      if (typeof a.value === 'number') {
-        if (!subjects[a.subjectId])
-          subjects[a.subjectId] = { total: 0, count: 0 }
-        subjects[a.subjectId].total += a.value
-        subjects[a.subjectId].count++
-      }
-    })
-
-    return Object.entries(subjects).map(([subjectId, data]) => ({
-      subjectId,
-      average: data.count > 0 ? (data.total / data.count).toFixed(1) : '-',
-    }))
-  }
-
-  const selectedEnrollment = enrollments.find(
-    (e) => e.id === selectedEnrollmentId,
-  )
-  const performanceData = selectedEnrollment
-    ? getEnrollmentPerformance(selectedEnrollment)
-    : []
 
   return (
     <div className="space-y-6 animate-fade-in pb-10">
@@ -294,6 +217,7 @@ export default function StudentDetails() {
       </div>
 
       <div className="grid gap-6 md:grid-cols-3">
+        {/* Left Column */}
         <div className="col-span-1 space-y-6">
           <Card>
             <CardContent className="pt-6 flex flex-col items-center text-center">
@@ -355,15 +279,14 @@ export default function StudentDetails() {
                 className="justify-start"
                 onClick={() => generateDocument('Ficha do Aluno')}
               >
-                <FileText className="mr-2 h-4 w-4" /> Gerar Ficha do Aluno
+                <FileText className="mr-2 h-4 w-4" /> Gerar Ficha
               </Button>
               <Button
                 variant="outline"
                 className="justify-start"
                 onClick={() => generateDocument('Carteira de Estudante')}
               >
-                <Briefcase className="mr-2 h-4 w-4" /> Gerar Carteira de
-                Estudante
+                <Briefcase className="mr-2 h-4 w-4" /> Carteira de Estudante
               </Button>
               <Button
                 variant="outline"
@@ -377,7 +300,7 @@ export default function StudentDetails() {
                 className="justify-start"
                 onClick={() => generateDocument('Histórico Escolar')}
               >
-                <Book className="mr-2 h-4 w-4" /> Gerar Histórico Escolar
+                <Book className="mr-2 h-4 w-4" /> Histórico Escolar
               </Button>
               <Separator className="my-2" />
               <Button
@@ -385,152 +308,17 @@ export default function StudentDetails() {
                 className="justify-start bg-orange-600 hover:bg-orange-700 text-white"
                 onClick={() => setIsTransferDialogOpen(true)}
               >
-                <ArrowRightLeft className="mr-2 h-4 w-4" /> Transferência de
-                Aluno
+                <ArrowRightLeft className="mr-2 h-4 w-4" /> Transferência
               </Button>
             </CardContent>
           </Card>
         </div>
 
+        {/* Right Column (2 spans) */}
         <div className="col-span-1 md:col-span-2 space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Dados Pessoais Detalhados</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <span className="text-sm text-muted-foreground">CPF</span>
-                  <p className="font-medium">{student.cpf || '-'}</p>
-                </div>
-                <div>
-                  <span className="text-sm text-muted-foreground">
-                    Cartão SUS
-                  </span>
-                  <p className="font-medium">{student.susCard || '-'}</p>
-                </div>
-                <div className="col-span-1 sm:col-span-2">
-                  <span className="text-sm text-muted-foreground flex items-center gap-1">
-                    <FileText className="h-3 w-3" /> Certidão de Nascimento
-                  </span>
-                  <p className="font-medium">
-                    {student.birthCertificate || '-'}
-                  </p>
-                </div>
-                <div>
-                  <span className="text-sm text-muted-foreground">NIS</span>
-                  <p className="font-medium">{student.social?.nis || '-'}</p>
-                </div>
-                <div>
-                  <span className="text-sm text-muted-foreground">
-                    Raça/Cor
-                  </span>
-                  <p className="font-medium">{student.raceColor || '-'}</p>
-                </div>
-                <div>
-                  <span className="text-sm text-muted-foreground">
-                    Nome do Pai
-                  </span>
-                  <p className="font-medium">{student.fatherName || '-'}</p>
-                  <span className="text-xs text-muted-foreground block mt-0.5">
-                    {student.fatherEducation || 'Escolaridade não inf.'}
-                  </span>
-                </div>
-                <div>
-                  <span className="text-sm text-muted-foreground">
-                    Nome da Mãe
-                  </span>
-                  <p className="font-medium">{student.motherName || '-'}</p>
-                  <span className="text-xs text-muted-foreground block mt-0.5">
-                    {student.motherEducation || 'Escolaridade não inf.'}
-                  </span>
-                </div>
-                <div>
-                  <span className="text-sm text-muted-foreground">
-                    Nacionalidade
-                  </span>
-                  <p className="font-medium">
-                    {student.nationality} - {student.birthCountry}
-                  </p>
-                </div>
-              </div>
-              <Separator />
-              <div>
-                <span className="text-sm text-muted-foreground flex items-center gap-2 mb-1">
-                  <MapPin className="h-4 w-4" /> Endereço
-                </span>
-                {student.address ? (
-                  <>
-                    <p className="font-medium">
-                      {student.address?.street}, {student.address?.number} -{' '}
-                      {student.address?.neighborhood}
-                    </p>
-                    <p className="text-sm text-muted-foreground">
-                      {student.address?.city}/{student.address?.state} - CEP:{' '}
-                      {student.address?.zipCode}
-                    </p>
-                  </>
-                ) : (
-                  <p className="text-muted-foreground italic">
-                    Endereço não cadastrado
-                  </p>
-                )}
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-2">
-                <div className="flex flex-col">
-                  <span className="text-sm text-muted-foreground flex items-center gap-1 mb-1">
-                    <Bus className="h-3 w-3" /> Transporte
-                  </span>
-                  <Badge
-                    variant={student.transport?.uses ? 'default' : 'outline'}
-                    className="w-fit"
-                  >
-                    {student.transport?.uses
-                      ? `Sim (${student.transport.routeNumber})`
-                      : 'Não'}
-                  </Badge>
-                </div>
-                <div className="flex flex-col">
-                  <span className="text-sm text-muted-foreground flex items-center gap-1 mb-1">
-                    <Users className="h-3 w-3" /> Bolsa Família
-                  </span>
-                  <Badge
-                    variant={
-                      student.social?.bolsaFamilia ? 'default' : 'outline'
-                    }
-                    className="w-fit"
-                  >
-                    {student.social?.bolsaFamilia ? 'Beneficiário' : 'Não'}
-                  </Badge>
-                </div>
-                <div className="flex flex-col">
-                  <span className="text-sm text-muted-foreground flex items-center gap-1 mb-1">
-                    <HeartPulse className="h-3 w-3" /> Nec. Especiais
-                  </span>
-                  {student.health?.hasSpecialNeeds ? (
-                    <div className="flex flex-col">
-                      <Badge variant="destructive" className="w-fit mb-1">
-                        Sim
-                      </Badge>
-                      <span className="text-xs">{student.health.cid}</span>
-                    </div>
-                  ) : (
-                    <Badge variant="outline" className="w-fit">
-                      Não
-                    </Badge>
-                  )}
-                </div>
-              </div>
-              {student.health?.observation && (
-                <div className="bg-muted/30 p-3 rounded-md text-sm mt-2">
-                  <span className="font-semibold block text-xs uppercase text-muted-foreground mb-1">
-                    Observações de Saúde
-                  </span>
-                  {student.health.observation}
-                </div>
-              )}
-            </CardContent>
-          </Card>
+          <StudentInfoCard student={student} />
+
+          <StudentPerformanceCard student={student} />
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
@@ -579,8 +367,7 @@ export default function StudentDetails() {
                     {sortedEnrollments.map((enrollment) => (
                       <TableRow
                         key={enrollment.id}
-                        className="cursor-pointer hover:bg-muted/50"
-                        onClick={() => setSelectedEnrollmentId(enrollment.id)}
+                        className="hover:bg-muted/50"
                       >
                         <TableCell className="font-medium">
                           {enrollment.year}
@@ -591,7 +378,7 @@ export default function StudentDetails() {
                               enrollment.status === 'Cursando'
                                 ? 'default'
                                 : enrollment.status === 'Aprovado'
-                                  ? 'default' // Should use success color ideally
+                                  ? 'default'
                                   : 'secondary'
                             }
                           >
@@ -712,75 +499,6 @@ export default function StudentDetails() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-
-      {/* Enrollment Detail Dialog */}
-      <Dialog
-        open={!!selectedEnrollment}
-        onOpenChange={(open) => !open && setSelectedEnrollmentId(null)}
-      >
-        <DialogContent className="sm:max-w-[600px]">
-          <DialogHeader>
-            <DialogTitle>Detalhes da Matrícula</DialogTitle>
-          </DialogHeader>
-          {selectedEnrollment && (
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4 text-sm">
-                <div>
-                  <span className="text-muted-foreground block">Escola</span>
-                  <span className="font-medium">
-                    {getSchoolName(selectedEnrollment.schoolId)}
-                  </span>
-                </div>
-                <div>
-                  <span className="text-muted-foreground block">Série/Ano</span>
-                  <span className="font-medium">
-                    {selectedEnrollment.grade} ({selectedEnrollment.year})
-                  </span>
-                </div>
-              </div>
-              <Separator />
-              <h4 className="text-sm font-semibold">
-                Desempenho Consolidado (Disciplinas Cursadas)
-              </h4>
-              <p className="text-xs text-muted-foreground mb-2">
-                Nota: Avaliações configuradas para "Não considerar no cálculo"
-                são excluídas desta média.
-              </p>
-              {performanceData.length > 0 ? (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Disciplina</TableHead>
-                      <TableHead className="text-right">Média Atual</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {performanceData.map((p) => (
-                      <TableRow key={p.subjectId}>
-                        <TableCell>
-                          {/* In a real app we'd fetch the subject name properly */}
-                          {p.subjectId === 's10'
-                            ? 'Matemática'
-                            : p.subjectId === 's9'
-                              ? 'Português'
-                              : `Disciplina ${p.subjectId}`}
-                        </TableCell>
-                        <TableCell className="text-right font-medium">
-                          {p.average}
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              ) : (
-                <p className="text-sm text-muted-foreground text-center py-4">
-                  Nenhuma avaliação contabilizada para este período.
-                </p>
-              )}
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
     </div>
   )
 }
