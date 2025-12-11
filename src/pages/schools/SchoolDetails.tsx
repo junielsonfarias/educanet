@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import {
   ArrowLeft,
@@ -5,10 +6,10 @@ import {
   Phone,
   User,
   School as SchoolIcon,
+  Calendar,
   Users,
-  BookOpen,
-  Edit,
-  Trash2,
+  Plus,
+  Clock,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
@@ -19,30 +20,29 @@ import {
   CardTitle,
 } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { Separator } from '@/components/ui/separator'
-import useSchoolStore from '@/stores/useSchoolStore'
-import { useState } from 'react'
-import { SchoolFormDialog } from './components/SchoolFormDialog'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog'
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from '@/components/ui/accordion'
+import useSchoolStore from '@/stores/useSchoolStore'
+import useCourseStore from '@/stores/useCourseStore'
+import { AcademicYearDialog } from './components/AcademicYearDialog'
+import { ClassroomDialog } from './components/ClassroomDialog'
 import { useToast } from '@/hooks/use-toast'
 
 export default function SchoolDetails() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
-  const { getSchool, updateSchool, deleteSchool } = useSchoolStore()
+  const { getSchool, addAcademicYear, addClassroom } = useSchoolStore()
+  const { courses } = useCourseStore()
   const { toast } = useToast()
 
-  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
-  const [deleteId, setDeleteId] = useState<string | null>(null)
+  const [isYearDialogOpen, setIsYearDialogOpen] = useState(false)
+  const [isClassDialogOpen, setIsClassDialogOpen] = useState(false)
+  const [selectedYearId, setSelectedYearId] = useState<string | null>(null)
 
   const school = getSchool(id || '')
 
@@ -55,21 +55,27 @@ export default function SchoolDetails() {
     )
   }
 
-  const handleUpdate = (data: any) => {
-    updateSchool(school.id, data)
+  const handleAddYear = (data: any) => {
+    addAcademicYear(school.id, data)
     toast({
-      title: 'Escola atualizada',
-      description: 'Dados atualizados com sucesso.',
+      title: 'Ano Letivo Criado',
+      description: `O ano ${data.name} foi adicionado.`,
     })
   }
 
-  const handleDelete = () => {
-    deleteSchool(school.id)
-    toast({
-      title: 'Escola excluída',
-      description: 'A escola foi removida com sucesso.',
-    })
-    navigate('/escolas')
+  const handleOpenClassDialog = (yearId: string) => {
+    setSelectedYearId(yearId)
+    setIsClassDialogOpen(true)
+  }
+
+  const handleAddClass = (data: any) => {
+    if (selectedYearId) {
+      addClassroom(school.id, selectedYearId, data)
+      toast({
+        title: 'Turma Criada',
+        description: `Turma ${data.name} adicionada com sucesso.`,
+      })
+    }
   }
 
   return (
@@ -95,129 +101,169 @@ export default function SchoolDetails() {
             <SchoolIcon className="h-4 w-4" /> Código: {school.code}
           </p>
         </div>
-        <div className="flex gap-2">
-          <Button variant="outline" onClick={() => setIsEditDialogOpen(true)}>
-            <Edit className="mr-2 h-4 w-4" /> Editar
-          </Button>
-          <Button variant="destructive" onClick={() => setDeleteId(school.id)}>
-            <Trash2 className="mr-2 h-4 w-4" /> Excluir
-          </Button>
-        </div>
       </div>
 
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-        <Card className="col-span-2">
-          <CardHeader>
-            <CardTitle>Informações Gerais</CardTitle>
-            <CardDescription>Detalhes cadastrais da unidade.</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="flex items-start gap-3">
-                <MapPin className="h-5 w-5 text-muted-foreground mt-0.5" />
-                <div>
-                  <p className="font-medium text-sm">Endereço</p>
-                  <p className="text-muted-foreground">{school.address}</p>
-                </div>
-              </div>
-              <div className="flex items-start gap-3">
-                <Phone className="h-5 w-5 text-muted-foreground mt-0.5" />
-                <div>
-                  <p className="font-medium text-sm">Telefone</p>
-                  <p className="text-muted-foreground">{school.phone}</p>
-                </div>
-              </div>
-              <div className="flex items-start gap-3">
-                <User className="h-5 w-5 text-muted-foreground mt-0.5" />
-                <div>
-                  <p className="font-medium text-sm">Direção</p>
-                  <p className="text-muted-foreground">{school.director}</p>
-                </div>
-              </div>
-            </div>
+      <Tabs defaultValue="info" className="w-full">
+        <TabsList>
+          <TabsTrigger value="info">Informações Gerais</TabsTrigger>
+          <TabsTrigger value="academic">Ano Letivo e Turmas</TabsTrigger>
+        </TabsList>
 
-            <Separator />
-
-            <div>
-              <h4 className="font-medium mb-3">
-                Estatísticas Rápidas (Simulado)
-              </h4>
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-                <div className="bg-secondary/30 p-3 rounded-lg">
-                  <div className="flex items-center gap-2 mb-1">
-                    <Users className="h-4 w-4 text-primary" />
-                    <span className="text-sm font-medium">Alunos</span>
+        <TabsContent value="info" className="space-y-6 mt-4">
+          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+            <Card className="col-span-2">
+              <CardHeader>
+                <CardTitle>Dados Cadastrais</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="flex items-start gap-3">
+                    <MapPin className="h-5 w-5 text-muted-foreground mt-0.5" />
+                    <div>
+                      <p className="font-medium text-sm">Endereço</p>
+                      <p className="text-muted-foreground">{school.address}</p>
+                    </div>
                   </div>
-                  <span className="text-2xl font-bold">450</span>
-                </div>
-                <div className="bg-secondary/30 p-3 rounded-lg">
-                  <div className="flex items-center gap-2 mb-1">
-                    <User className="h-4 w-4 text-primary" />
-                    <span className="text-sm font-medium">Professores</span>
+                  <div className="flex items-start gap-3">
+                    <Phone className="h-5 w-5 text-muted-foreground mt-0.5" />
+                    <div>
+                      <p className="font-medium text-sm">Telefone</p>
+                      <p className="text-muted-foreground">{school.phone}</p>
+                    </div>
                   </div>
-                  <span className="text-2xl font-bold">28</span>
-                </div>
-                <div className="bg-secondary/30 p-3 rounded-lg">
-                  <div className="flex items-center gap-2 mb-1">
-                    <BookOpen className="h-4 w-4 text-primary" />
-                    <span className="text-sm font-medium">Turmas</span>
+                  <div className="flex items-start gap-3">
+                    <User className="h-5 w-5 text-muted-foreground mt-0.5" />
+                    <div>
+                      <p className="font-medium text-sm">Direção</p>
+                      <p className="text-muted-foreground">{school.director}</p>
+                    </div>
                   </div>
-                  <span className="text-2xl font-bold">16</span>
                 </div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+              </CardContent>
+            </Card>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Imagem da Escola</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="aspect-video rounded-md overflow-hidden bg-muted">
-              <img
-                src={`https://img.usecurling.com/p/400/300?q=school%20building&dpr=2`}
-                alt="Escola"
-                className="w-full h-full object-cover hover:scale-105 transition-transform duration-500"
-              />
-            </div>
-            <p className="text-xs text-muted-foreground mt-2 text-center">
-              Foto da fachada principal
-            </p>
-          </CardContent>
-        </Card>
-      </div>
+            <Card>
+              <CardContent className="p-0">
+                <div className="aspect-video rounded-md overflow-hidden bg-muted">
+                  <img
+                    src={`https://img.usecurling.com/p/400/300?q=school%20building&dpr=2`}
+                    alt="Escola"
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
 
-      <SchoolFormDialog
-        open={isEditDialogOpen}
-        onOpenChange={setIsEditDialogOpen}
-        onSubmit={handleUpdate}
-        initialData={school}
+        <TabsContent value="academic" className="mt-4 space-y-4">
+          <div className="flex justify-between items-center">
+            <h3 className="text-lg font-semibold">Configuração Acadêmica</h3>
+            <Button onClick={() => setIsYearDialogOpen(true)}>
+              <Plus className="mr-2 h-4 w-4" /> Novo Ano Letivo
+            </Button>
+          </div>
+
+          {!school.academicYears || school.academicYears.length === 0 ? (
+            <Card>
+              <CardContent className="py-10 text-center text-muted-foreground">
+                Nenhum ano letivo configurado.
+              </CardContent>
+            </Card>
+          ) : (
+            <Accordion
+              type="single"
+              collapsible
+              className="w-full space-y-4"
+              defaultValue={school.academicYears[0].id}
+            >
+              {school.academicYears.map((year) => (
+                <AccordionItem
+                  key={year.id}
+                  value={year.id}
+                  className="border rounded-lg px-4"
+                >
+                  <AccordionTrigger className="hover:no-underline py-4">
+                    <div className="flex items-center gap-4 w-full">
+                      <div className="flex items-center gap-2">
+                        <Calendar className="h-5 w-5 text-primary" />
+                        <span className="font-bold text-lg">{year.name}</span>
+                      </div>
+                      <span className="text-sm text-muted-foreground font-normal">
+                        {year.startDate.split('-').reverse().join('/')} a{' '}
+                        {year.endDate.split('-').reverse().join('/')}
+                      </span>
+                      <Badge variant="secondary" className="ml-auto mr-4">
+                        {year.classes.length} Turmas
+                      </Badge>
+                    </div>
+                  </AccordionTrigger>
+                  <AccordionContent className="pt-2 pb-4">
+                    <div className="space-y-4">
+                      <div className="flex justify-between items-center">
+                        <h4 className="text-sm font-semibold text-muted-foreground">
+                          Turmas Ativas
+                        </h4>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleOpenClassDialog(year.id)}
+                        >
+                          <Plus className="mr-2 h-3 w-3" /> Adicionar Turma
+                        </Button>
+                      </div>
+
+                      {year.classes.length === 0 ? (
+                        <p className="text-sm text-muted-foreground italic">
+                          Nenhuma turma cadastrada.
+                        </p>
+                      ) : (
+                        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                          {year.classes.map((classroom) => (
+                            <div
+                              key={classroom.id}
+                              className="bg-secondary/20 p-4 rounded-md border flex flex-col gap-2"
+                            >
+                              <div className="flex justify-between items-start">
+                                <span className="font-bold text-lg">
+                                  {classroom.name}
+                                </span>
+                                <Badge variant="outline">
+                                  {classroom.shift}
+                                </Badge>
+                              </div>
+                              <div className="text-sm text-muted-foreground">
+                                {classroom.gradeName}
+                              </div>
+                              <div className="flex items-center gap-2 text-xs text-muted-foreground mt-2">
+                                <Users className="h-3 w-3" />
+                                {classroom.studentCount || 0} Alunos
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </AccordionContent>
+                </AccordionItem>
+              ))}
+            </Accordion>
+          )}
+        </TabsContent>
+      </Tabs>
+
+      <AcademicYearDialog
+        open={isYearDialogOpen}
+        onOpenChange={setIsYearDialogOpen}
+        onSubmit={handleAddYear}
       />
 
-      <AlertDialog
-        open={!!deleteId}
-        onOpenChange={(open) => !open && setDeleteId(null)}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Confirmar exclusão</AlertDialogTitle>
-            <AlertDialogDescription>
-              Esta ação excluirá permanentemente a escola e todos os dados
-              associados.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleDelete}
-              className="bg-destructive hover:bg-destructive/90"
-            >
-              Excluir Definitivamente
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <ClassroomDialog
+        open={isClassDialogOpen}
+        onOpenChange={setIsClassDialogOpen}
+        onSubmit={handleAddClass}
+        courses={courses}
+      />
     </div>
   )
 }

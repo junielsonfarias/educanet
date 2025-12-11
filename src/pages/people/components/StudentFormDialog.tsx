@@ -28,13 +28,14 @@ import {
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
-import { Student, mockSchools } from '@/lib/mock-data'
+import { Student } from '@/lib/mock-data'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import useSchoolStore from '@/stores/useSchoolStore'
 
 const studentSchema = z.object({
   // Personal Info
   name: z.string().min(3, 'Nome deve ter pelo menos 3 caracteres'),
-  cpf: z.string().optional(), // Can add regex for CPF
+  cpf: z.string().optional(),
   birthDate: z.string().min(1, 'Data de nascimento é obrigatória'),
   fatherName: z.string().optional(),
   motherName: z.string().optional(),
@@ -69,9 +70,9 @@ const studentSchema = z.object({
   observation: z.string().optional(),
 
   // Initial Enrollment (Only for new students)
-  enrollmentYear: z.coerce.number().optional(),
   enrollmentSchoolId: z.string().optional(),
-  enrollmentGrade: z.string().optional(),
+  enrollmentYearId: z.string().optional(),
+  enrollmentClassId: z.string().optional(),
 })
 
 interface StudentFormDialogProps {
@@ -88,6 +89,7 @@ export function StudentFormDialog({
   initialData,
 }: StudentFormDialogProps) {
   const [activeTab, setActiveTab] = useState('personal')
+  const { schools } = useSchoolStore()
 
   const form = useForm<z.infer<typeof studentSchema>>({
     resolver: zodResolver(studentSchema),
@@ -114,9 +116,9 @@ export function StudentFormDialog({
       hasSpecialNeeds: 'no',
       cid: '',
       observation: '',
-      enrollmentYear: new Date().getFullYear(),
       enrollmentSchoolId: '',
-      enrollmentGrade: '',
+      enrollmentYearId: '',
+      enrollmentClassId: '',
     },
   })
 
@@ -146,10 +148,9 @@ export function StudentFormDialog({
           hasSpecialNeeds: initialData.health.hasSpecialNeeds ? 'yes' : 'no',
           cid: initialData.health.cid || '',
           observation: initialData.health.observation || '',
-          // Enrollment fields not needed for edit usually, but keeping them empty
-          enrollmentYear: new Date().getFullYear(),
           enrollmentSchoolId: '',
-          enrollmentGrade: '',
+          enrollmentYearId: '',
+          enrollmentClassId: '',
         })
       } else {
         form.reset({
@@ -175,14 +176,24 @@ export function StudentFormDialog({
           hasSpecialNeeds: 'no',
           cid: '',
           observation: '',
-          enrollmentYear: new Date().getFullYear(),
           enrollmentSchoolId: '',
-          enrollmentGrade: '',
+          enrollmentYearId: '',
+          enrollmentClassId: '',
         })
       }
       setActiveTab('personal')
     }
   }, [open, initialData, form])
+
+  // Logic to filter options for Enrollment
+  const selectedSchoolId = form.watch('enrollmentSchoolId')
+  const selectedYearId = form.watch('enrollmentYearId')
+
+  const selectedSchool = schools.find((s) => s.id === selectedSchoolId)
+  const academicYears = selectedSchool?.academicYears || []
+
+  const selectedYear = academicYears.find((y) => y.id === selectedYearId)
+  const classes = selectedYear?.classes || []
 
   const handleSubmit = (values: z.infer<typeof studentSchema>) => {
     // Structure data for Student object
@@ -223,13 +234,22 @@ export function StudentFormDialog({
       },
     }
 
-    const enrollmentData = initialData
-      ? undefined
-      : {
-          year: values.enrollmentYear,
-          schoolId: values.enrollmentSchoolId,
-          grade: values.enrollmentGrade,
-        }
+    let enrollmentData = undefined
+    if (!initialData && values.enrollmentSchoolId && values.enrollmentClassId) {
+      const selectedClass = classes.find(
+        (c) => c.id === values.enrollmentClassId,
+      )
+      // Extract year number from name or use current date?
+      // Mock data AcademicYear.name usually is "2024".
+      const yearName = selectedYear?.name || new Date().getFullYear().toString()
+      const yearNumber = parseInt(yearName) || new Date().getFullYear()
+
+      enrollmentData = {
+        year: yearNumber,
+        schoolId: values.enrollmentSchoolId,
+        grade: selectedClass ? selectedClass.name : 'Turma Indefinida', // Using Class Name as grade string for compatibility
+      }
+    }
 
     onSubmit(studentData, enrollmentData)
     onOpenChange(false)
@@ -624,25 +644,16 @@ export function StudentFormDialog({
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <FormField
                       control={form.control}
-                      name="enrollmentYear"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Ano Letivo</FormLabel>
-                          <FormControl>
-                            <Input type="number" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={form.control}
                       name="enrollmentSchoolId"
                       render={({ field }) => (
                         <FormItem>
                           <FormLabel>Escola</FormLabel>
                           <Select
-                            onValueChange={field.onChange}
+                            onValueChange={(val) => {
+                              field.onChange(val)
+                              form.setValue('enrollmentYearId', '')
+                              form.setValue('enrollmentClassId', '')
+                            }}
                             defaultValue={field.value}
                           >
                             <FormControl>
@@ -651,7 +662,7 @@ export function StudentFormDialog({
                               </SelectTrigger>
                             </FormControl>
                             <SelectContent>
-                              {mockSchools.map((school) => (
+                              {schools.map((school) => (
                                 <SelectItem key={school.id} value={school.id}>
                                   {school.name}
                                 </SelectItem>
@@ -664,13 +675,59 @@ export function StudentFormDialog({
                     />
                     <FormField
                       control={form.control}
-                      name="enrollmentGrade"
+                      name="enrollmentYearId"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Série/Turma</FormLabel>
-                          <FormControl>
-                            <Input placeholder="Ex: 5º Ano A" {...field} />
-                          </FormControl>
+                          <FormLabel>Ano Letivo</FormLabel>
+                          <Select
+                            onValueChange={(val) => {
+                              field.onChange(val)
+                              form.setValue('enrollmentClassId', '')
+                            }}
+                            defaultValue={field.value}
+                            disabled={!selectedSchoolId}
+                          >
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Selecione o ano" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              {academicYears.map((year) => (
+                                <SelectItem key={year.id} value={year.id}>
+                                  {year.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="enrollmentClassId"
+                      render={({ field }) => (
+                        <FormItem className="col-span-1 md:col-span-2">
+                          <FormLabel>Turma (Série/Turno)</FormLabel>
+                          <Select
+                            onValueChange={field.onChange}
+                            defaultValue={field.value}
+                            disabled={!selectedYearId}
+                          >
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Selecione a turma" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              {classes.map((cls) => (
+                                <SelectItem key={cls.id} value={cls.id}>
+                                  {cls.name} ({cls.gradeName}) - {cls.shift}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
                           <FormMessage />
                         </FormItem>
                       )}

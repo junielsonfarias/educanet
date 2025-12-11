@@ -1,35 +1,25 @@
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { Calendar, Users, Clock } from 'lucide-react'
+import { Calendar, Users, Clock, School } from 'lucide-react'
+import useSchoolStore from '@/stores/useSchoolStore'
+import { Link } from 'react-router-dom'
 
 export default function ClassesList() {
-  const classes = [
-    {
-      id: 1,
-      name: '5º Ano A',
-      shift: 'Matutino',
-      students: 25,
-      max: 30,
-      teacher: 'Prof. Alberto',
-    },
-    {
-      id: 2,
-      name: '5º Ano B',
-      shift: 'Vespertino',
-      students: 28,
-      max: 30,
-      teacher: 'Prof. Bianca',
-    },
-    {
-      id: 3,
-      name: '4º Ano A',
-      shift: 'Matutino',
-      students: 22,
-      max: 30,
-      teacher: 'Prof. Carlos',
-    },
-  ]
+  const { schools } = useSchoolStore()
+
+  // Flatten all classes for display
+  const allClasses = schools.flatMap((school) => {
+    return school.academicYears.flatMap((year) => {
+      // Maybe filter only current/active year in a real app
+      return year.classes.map((cls) => ({
+        ...cls,
+        schoolName: school.name,
+        schoolId: school.id,
+        yearName: year.name,
+      }))
+    })
+  })
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -39,57 +29,78 @@ export default function ClassesList() {
             Turmas
           </h2>
           <p className="text-muted-foreground">
-            Gerenciamento de turmas e enturmação.
+            Visão geral de todas as turmas cadastradas na rede.
           </p>
         </div>
-        <Button>Nova Turma</Button>
+        <Link to="/escolas">
+          <Button variant="outline">Gerenciar por Escola</Button>
+        </Link>
       </div>
 
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-        {classes.map((cls) => (
-          <Card
-            key={cls.id}
-            className="hover:border-primary/50 transition-colors cursor-pointer group"
-          >
-            <CardHeader className="pb-2">
-              <div className="flex justify-between items-start">
-                <CardTitle className="text-xl group-hover:text-primary transition-colors">
-                  {cls.name}
-                </CardTitle>
-                <Badge variant="secondary">{cls.shift}</Badge>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                <div className="text-sm text-muted-foreground">
-                  Responsável:{' '}
-                  <span className="text-foreground font-medium">
-                    {cls.teacher}
-                  </span>
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="flex items-center gap-2 text-sm">
-                    <Users className="h-4 w-4 text-muted-foreground" />
-                    <span>
-                      {cls.students}/{cls.max} Alunos
-                    </span>
+      {allClasses.length === 0 ? (
+        <Card>
+          <CardContent className="py-10 text-center text-muted-foreground">
+            Nenhuma turma cadastrada. Acesse o menu "Escolas" para configurar as
+            turmas de cada unidade.
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+          {allClasses.map((cls) => (
+            <Card
+              key={`${cls.schoolId}-${cls.id}`}
+              className="hover:border-primary/50 transition-colors group"
+            >
+              <CardHeader className="pb-2">
+                <div className="flex justify-between items-start">
+                  <div className="space-y-1">
+                    <CardTitle className="text-xl group-hover:text-primary transition-colors">
+                      {cls.name}
+                    </CardTitle>
+                    <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                      <School className="h-3 w-3" />
+                      <span className="truncate max-w-[180px]">
+                        {cls.schoolName}
+                      </span>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-2 text-sm">
-                    <Clock className="h-4 w-4 text-muted-foreground" />
-                    <span>7:00 - 11:30</span>
+                  <Badge variant="secondary">{cls.shift}</Badge>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-muted-foreground">Série/Ano:</span>
+                    <span className="font-medium">{cls.gradeName}</span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="flex items-center gap-2 text-sm">
+                      <Users className="h-4 w-4 text-muted-foreground" />
+                      <span>{cls.studentCount || 0} Alunos</span>
+                    </div>
+                    <div className="flex items-center gap-2 text-sm">
+                      <Calendar className="h-4 w-4 text-muted-foreground" />
+                      <span>{cls.yearName}</span>
+                    </div>
+                  </div>
+                  {/* Simplified progress bar simulation */}
+                  <div className="h-2 w-full bg-secondary rounded-full overflow-hidden mt-2">
+                    <div
+                      className="h-full bg-primary"
+                      style={{
+                        width: `${Math.min(
+                          ((cls.studentCount || 0) / 30) * 100,
+                          100,
+                        )}%`,
+                      }}
+                    />
                   </div>
                 </div>
-                <div className="h-2 w-full bg-secondary rounded-full overflow-hidden">
-                  <div
-                    className="h-full bg-primary"
-                    style={{ width: `${(cls.students / cls.max) * 100}%` }}
-                  />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
     </div>
   )
 }

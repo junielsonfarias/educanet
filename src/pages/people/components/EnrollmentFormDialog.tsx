@@ -24,14 +24,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
-import { mockSchools } from '@/lib/mock-data'
+import useSchoolStore from '@/stores/useSchoolStore'
 
 const enrollmentSchema = z.object({
-  year: z.coerce.number().min(2000, 'Ano inválido'),
   schoolId: z.string().min(1, 'Escola é obrigatória'),
-  grade: z.string().min(1, 'Série/Turma é obrigatória'),
+  yearId: z.string().min(1, 'Ano Letivo é obrigatório'),
+  classId: z.string().min(1, 'Turma é obrigatória'),
   type: z.enum(['regular', 'dependency']),
   status: z.enum([
     'Cursando',
@@ -53,19 +52,42 @@ export function EnrollmentFormDialog({
   onOpenChange,
   onSubmit,
 }: EnrollmentFormDialogProps) {
+  const { schools } = useSchoolStore()
+
   const form = useForm<z.infer<typeof enrollmentSchema>>({
     resolver: zodResolver(enrollmentSchema),
     defaultValues: {
-      year: new Date().getFullYear(),
       schoolId: '',
-      grade: '',
+      yearId: '',
+      classId: '',
       type: 'regular',
       status: 'Cursando',
     },
   })
 
+  // Dependent dropdown logic
+  const selectedSchoolId = form.watch('schoolId')
+  const selectedYearId = form.watch('yearId')
+
+  const selectedSchool = schools.find((s) => s.id === selectedSchoolId)
+  const academicYears = selectedSchool?.academicYears || []
+
+  const selectedYear = academicYears.find((y) => y.id === selectedYearId)
+  const classes = selectedYear?.classes || []
+
   const handleSubmit = (data: z.infer<typeof enrollmentSchema>) => {
-    onSubmit(data)
+    const selectedClass = classes.find((c) => c.id === data.classId)
+    // Extract year number from name
+    const yearName = selectedYear?.name || new Date().getFullYear().toString()
+    const yearNumber = parseInt(yearName) || new Date().getFullYear()
+
+    onSubmit({
+      schoolId: data.schoolId,
+      year: yearNumber,
+      grade: selectedClass ? selectedClass.name : 'Turma Indefinida',
+      type: data.type,
+      status: data.status,
+    })
     onOpenChange(false)
     form.reset()
   }
@@ -76,7 +98,7 @@ export function EnrollmentFormDialog({
         <DialogHeader>
           <DialogTitle>Nova Matrícula</DialogTitle>
           <DialogDescription>
-            Adicionar uma nova matrícula ou dependência para o aluno.
+            Selecione a turma e o ano letivo para o aluno.
           </DialogDescription>
         </DialogHeader>
 
@@ -110,47 +132,32 @@ export function EnrollmentFormDialog({
               )}
             />
 
-            <div className="grid grid-cols-2 gap-4">
-              <FormField
-                control={form.control}
-                name="year"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Ano Letivo</FormLabel>
+            <FormField
+              control={form.control}
+              name="status"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Status Inicial</FormLabel>
+                  <Select
+                    onValueChange={field.onChange}
+                    defaultValue={field.value}
+                  >
                     <FormControl>
-                      <Input type="number" {...field} />
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
                     </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="status"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Status Inicial</FormLabel>
-                    <Select
-                      onValueChange={field.onChange}
-                      defaultValue={field.value}
-                    >
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value="Cursando">Cursando</SelectItem>
-                        <SelectItem value="Aprovado">Aprovado</SelectItem>
-                        <SelectItem value="Reprovado">Reprovado</SelectItem>
-                        <SelectItem value="Transferido">Transferido</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
+                    <SelectContent>
+                      <SelectItem value="Cursando">Cursando</SelectItem>
+                      <SelectItem value="Aprovado">Aprovado</SelectItem>
+                      <SelectItem value="Reprovado">Reprovado</SelectItem>
+                      <SelectItem value="Transferido">Transferido</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
 
             <FormField
               control={form.control}
@@ -159,7 +166,11 @@ export function EnrollmentFormDialog({
                 <FormItem>
                   <FormLabel>Escola</FormLabel>
                   <Select
-                    onValueChange={field.onChange}
+                    onValueChange={(val) => {
+                      field.onChange(val)
+                      form.setValue('yearId', '')
+                      form.setValue('classId', '')
+                    }}
                     defaultValue={field.value}
                   >
                     <FormControl>
@@ -168,7 +179,7 @@ export function EnrollmentFormDialog({
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      {mockSchools.map((school) => (
+                      {schools.map((school) => (
                         <SelectItem key={school.id} value={school.id}>
                           {school.name}
                         </SelectItem>
@@ -182,13 +193,60 @@ export function EnrollmentFormDialog({
 
             <FormField
               control={form.control}
-              name="grade"
+              name="yearId"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Série/Turma</FormLabel>
-                  <FormControl>
-                    <Input placeholder="Ex: 6º Ano B (Matemática)" {...field} />
-                  </FormControl>
+                  <FormLabel>Ano Letivo</FormLabel>
+                  <Select
+                    onValueChange={(val) => {
+                      field.onChange(val)
+                      form.setValue('classId', '')
+                    }}
+                    defaultValue={field.value}
+                    disabled={!selectedSchoolId}
+                  >
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecione o ano" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {academicYears.map((year) => (
+                        <SelectItem key={year.id} value={year.id}>
+                          {year.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="classId"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Turma</FormLabel>
+                  <Select
+                    onValueChange={field.onChange}
+                    defaultValue={field.value}
+                    disabled={!selectedYearId}
+                  >
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecione a turma" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {classes.map((cls) => (
+                        <SelectItem key={cls.id} value={cls.id}>
+                          {cls.name} ({cls.gradeName}) - {cls.shift}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                   <FormMessage />
                 </FormItem>
               )}

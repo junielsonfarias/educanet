@@ -7,6 +7,7 @@ import {
   Edit,
   Trash2,
   Calendar,
+  Plus,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
@@ -20,8 +21,11 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
 import useTeacherStore from '@/stores/useTeacherStore'
+import useSchoolStore from '@/stores/useSchoolStore'
+import useCourseStore from '@/stores/useCourseStore'
 import { useState } from 'react'
 import { TeacherFormDialog } from './components/TeacherFormDialog'
+import { TeacherAllocationDialog } from './components/TeacherAllocationDialog'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -37,10 +41,14 @@ import { useToast } from '@/hooks/use-toast'
 export default function TeacherDetails() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
-  const { getTeacher, updateTeacher, deleteTeacher } = useTeacherStore()
+  const { getTeacher, updateTeacher, deleteTeacher, addAllocation } =
+    useTeacherStore()
+  const { getSchool } = useSchoolStore()
+  const { courses } = useCourseStore()
   const { toast } = useToast()
 
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
+  const [isAllocationDialogOpen, setIsAllocationDialogOpen] = useState(false)
   const [deleteId, setDeleteId] = useState<string | null>(null)
 
   const teacher = getTeacher(id || '')
@@ -71,6 +79,34 @@ export default function TeacherDetails() {
       description: 'Registro removido com sucesso.',
     })
     navigate('/pessoas/professores')
+  }
+
+  const handleAddAllocation = (data: any) => {
+    addAllocation(teacher.id, data)
+    toast({
+      title: 'Alocação realizada',
+      description: 'Professor vinculado à turma com sucesso.',
+    })
+  }
+
+  const getAllocationDetails = (allocation: any) => {
+    const school = getSchool(allocation.schoolId)
+    const year = school?.academicYears.find(
+      (y) => y.id === allocation.academicYearId,
+    )
+    const classroom = year?.classes.find((c) => c.id === allocation.classroomId)
+
+    // Flatten grades to find subject
+    const allGrades = courses.flatMap((c) => c.grades)
+    const allSubjects = allGrades.flatMap((g) => g.subjects)
+    const subject = allSubjects.find((s) => s.id === allocation.subjectId)
+
+    return {
+      schoolName: school?.name || 'Escola desconhecida',
+      yearName: year?.name || '-',
+      className: classroom?.name || 'Turma desconhecida',
+      subjectName: subject?.name || 'Regente',
+    }
   }
 
   return (
@@ -129,7 +165,7 @@ export default function TeacherDetails() {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
               <div className="space-y-1">
                 <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                  <BookOpen className="h-4 w-4" /> Disciplina
+                  <BookOpen className="h-4 w-4" /> Disciplina Principal
                 </span>
                 <p className="font-medium">{teacher.subject}</p>
               </div>
@@ -150,19 +186,46 @@ export default function TeacherDetails() {
             <Separator />
 
             <div className="pt-2">
-              <h4 className="font-semibold mb-3 flex items-center gap-2">
-                <Calendar className="h-4 w-4" /> Turmas Alocadas (Exemplo)
-              </h4>
-              <div className="grid gap-2">
-                <div className="p-3 border rounded-md bg-secondary/20 flex justify-between items-center">
-                  <span className="font-medium">5º Ano A - Matutino</span>
-                  <Badge variant="outline">{teacher.subject}</Badge>
-                </div>
-                <div className="p-3 border rounded-md bg-secondary/20 flex justify-between items-center">
-                  <span className="font-medium">4º Ano B - Vespertino</span>
-                  <Badge variant="outline">{teacher.subject}</Badge>
-                </div>
+              <div className="flex justify-between items-center mb-4">
+                <h4 className="font-semibold flex items-center gap-2">
+                  <Calendar className="h-4 w-4" /> Histórico de Alocações
+                </h4>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setIsAllocationDialogOpen(true)}
+                >
+                  <Plus className="h-3 w-3 mr-1" /> Nova Alocação
+                </Button>
               </div>
+
+              {teacher.allocations.length === 0 ? (
+                <p className="text-sm text-muted-foreground italic text-center py-4">
+                  Nenhuma alocação registrada.
+                </p>
+              ) : (
+                <div className="grid gap-2">
+                  {teacher.allocations.map((alloc) => {
+                    const details = getAllocationDetails(alloc)
+                    return (
+                      <div
+                        key={alloc.id}
+                        className="p-3 border rounded-md bg-secondary/20 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2"
+                      >
+                        <div className="flex flex-col">
+                          <span className="font-medium">
+                            {details.className} - {details.subjectName}
+                          </span>
+                          <span className="text-xs text-muted-foreground">
+                            {details.schoolName}
+                          </span>
+                        </div>
+                        <Badge variant="outline">{details.yearName}</Badge>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
             </div>
           </CardContent>
         </Card>
@@ -173,6 +236,12 @@ export default function TeacherDetails() {
         onOpenChange={setIsEditDialogOpen}
         onSubmit={handleUpdate}
         initialData={teacher}
+      />
+
+      <TeacherAllocationDialog
+        open={isAllocationDialogOpen}
+        onOpenChange={setIsAllocationDialogOpen}
+        onSubmit={handleAddAllocation}
       />
 
       <AlertDialog

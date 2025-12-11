@@ -13,7 +13,6 @@ import {
 } from '@/components/ui/sidebar'
 import {
   BookOpen,
-  Calendar,
   GraduationCap,
   LayoutDashboard,
   LogOut,
@@ -21,8 +20,7 @@ import {
   Settings,
   Users,
   FileText,
-  UserCircle,
-  Shield,
+  Library,
 } from 'lucide-react'
 import { Link, useLocation } from 'react-router-dom'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
@@ -55,7 +53,10 @@ export function AppSidebar() {
     {
       title: 'Acadêmico',
       icon: BookOpen,
-      items: [{ title: 'Turmas', url: '/academico/turmas' }],
+      items: [
+        { title: 'Cursos', url: '/academico/cursos' },
+        { title: 'Turmas', url: '/academico/turmas' },
+      ],
     },
     {
       title: 'Avaliação',
@@ -77,33 +78,6 @@ export function AppSidebar() {
     },
   ]
 
-  // Filter menu items based on role (simple mock implementation)
-  // In a real app, this would be more robust
-  const filteredMenuItems = menuItems
-    .map((item) => {
-      if (
-        item.title === 'Configurações' &&
-        currentUser?.role !== 'admin' &&
-        currentUser?.role !== 'supervisor'
-      ) {
-        // Hide users menu for non-admins/supervisors if needed,
-        // but here we show it and let the page handle access denied for better UX or hide specific subitems
-        return {
-          ...item,
-          items: item.items?.filter((sub) => sub.title !== 'Usuários'),
-        }
-      }
-      return item
-    })
-    .filter((item) => {
-      // Allow settings to show up but empty if filtered out completely?
-      // For simplicity in this demo, we just keep it.
-      return true
-    })
-
-  // Actually, let's just show 'Usuários' link for everyone for demo visibility,
-  // and the page itself shows "Access Denied" if not authorized.
-  // But purely for UI clean-up:
   const displayItems = menuItems.map((item) => {
     if (item.title === 'Configurações') {
       return {
