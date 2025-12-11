@@ -35,6 +35,7 @@ import {
 } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import useStudentStore from '@/stores/useStudentStore'
+import useUserStore from '@/stores/useUserStore'
 import { useNavigate } from 'react-router-dom'
 import { StudentFormDialog } from './components/StudentFormDialog'
 import { Student } from '@/lib/mock-data'
@@ -53,6 +54,7 @@ import {
 export default function StudentsList() {
   const { students, addStudent, updateStudent, deleteStudent } =
     useStudentStore()
+  const { currentUser } = useUserStore()
   const [searchTerm, setSearchTerm] = useState('')
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [editingStudent, setEditingStudent] = useState<Student | null>(null)
@@ -61,14 +63,17 @@ export default function StudentsList() {
   const navigate = useNavigate()
   const { toast } = useToast()
 
+  const isAdminOrSupervisor =
+    currentUser?.role === 'admin' || currentUser?.role === 'supervisor'
+
   const filteredStudents = students.filter(
     (student) =>
       student.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       student.registration.toLowerCase().includes(searchTerm.toLowerCase()),
   )
 
-  const handleCreate = (data: any) => {
-    addStudent(data)
+  const handleCreate = (data: any, initialEnrollment: any) => {
+    addStudent(data, initialEnrollment)
     toast({
       title: 'Aluno matriculado',
       description: `${data.name} adicionado com sucesso.`,
@@ -122,10 +127,12 @@ export default function StudentsList() {
           <Button variant="outline" className="w-full sm:w-auto">
             Exportar Lista
           </Button>
-          <Button onClick={openCreateDialog} className="w-full sm:w-auto">
-            <Plus className="mr-2 h-4 w-4" />
-            Novo Aluno
-          </Button>
+          {isAdminOrSupervisor && (
+            <Button onClick={openCreateDialog} className="w-full sm:w-auto">
+              <Plus className="mr-2 h-4 w-4" />
+              Novo Aluno
+            </Button>
+          )}
         </div>
       </div>
 
@@ -172,97 +179,116 @@ export default function StudentsList() {
                     </TableCell>
                   </TableRow>
                 ) : (
-                  filteredStudents.map((student) => (
-                    <TableRow
-                      key={student.id}
-                      className="cursor-pointer hover:bg-muted/50"
-                      onClick={() => navigate(`/pessoas/alunos/${student.id}`)}
-                    >
-                      <TableCell>
-                        <Avatar className="h-9 w-9">
-                          <AvatarImage
-                            src={`https://img.usecurling.com/ppl/thumbnail?seed=${student.id}`}
-                          />
-                          <AvatarFallback>
-                            {student.name.substring(0, 2).toUpperCase()}
-                          </AvatarFallback>
-                        </Avatar>
-                      </TableCell>
-                      <TableCell className="font-medium">
-                        {student.name}
-                      </TableCell>
-                      <TableCell className="text-muted-foreground font-mono text-sm">
-                        {student.registration}
-                      </TableCell>
-                      <TableCell>{student.grade}</TableCell>
-                      <TableCell>
-                        <Badge
-                          variant={
-                            student.status === 'Cursando'
-                              ? 'outline'
-                              : 'secondary'
-                          }
-                          className={
-                            student.status === 'Cursando'
-                              ? 'bg-green-50 text-green-700 border-green-200'
-                              : ''
-                          }
-                        >
-                          {student.status}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button
-                              variant="ghost"
-                              className="h-8 w-8 p-0"
-                              onClick={(e) => e.stopPropagation()}
-                            >
-                              <span className="sr-only">Abrir menu</span>
-                              <MoreHorizontal className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuLabel>Aluno</DropdownMenuLabel>
-                            <DropdownMenuItem
-                              className="gap-2"
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                navigate(`/pessoas/alunos/${student.id}`)
-                              }}
-                            >
-                              <User className="h-4 w-4" /> Perfil Completo
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                              className="gap-2"
-                              onClick={(e) => e.stopPropagation()}
-                            >
-                              <FileText className="h-4 w-4" /> Histórico Escolar
-                            </DropdownMenuItem>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                openEditDialog(student)
-                              }}
-                            >
-                              Editar Cadastro
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                              className="text-destructive"
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                setDeleteId(student.id)
-                              }}
-                            >
-                              Excluir
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </TableCell>
-                    </TableRow>
-                  ))
+                  filteredStudents.map((student) => {
+                    const activeEnrollment = student.enrollments.find(
+                      (e) => e.status === 'Cursando',
+                    )
+                    const displayGrade = activeEnrollment
+                      ? activeEnrollment.grade
+                      : student.grade
+                    const displayStatus = activeEnrollment
+                      ? activeEnrollment.status
+                      : student.status
+
+                    return (
+                      <TableRow
+                        key={student.id}
+                        className="cursor-pointer hover:bg-muted/50"
+                        onClick={() =>
+                          navigate(`/pessoas/alunos/${student.id}`)
+                        }
+                      >
+                        <TableCell>
+                          <Avatar className="h-9 w-9">
+                            <AvatarImage
+                              src={`https://img.usecurling.com/ppl/thumbnail?seed=${student.id}`}
+                            />
+                            <AvatarFallback>
+                              {student.name.substring(0, 2).toUpperCase()}
+                            </AvatarFallback>
+                          </Avatar>
+                        </TableCell>
+                        <TableCell className="font-medium">
+                          {student.name}
+                        </TableCell>
+                        <TableCell className="text-muted-foreground font-mono text-sm">
+                          {student.registration}
+                        </TableCell>
+                        <TableCell>{displayGrade || '-'}</TableCell>
+                        <TableCell>
+                          <Badge
+                            variant={
+                              displayStatus === 'Cursando'
+                                ? 'outline'
+                                : 'secondary'
+                            }
+                            className={
+                              displayStatus === 'Cursando'
+                                ? 'bg-green-50 text-green-700 border-green-200'
+                                : ''
+                            }
+                          >
+                            {displayStatus || 'Inativo'}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                className="h-8 w-8 p-0"
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                <span className="sr-only">Abrir menu</span>
+                                <MoreHorizontal className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuLabel>Aluno</DropdownMenuLabel>
+                              <DropdownMenuItem
+                                className="gap-2"
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  navigate(`/pessoas/alunos/${student.id}`)
+                                }}
+                              >
+                                <User className="h-4 w-4" /> Perfil Completo
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                className="gap-2"
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                <FileText className="h-4 w-4" /> Histórico
+                                Escolar
+                              </DropdownMenuItem>
+                              {isAdminOrSupervisor && (
+                                <>
+                                  <DropdownMenuSeparator />
+                                  <DropdownMenuItem
+                                    onClick={(e) => {
+                                      e.stopPropagation()
+                                      openEditDialog(student)
+                                    }}
+                                  >
+                                    Editar Cadastro
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem
+                                    className="text-destructive"
+                                    onClick={(e) => {
+                                      e.stopPropagation()
+                                      setDeleteId(student.id)
+                                    }}
+                                  >
+                                    Excluir
+                                  </DropdownMenuItem>
+                                </>
+                              )}
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </TableCell>
+                      </TableRow>
+                    )
+                  })
                 )}
               </TableBody>
             </Table>
