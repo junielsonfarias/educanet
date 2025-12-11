@@ -1,6 +1,14 @@
 import { useState } from 'react'
-import { Plus, Edit, Trash2, GraduationCap, AlertCircle } from 'lucide-react'
+import {
+  Plus,
+  Edit,
+  Trash2,
+  GraduationCap,
+  AlertCircle,
+  Search,
+} from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import {
   Card,
   CardContent,
@@ -44,6 +52,7 @@ export default function AssessmentTypesList() {
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [editingType, setEditingType] = useState<AssessmentType | null>(null)
   const [deleteId, setDeleteId] = useState<string | null>(null)
+  const [searchTerm, setSearchTerm] = useState('')
   const { toast } = useToast()
 
   const handleCreate = (data: any) => {
@@ -94,6 +103,10 @@ export default function AssessmentTypesList() {
     return names.filter(Boolean).join(', ')
   }
 
+  const filteredTypes = assessmentTypes.filter((type) =>
+    type.name.toLowerCase().includes(searchTerm.toLowerCase()),
+  )
+
   return (
     <div className="space-y-6 animate-fade-in">
       <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
@@ -119,23 +132,36 @@ export default function AssessmentTypesList() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          {assessmentTypes.length === 0 ? (
+          <div className="mb-4">
+            <div className="relative">
+              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Buscar tipo de avaliação..."
+                className="pl-8 max-w-sm"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+            </div>
+          </div>
+
+          {filteredTypes.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-10 text-muted-foreground">
               <AlertCircle className="h-10 w-10 mb-2 opacity-50" />
-              <p>Nenhum tipo de avaliação cadastrado.</p>
+              <p>Nenhum tipo de avaliação encontrado.</p>
             </div>
           ) : (
             <Table>
               <TableHeader>
                 <TableRow>
                   <TableHead>Nome</TableHead>
+                  <TableHead>Descrição</TableHead>
                   <TableHead>Séries Aplicáveis</TableHead>
                   <TableHead>Média</TableHead>
                   <TableHead className="text-right">Ações</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {assessmentTypes.map((type) => (
+                {filteredTypes.map((type) => (
                   <TableRow key={type.id}>
                     <TableCell className="font-medium">
                       <div className="flex items-center gap-2">
@@ -143,8 +169,11 @@ export default function AssessmentTypesList() {
                         {type.name}
                       </div>
                     </TableCell>
+                    <TableCell className="text-muted-foreground text-sm max-w-[200px] truncate">
+                      {type.description || '-'}
+                    </TableCell>
                     <TableCell
-                      className="max-w-[300px] truncate"
+                      className="max-w-[250px] truncate"
                       title={getGradeNames(type.applicableGradeIds)}
                     >
                       {getGradeNames(type.applicableGradeIds) || 'Nenhuma'}

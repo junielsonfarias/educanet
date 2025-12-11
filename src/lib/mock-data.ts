@@ -77,6 +77,7 @@ export interface EvaluationRule {
   // New flexible configuration fields
   typeWeights?: Record<string, number> // Map of AssessmentType ID to Weight percentage (0-100)
   allowedExclusions?: boolean // Allow excluding lowest grade
+  recoveryStrategy?: 'replace_if_higher' | 'always_replace' | 'average'
 }
 
 export interface Grade {
@@ -119,6 +120,7 @@ export interface Teacher {
 export interface AssessmentType {
   id: string
   name: string
+  description?: string
   applicableGradeIds: string[]
   excludeFromAverage: boolean
 }
@@ -166,6 +168,7 @@ export const mockEvaluationRules: EvaluationRule[] = [
     isStandard: true,
     periodCount: 4,
     allowedExclusions: false,
+    recoveryStrategy: 'replace_if_higher',
   },
   {
     id: 'rule2',
@@ -189,6 +192,7 @@ export const mockEvaluationRules: EvaluationRule[] = [
     isStandard: false,
     periodCount: 4,
     allowedExclusions: true,
+    recoveryStrategy: 'average',
   },
 ]
 
@@ -224,18 +228,22 @@ export const mockAssessmentTypes: AssessmentType[] = [
   {
     id: 'at1',
     name: 'Prova Bimestral',
+    description: 'Avaliação principal do bimestre, abrangendo todo o conteúdo.',
     applicableGradeIds: ['g5'],
     excludeFromAverage: false,
   },
   {
     id: 'at2',
     name: 'Trabalho em Grupo',
+    description:
+      'Atividades realizadas em equipe para avaliação de competências colaborativas.',
     applicableGradeIds: ['g5'],
     excludeFromAverage: false,
   },
   {
     id: 'at3',
     name: 'Simulado Extra',
+    description: 'Teste simulado para preparação, sem impacto na nota final.',
     applicableGradeIds: ['g5'],
     excludeFromAverage: true,
   },

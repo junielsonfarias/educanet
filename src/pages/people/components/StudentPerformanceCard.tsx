@@ -30,7 +30,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import { GraduationCap, Calculator, Info } from 'lucide-react'
+import { GraduationCap, Calculator, Info, FileText } from 'lucide-react'
 import { Student, EvaluationRule } from '@/lib/mock-data'
 import useAssessmentStore from '@/stores/useAssessmentStore'
 import useSchoolStore from '@/stores/useSchoolStore'
@@ -243,7 +243,7 @@ export function StudentPerformanceCard({
         open={!!detailsDialog}
         onOpenChange={(open) => !open && setDetailsDialog(null)}
       >
-        <DialogContent className="sm:max-w-[600px] max-h-[85vh] overflow-hidden flex flex-col">
+        <DialogContent className="sm:max-w-[700px] max-h-[85vh] overflow-hidden flex flex-col">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Calculator className="h-5 w-5 text-primary" />
@@ -283,7 +283,55 @@ export function StudentPerformanceCard({
                     </div>
                   </div>
                   <Separator />
-                  <div className="text-xs text-muted-foreground space-y-1 bg-muted/30 p-2 rounded">
+
+                  {/* Detailed Assessments List */}
+                  {period.assessments && period.assessments.length > 0 ? (
+                    <div className="space-y-2 mt-2">
+                      <p className="text-xs font-semibold text-muted-foreground uppercase">
+                        Avaliações
+                      </p>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        {period.assessments.map((assessment) => {
+                          const type = assessmentTypes.find(
+                            (t) => t.id === assessment.assessmentTypeId,
+                          )
+                          return (
+                            <div
+                              key={assessment.id}
+                              className="flex justify-between items-center bg-secondary/20 p-2 rounded text-sm"
+                            >
+                              <div className="flex items-center gap-2">
+                                <FileText className="h-3 w-3 text-primary" />
+                                <span
+                                  className="truncate max-w-[120px]"
+                                  title={type?.name || 'Avaliação'}
+                                >
+                                  {type?.name || 'Avaliação'}
+                                </span>
+                                {assessment.category === 'recuperation' && (
+                                  <Badge
+                                    variant="outline"
+                                    className="text-[10px] h-4 px-1"
+                                  >
+                                    Rec
+                                  </Badge>
+                                )}
+                              </div>
+                              <span className="font-semibold">
+                                {Number(assessment.value).toFixed(1)}
+                              </span>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="text-xs text-muted-foreground italic py-2">
+                      Nenhuma avaliação lançada neste período.
+                    </p>
+                  )}
+
+                  <div className="text-xs text-muted-foreground space-y-1 bg-muted/30 p-2 rounded mt-2">
                     <p className="font-semibold text-foreground mb-1">
                       Log de Processamento:
                     </p>

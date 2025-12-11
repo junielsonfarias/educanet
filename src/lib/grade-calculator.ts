@@ -8,6 +8,7 @@ export interface PeriodCalculationResult {
   finalPeriodGrade: number
   isRecoveryUsed: boolean
   logs: string[]
+  assessments: Assessment[] // Detailed breakdown of assessments for this period
 }
 
 export interface SubjectCalculationResult {
@@ -84,8 +85,6 @@ export function calculateGrades(
         }
       }
 
-      // If weights don't sum to 100, we typically treat the configured weights as absolute contributions
-      // Alternatively, we could normalize. For this system, let's assume absolute contribution to final grade (0-10).
       regularAverage = weightedSum
     } else {
       // Simple Average
@@ -94,7 +93,7 @@ export function calculateGrades(
         const type = assessmentTypes.find((t) => t.id === a.assessmentTypeId)
         if (type?.excludeFromAverage) {
           periodLog.push(
-            `Nota ${a.value} ignorada (Tipo: ${type.name} não contabiliza na média)`,
+            `Nota ${a.value} ignorada (Tipo: ${type?.name} não contabiliza na média)`,
           )
           return false
         }
@@ -138,16 +137,31 @@ export function calculateGrades(
       )
       recoveryGrade = maxRecovery
 
-      if (maxRecovery > regularAverage) {
+      if (rule.recoveryStrategy === 'always_replace') {
         finalPeriodGrade = maxRecovery
         isRecoveryUsed = true
         periodLog.push(
-          `Recuperação (${maxRecovery}) é maior que a média regular (${regularAverage.toFixed(2)}). Nota substituída.`,
+          `Regra de Recuperação (Sempre Substituir): Nota de recuperação (${maxRecovery}) substitui a média (${regularAverage.toFixed(2)}).`,
+        )
+      } else if (rule.recoveryStrategy === 'average') {
+        finalPeriodGrade = (regularAverage + maxRecovery) / 2
+        isRecoveryUsed = true
+        periodLog.push(
+          `Regra de Recuperação (Média): Média entre original (${regularAverage.toFixed(2)}) e recuperação (${maxRecovery}) = ${finalPeriodGrade.toFixed(2)}.`,
         )
       } else {
-        periodLog.push(
-          `Recuperação (${maxRecovery}) não superou a média regular (${regularAverage.toFixed(2)}). Mantida a nota original.`,
-        )
+        // Default: replace_if_higher
+        if (maxRecovery > regularAverage) {
+          finalPeriodGrade = maxRecovery
+          isRecoveryUsed = true
+          periodLog.push(
+            `Regra de Recuperação (Maior Nota): Recuperação (${maxRecovery}) é maior que a média regular (${regularAverage.toFixed(2)}). Nota substituída.`,
+          )
+        } else {
+          periodLog.push(
+            `Regra de Recuperação (Maior Nota): Recuperação (${maxRecovery}) não superou a média regular (${regularAverage.toFixed(2)}). Mantida a nota original.`,
+          )
+        }
       }
     }
 
@@ -159,6 +173,7 @@ export function calculateGrades(
       finalPeriodGrade,
       isRecoveryUsed,
       logs: periodLog,
+      assessments: pAssessments,
     })
   }
 
@@ -175,11 +190,9 @@ export function calculateGrades(
         context[`eval${index + 1}`] = res.finalPeriodGrade
       })
 
-      // Parse formula (Simple naive parser for demo: replace vars and eval)
+      // Parse formula
       let expression = rule.formula
 
-      // Check if we have enough periods for the formula
-      // Assume formula uses eval1..evalN
       Object.keys(context).forEach((key) => {
         expression = expression.replace(
           new RegExp(key, 'g'),
@@ -187,10 +200,8 @@ export function calculateGrades(
         )
       })
 
-      // Replace remaining evals with 0 if not yet happened (future periods)
       expression = expression.replace(/eval\d+/g, '0')
 
-      // Safety check: only allow digits, operators, parens, dots, spaces
       if (/^[\d.+\-*/()\s]+$/.test(expression)) {
         // eslint-disable-next-line no-new-func
         finalGrade = new Function(`return ${expression}`)()
@@ -203,10 +214,8 @@ export function calculateGrades(
       finalGrade = 0
     }
   } else {
-    // Default: Average of periods
     if (periodResults.length > 0) {
       const sum = periodResults.reduce((acc, p) => acc + p.finalPeriodGrade, 0)
-      // Usually divide by periodCount defined in Rule
       const divisor = rule.periodCount || 4
       finalGrade = sum / divisor
       formulaUsed = `Soma das notas (${sum.toFixed(1)}) / Total de períodos (${divisor})`
@@ -223,9 +232,6 @@ export function calculateGrades(
   const passingGrade = rule.passingGrade || 6.0
   const minDependency = rule.minDependencyGrade || 4.0
 
-  // Only consider Approved/Failed if we have data for periods (at least one)
-  // Or simply calculate based on current accumulation vs passing
-  // Ideally we check if all periods are closed, but for this simpler version:
   if (finalGrade >= passingGrade) {
     status = 'Aprovado'
   } else if (finalGrade >= minDependency) {

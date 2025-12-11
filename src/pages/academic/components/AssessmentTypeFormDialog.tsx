@@ -22,6 +22,7 @@ import {
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
+import { Textarea } from '@/components/ui/textarea'
 import { AssessmentType } from '@/lib/mock-data'
 import useCourseStore from '@/stores/useCourseStore'
 import { ScrollArea } from '@/components/ui/scroll-area'
@@ -29,6 +30,7 @@ import { Label } from '@/components/ui/label'
 
 const typeSchema = z.object({
   name: z.string().min(3, 'Nome deve ter pelo menos 3 caracteres'),
+  description: z.string().optional(),
   applicableGradeIds: z
     .array(z.string())
     .min(1, 'Selecione pelo menos uma série'),
@@ -54,6 +56,7 @@ export function AssessmentTypeFormDialog({
     resolver: zodResolver(typeSchema),
     defaultValues: {
       name: '',
+      description: '',
       applicableGradeIds: [],
       excludeFromAverage: false,
     },
@@ -64,12 +67,14 @@ export function AssessmentTypeFormDialog({
       if (initialData) {
         form.reset({
           name: initialData.name,
+          description: initialData.description || '',
           applicableGradeIds: initialData.applicableGradeIds,
           excludeFromAverage: initialData.excludeFromAverage,
         })
       } else {
         form.reset({
           name: '',
+          description: '',
           applicableGradeIds: [],
           excludeFromAverage: false,
         })
@@ -82,13 +87,9 @@ export function AssessmentTypeFormDialog({
     onOpenChange(false)
   }
 
-  const allGrades = courses.flatMap((c) =>
-    c.grades.map((g) => ({ ...g, courseName: c.name })),
-  )
-
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[500px]">
+      <DialogContent className="sm:max-w-[600px]">
         <DialogHeader>
           <DialogTitle>
             {initialData
@@ -113,6 +114,24 @@ export function AssessmentTypeFormDialog({
                   <FormLabel>Nome da Avaliação</FormLabel>
                   <FormControl>
                     <Input placeholder="Ex: Prova Mensal" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="description"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Descrição</FormLabel>
+                  <FormControl>
+                    <Textarea
+                      placeholder="Descreva o propósito deste tipo de avaliação..."
+                      className="resize-none"
+                      {...field}
+                    />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -149,16 +168,16 @@ export function AssessmentTypeFormDialog({
               render={() => (
                 <FormItem>
                   <FormLabel>Séries Aplicáveis</FormLabel>
-                  <ScrollArea className="h-[200px] w-full rounded-md border p-4">
+                  <ScrollArea className="h-[200px] w-full rounded-md border p-4 bg-muted/10">
                     <div className="space-y-4">
                       {courses.map((course) => (
                         <div key={course.id}>
-                          <h4 className="mb-2 text-sm font-semibold leading-none tracking-tight">
+                          <h4 className="mb-2 text-sm font-semibold leading-none tracking-tight text-primary">
                             {course.name}
                           </h4>
-                          <div className="grid grid-cols-1 gap-2 pl-2">
+                          <div className="grid grid-cols-1 gap-2 pl-2 border-l-2 border-primary/20 ml-1">
                             {course.grades.length === 0 ? (
-                              <p className="text-xs text-muted-foreground">
+                              <p className="text-xs text-muted-foreground pl-2">
                                 Nenhuma série cadastrada.
                               </p>
                             ) : (
