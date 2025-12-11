@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Search, Printer } from 'lucide-react'
+import { Search, Printer, Info } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
@@ -22,51 +22,21 @@ import useStudentStore from '@/stores/useStudentStore'
 import useAssessmentStore from '@/stores/useAssessmentStore'
 import useCourseStore from '@/stores/useCourseStore'
 import useSchoolStore from '@/stores/useSchoolStore'
-import { EvaluationRule } from '@/lib/mock-data'
+import { calculateGrades } from '@/lib/grade-calculator'
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@/components/ui/tooltip'
 
 export default function ReportCard() {
   const [searchId, setSearchId] = useState('')
   const [result, setResult] = useState<any>(null)
 
   const { students } = useStudentStore()
-  const { assessments } = useAssessmentStore()
+  const { assessments, assessmentTypes } = useAssessmentStore()
   const { courses, evaluationRules } = useCourseStore()
   const { schools } = useSchoolStore()
-
-  const calculateFinalGrade = (evaluations: number[], rule: EvaluationRule) => {
-    if (!rule.formula) return null
-
-    try {
-      // Create context variables: eval1, eval2, etc.
-      const context: Record<string, number> = {}
-      evaluations.forEach((val, index) => {
-        context[`eval${index + 1}`] = val
-      })
-
-      // Simple and safe parser for basic arithmetic expressions
-      // Using Function constructor with limited scope for demo purposes
-      // In production, use a math expression parser library
-      const formula = rule.formula
-      const keys = Object.keys(context)
-      const values = Object.values(context)
-
-      // Ensure all required variables are present (assuming up to periodCount)
-      const periodCount = rule.periodCount || 4
-      for (let i = 1; i <= periodCount; i++) {
-        if (context[`eval${i}`] === undefined) {
-          // If a grade is missing, we can treat as 0 or null.
-          // Treating as 0 for calculation safety
-          return 0
-        }
-      }
-
-      const func = new Function(...keys, `return ${formula};`)
-      return func(...values)
-    } catch (e) {
-      console.error('Error calculating grade', e)
-      return 0
-    }
-  }
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault()
@@ -88,79 +58,61 @@ export default function ReportCard() {
     const academicYear = school?.academicYears.find(
       (y) => y.name === enrollment.year.toString(),
     )
-    // Assuming simple mock matching for class
-    // In real app, enrollment links to classId
     const classroom = academicYear?.classes.find(
       (c) => c.name === enrollment.grade,
     )
 
     // Find Course Structure
-    const allGrades = courses.flatMap((c) =>
-      c.grades.map((g) => ({ ...g, courseId: c.id })),
-    )
-    const grade = allGrades.find(
-      (g) =>
-        g.name === enrollment.grade ||
-        (classroom && g.id === classroom.gradeId),
-    )
+    let gradeStructure: any = null
+    let courseEvaluationRule: any = null
 
-    if (!grade) return
+    for (const course of courses) {
+      const g = course.grades.find(
+        (gr) =>
+          gr.name === enrollment.grade ||
+          (classroom && gr.id === classroom.gradeId),
+      )
+      if (g) {
+        gradeStructure = g
+        courseEvaluationRule = evaluationRules.find(
+          (r) => r.id === g.evaluationRuleId,
+        )
+        break
+      }
+    }
 
-    const rule = evaluationRules.find((r) => r.id === grade.evaluationRuleId)
-    if (!rule) return
+    if (!gradeStructure || !courseEvaluationRule) return
 
-    // Process Grades
-    const reportCardGrades = grade.subjects.map((subject) => {
+    const periods = academicYear?.periods || []
+
+    // Process Grades using centralized calculator
+    const reportCardGrades = gradeStructure.subjects.map((subject: any) => {
       const subjectAssessments = assessments.filter(
-        (a) => a.studentId === student.id && a.subjectId === subject.id,
+        (a) =>
+          a.studentId === student.id &&
+          a.subjectId === subject.id &&
+          academicYear!.id === a.yearId,
       )
 
-      // Group by period (assuming 4 periods for now based on mock data)
-      const periods = academicYear?.periods || []
-      const periodGrades: number[] = []
-
-      periods.forEach((period) => {
-        // Find regular assessment
-        const regular = subjectAssessments.find(
-          (a) =>
-            a.periodId === period.id &&
-            (a.category === 'regular' || !a.category),
-        )
-        // Find recuperation assessment
-        const recuperation = subjectAssessments.find(
-          (a) => a.periodId === period.id && a.category === 'recuperation',
-        )
-
-        // Logic: Substitute lowest evaluation grade with higher recuperation grade
-        let finalValue = 0
-        const regValue = regular ? Number(regular.value) : 0
-        const recValue = recuperation ? Number(recuperation.value) : 0
-
-        // If recuperation is higher, use it. Otherwise use regular.
-        if (recValue > regValue) {
-          finalValue = recValue
-        } else {
-          finalValue = regValue
-        }
-
-        periodGrades.push(finalValue)
-      })
-
-      // Calculate Final based on Formula
-      let finalGrade = 0
-      if (rule.type === 'numeric' && rule.formula) {
-        finalGrade = calculateFinalGrade(periodGrades, rule) || 0
-      } else if (rule.type === 'numeric') {
-        // Fallback average
-        const sum = periodGrades.reduce((a, b) => a + b, 0)
-        finalGrade = periodGrades.length > 0 ? sum / periodGrades.length : 0
-      }
+      const calculation = calculateGrades(
+        subjectAssessments,
+        courseEvaluationRule,
+        periods,
+        assessmentTypes,
+      )
 
       return {
         subject: subject.name,
-        periods: periodGrades,
-        final: finalGrade,
-        passing: finalGrade >= (rule.passingGrade || 6.0),
+        periodGrades: periods.map((p) => {
+          const pRes = calculation.periodResults.find(
+            (pr) => pr.periodId === p.id,
+          )
+          return pRes ? pRes.finalPeriodGrade : 0
+        }),
+        final: calculation.finalGrade,
+        status: calculation.status,
+        passing: calculation.isPassing,
+        formula: calculation.formulaUsed,
       }
     })
 
@@ -169,20 +121,15 @@ export default function ReportCard() {
       school: school?.name,
       grade: enrollment.grade,
       year: enrollment.year,
-      ruleName: rule.name,
+      ruleName: courseEvaluationRule.name,
       grades: reportCardGrades,
-      periodNames: academicYear?.periods.map((p) => p.name) || [
-        '1º Bim',
-        '2º Bim',
-        '3º Bim',
-        '4º Bim',
-      ],
+      periodNames: periods.map((p) => p.name),
     })
   }
 
   return (
     <div className="min-h-screen bg-secondary/30 p-4 md:p-8">
-      <div className="max-w-4xl mx-auto space-y-8">
+      <div className="max-w-5xl mx-auto space-y-8">
         <div className="text-center space-y-2">
           <h1 className="text-3xl font-bold text-primary">
             Boletim Escolar Online
@@ -216,7 +163,7 @@ export default function ReportCard() {
 
         {result && (
           <Card className="animate-slide-up">
-            <CardHeader className="flex flex-row items-center justify-between">
+            <CardHeader className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
               <div>
                 <CardTitle className="text-xl">{result.name}</CardTitle>
                 <CardDescription className="text-base mt-1">
@@ -224,26 +171,34 @@ export default function ReportCard() {
                 </CardDescription>
               </div>
               <div className="flex gap-2">
-                <Button variant="outline" size="sm">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => window.print()}
+                >
                   <Printer className="mr-2 h-4 w-4" /> Imprimir
                 </Button>
               </div>
             </CardHeader>
             <CardContent>
-              <div className="rounded-md border">
+              <div className="rounded-md border overflow-x-auto">
                 <Table>
                   <TableHeader className="bg-muted/50">
                     <TableRow>
-                      <TableHead className="font-bold">Disciplina</TableHead>
+                      <TableHead className="font-bold min-w-[200px]">
+                        Disciplina
+                      </TableHead>
                       {result.periodNames.map((p: string) => (
-                        <TableHead key={p} className="text-center">
+                        <TableHead key={p} className="text-center min-w-[80px]">
                           {p}
                         </TableHead>
                       ))}
-                      <TableHead className="text-center font-bold">
+                      <TableHead className="text-center font-bold min-w-[100px]">
                         Média Final
                       </TableHead>
-                      <TableHead className="text-center">Situação</TableHead>
+                      <TableHead className="text-center min-w-[120px]">
+                        Situação
+                      </TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -252,13 +207,24 @@ export default function ReportCard() {
                         <TableCell className="font-medium">
                           {grade.subject}
                         </TableCell>
-                        {grade.periods.map((p: number, idx: number) => (
+                        {grade.periodGrades.map((p: number, idx: number) => (
                           <TableCell key={idx} className="text-center">
                             {p.toFixed(1)}
                           </TableCell>
                         ))}
                         <TableCell className="text-center font-bold bg-muted/20">
-                          {grade.final.toFixed(1)}
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <div className="flex items-center justify-center gap-1 cursor-help">
+                                {grade.final.toFixed(1)}
+                              </div>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p className="text-xs">
+                                Fórmula: {grade.formula}
+                              </p>
+                            </TooltipContent>
+                          </Tooltip>
                         </TableCell>
                         <TableCell className="text-center">
                           <Badge
@@ -269,7 +235,7 @@ export default function ReportCard() {
                                 : ''
                             }
                           >
-                            {grade.passing ? 'Aprovado' : 'Recuperação'}
+                            {grade.status}
                           </Badge>
                         </TableCell>
                       </TableRow>
@@ -277,8 +243,12 @@ export default function ReportCard() {
                   </TableBody>
                 </Table>
               </div>
-              <div className="mt-4 text-xs text-muted-foreground text-center">
-                * Regra de Avaliação Aplicada: {result.ruleName}
+              <div className="mt-4 flex items-center justify-center gap-2 text-xs text-muted-foreground">
+                <Info className="h-3 w-3" />
+                <span>
+                  Regra de Avaliação Aplicada:{' '}
+                  <strong>{result.ruleName}</strong>
+                </span>
               </div>
             </CardContent>
           </Card>

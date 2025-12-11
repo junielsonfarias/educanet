@@ -22,11 +22,25 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { Badge } from '@/components/ui/badge'
-import { GraduationCap } from 'lucide-react'
-import { Student } from '@/lib/mock-data'
+import { Button } from '@/components/ui/button'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
+import { GraduationCap, Calculator, Info } from 'lucide-react'
+import { Student, EvaluationRule } from '@/lib/mock-data'
 import useAssessmentStore from '@/stores/useAssessmentStore'
 import useSchoolStore from '@/stores/useSchoolStore'
 import useCourseStore from '@/stores/useCourseStore'
+import {
+  calculateGrades,
+  SubjectCalculationResult,
+} from '@/lib/grade-calculator'
+import { ScrollArea } from '@/components/ui/scroll-area'
+import { Separator } from '@/components/ui/separator'
 
 interface StudentPerformanceCardProps {
   student: Student
@@ -35,17 +49,19 @@ interface StudentPerformanceCardProps {
 export function StudentPerformanceCard({
   student,
 }: StudentPerformanceCardProps) {
-  const { assessments } = useAssessmentStore()
+  const { assessments, assessmentTypes } = useAssessmentStore()
   const { schools } = useSchoolStore()
-  const { courses } = useCourseStore()
+  const { courses, evaluationRules } = useCourseStore()
   const [selectedYear, setSelectedYear] = useState<string>('')
+  const [detailsDialog, setDetailsDialog] =
+    useState<SubjectCalculationResult | null>(null)
+  const [selectedSubjectName, setSelectedSubjectName] = useState('')
 
   // Get unique years from enrollments
   const years = Array.from(
     new Set(student.enrollments.map((e) => e.year)),
   ).sort((a, b) => b - a)
 
-  // Default select most recent year
   useEffect(() => {
     if (years.length > 0 && !selectedYear) {
       setSelectedYear(years[0].toString())
@@ -54,107 +70,76 @@ export function StudentPerformanceCard({
 
   const getPerformanceData = (yearStr: string) => {
     // 1. Find academic years (ids) that match the selected year string
-    const relevantYearIds: string[] = []
-    schools.forEach((school) => {
-      school.academicYears.forEach((ay) => {
-        if (ay.name === yearStr || ay.name.includes(yearStr)) {
-          relevantYearIds.push(ay.id)
-        }
-      })
-    })
+    let relevantSchool: any = null
+    let relevantAcademicYear: any = null
 
-    // 2. Filter assessments for student and year
-    const relevantAssessments = assessments.filter(
-      (a) =>
-        a.studentId === student.id &&
-        (relevantYearIds.includes(a.yearId) ||
-          // Fallback if yearId matches directly (e.g., 'y2024' matches '2024' check)
-          a.yearId.includes(yearStr)),
+    // Find the correct school and academic year for the selected year string
+    for (const school of schools) {
+      const ay = school.academicYears.find(
+        (y) => y.name === yearStr || y.name.includes(yearStr),
+      )
+      if (ay) {
+        relevantSchool = school
+        relevantAcademicYear = ay
+        break
+      }
+    }
+
+    if (!relevantAcademicYear) return []
+
+    // 2. Identify subjects based on student's class
+    // Find student's class/grade in this year
+    const enrollment = student.enrollments.find(
+      (e) => e.year.toString() === yearStr,
+    )
+    // Find corresponding class object (simplified matching by grade name for mock)
+    const classroom = relevantAcademicYear.classes.find(
+      (c: any) => c.name === enrollment?.grade,
     )
 
-    // 3. Group by Subject
-    const subjectsMap = new Map<string, { regular: any[]; recovery: any[] }>()
+    // Find Course/Grade structure
+    // We iterate courses to find the grade that matches the classroom gradeId
+    let gradeStructure: any = null
+    let courseEvaluationRule: EvaluationRule | undefined = undefined
 
-    relevantAssessments.forEach((a) => {
-      if (!subjectsMap.has(a.subjectId)) {
-        subjectsMap.set(a.subjectId, { regular: [], recovery: [] })
-      }
-      const entry = subjectsMap.get(a.subjectId)!
-      if (a.category === 'recuperation') {
-        entry.recovery.push(a)
-      } else {
-        entry.regular.push(a)
-      }
-    })
-
-    // 4. Calculate stats and format
-    return Array.from(subjectsMap.entries()).map(([subjectId, data]) => {
-      // Find Subject Name using Course Store
-      let subjectName = 'Disciplina desconhecida'
-      for (const course of courses) {
-        for (const grade of course.grades) {
-          const found = grade.subjects.find((s) => s.id === subjectId)
-          if (found) {
-            subjectName = found.name
-            break
-          }
-        }
-        if (subjectName !== 'Disciplina desconhecida') break
-      }
-
-      // Calculate Average (Simplified Logic)
-      // Group by period to correctly apply recovery logic
-      const periods = new Set(
-        [...data.regular, ...data.recovery].map((a) => a.periodId),
+    for (const course of courses) {
+      const g = course.grades.find(
+        (gr) => gr.id === classroom?.gradeId || gr.name === enrollment?.grade,
       )
-      let totalPeriodGrades = 0
-      let periodCount = 0
+      if (g) {
+        gradeStructure = g
+        courseEvaluationRule = evaluationRules.find(
+          (r) => r.id === g.evaluationRuleId,
+        )
+        break
+      }
+    }
 
-      periods.forEach((periodId) => {
-        const pRegular = data.regular.filter((a) => a.periodId === periodId)
-        const pRecovery = data.recovery.filter((a) => a.periodId === periodId)
+    if (!gradeStructure || !courseEvaluationRule) return []
 
-        let regularAvg = 0
-        if (pRegular.length > 0) {
-          const sum = pRegular.reduce(
-            (acc, curr) =>
-              acc + (typeof curr.value === 'number' ? curr.value : 0),
-            0,
-          )
-          regularAvg = sum / pRegular.length
-        }
+    const periods = relevantAcademicYear.periods || []
 
-        let periodGrade = regularAvg
-        // Logic: Recovery replaces regular avg if higher
-        if (pRecovery.length > 0) {
-          const bestRecovery = Math.max(
-            ...pRecovery.map((r) =>
-              typeof r.value === 'number' ? r.value : 0,
-            ),
-          )
-          if (bestRecovery > regularAvg) periodGrade = bestRecovery
-        }
+    // 3. Calculate for each subject
+    return gradeStructure.subjects.map((subject: any) => {
+      // Filter assessments for this subject
+      const subjectAssessments = assessments.filter(
+        (a) =>
+          a.studentId === student.id &&
+          a.subjectId === subject.id &&
+          relevantAcademicYear.id === a.yearId, // Ensure year matches
+      )
 
-        if (pRegular.length > 0 || pRecovery.length > 0) {
-          totalPeriodGrades += periodGrade
-          periodCount++
-        }
-      })
-
-      const finalAverage =
-        periodCount > 0 ? (totalPeriodGrades / periodCount).toFixed(1) : '-'
-
-      // Status based on average (Assuming 6.0 passing)
-      const numAvg = parseFloat(finalAverage)
-      const isPassing = !isNaN(numAvg) && numAvg >= 6.0
+      const calculation = calculateGrades(
+        subjectAssessments,
+        courseEvaluationRule!,
+        periods,
+        assessmentTypes,
+      )
 
       return {
-        subjectId,
-        subjectName,
-        regular: data.regular,
-        recovery: data.recovery,
-        finalAverage,
-        isPassing,
+        subjectId: subject.id,
+        subjectName: subject.name,
+        calculation,
       }
     })
   }
@@ -191,70 +176,60 @@ export function StudentPerformanceCard({
       <CardContent>
         {performanceData.length === 0 ? (
           <p className="text-sm text-muted-foreground py-8 text-center bg-muted/20 rounded-md">
-            Nenhum dado de avaliação encontrado para o ano selecionado.
+            Nenhum dado de avaliação encontrado ou configuração incompleta para
+            o ano selecionado.
           </p>
         ) : (
           <Table>
             <TableHeader>
               <TableRow>
                 <TableHead className="w-[30%]">Disciplina</TableHead>
-                <TableHead>Avaliações (Regulares)</TableHead>
-                <TableHead>Recuperação</TableHead>
-                <TableHead className="text-right">Média Final</TableHead>
+                <TableHead>Média Final</TableHead>
+                <TableHead>Situação</TableHead>
+                <TableHead className="text-right">Detalhes</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {performanceData.map((data) => (
+              {performanceData.map((data: any) => (
                 <TableRow key={data.subjectId}>
                   <TableCell className="font-medium">
                     {data.subjectName}
                   </TableCell>
                   <TableCell>
-                    <div className="flex flex-wrap gap-1">
-                      {data.regular.length > 0 ? (
-                        data.regular.map((a, idx) => (
-                          <Badge
-                            key={idx}
-                            variant="secondary"
-                            className="text-xs font-normal"
-                          >
-                            {a.value}
-                          </Badge>
-                        ))
-                      ) : (
-                        <span className="text-muted-foreground text-xs">-</span>
-                      )}
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex flex-wrap gap-1">
-                      {data.recovery.length > 0 ? (
-                        data.recovery.map((a, idx) => (
-                          <Badge
-                            key={idx}
-                            variant="outline"
-                            className="text-xs font-normal border-orange-200 text-orange-700 bg-orange-50"
-                          >
-                            {a.value}
-                          </Badge>
-                        ))
-                      ) : (
-                        <span className="text-muted-foreground text-xs">-</span>
-                      )}
-                    </div>
-                  </TableCell>
-                  <TableCell className="text-right">
                     <span
-                      className={`font-bold ${
-                        data.finalAverage !== '-'
-                          ? data.isPassing
-                            ? 'text-green-600'
-                            : 'text-red-600'
-                          : ''
+                      className={`font-bold text-lg ${
+                        data.calculation.isPassing
+                          ? 'text-green-600'
+                          : 'text-red-600'
                       }`}
                     >
-                      {data.finalAverage}
+                      {data.calculation.finalGrade.toFixed(1)}
                     </span>
+                  </TableCell>
+                  <TableCell>
+                    <Badge
+                      variant={
+                        data.calculation.isPassing
+                          ? 'default'
+                          : data.calculation.status === 'Dependência'
+                            ? 'secondary'
+                            : 'destructive'
+                      }
+                    >
+                      {data.calculation.status}
+                    </Badge>
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        setSelectedSubjectName(data.subjectName)
+                        setDetailsDialog(data.calculation)
+                      }}
+                    >
+                      <Info className="h-4 w-4 mr-2" /> Ver Cálculo
+                    </Button>
                   </TableCell>
                 </TableRow>
               ))}
@@ -262,6 +237,115 @@ export function StudentPerformanceCard({
           </Table>
         )}
       </CardContent>
+
+      {/* Details Dialog */}
+      <Dialog
+        open={!!detailsDialog}
+        onOpenChange={(open) => !open && setDetailsDialog(null)}
+      >
+        <DialogContent className="sm:max-w-[600px] max-h-[85vh] overflow-hidden flex flex-col">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Calculator className="h-5 w-5 text-primary" />
+              Memória de Cálculo: {selectedSubjectName}
+            </DialogTitle>
+            <DialogDescription>
+              Detalhamento de como a nota final foi obtida baseada na regra:{' '}
+              <span className="font-semibold text-primary">
+                {detailsDialog?.ruleName}
+              </span>
+            </DialogDescription>
+          </DialogHeader>
+
+          <ScrollArea className="flex-1 pr-4">
+            <div className="space-y-6 py-4">
+              {detailsDialog?.periodResults.map((period) => (
+                <div
+                  key={period.periodId}
+                  className="border rounded-lg p-4 space-y-3"
+                >
+                  <div className="flex justify-between items-center">
+                    <h4 className="font-semibold text-sm">
+                      {period.periodName}
+                    </h4>
+                    <div className="flex items-center gap-2">
+                      {period.isRecoveryUsed && (
+                        <Badge
+                          variant="outline"
+                          className="text-orange-600 border-orange-200 bg-orange-50"
+                        >
+                          Recuperação Aplicada
+                        </Badge>
+                      )}
+                      <span className="font-bold text-lg">
+                        {period.finalPeriodGrade.toFixed(1)}
+                      </span>
+                    </div>
+                  </div>
+                  <Separator />
+                  <div className="text-xs text-muted-foreground space-y-1 bg-muted/30 p-2 rounded">
+                    <p className="font-semibold text-foreground mb-1">
+                      Log de Processamento:
+                    </p>
+                    {period.logs.map((log, idx) => (
+                      <p key={idx}>• {log}</p>
+                    ))}
+                  </div>
+                  <div className="grid grid-cols-2 text-sm gap-2 mt-2">
+                    <div>
+                      <span className="text-muted-foreground">
+                        Média Regular:
+                      </span>{' '}
+                      {period.regularAverage.toFixed(2)}
+                    </div>
+                    {period.recoveryGrade !== null && (
+                      <div>
+                        <span className="text-muted-foreground">
+                          Nota Recuperação:
+                        </span>{' '}
+                        {period.recoveryGrade}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))}
+
+              <div className="border-t pt-4 mt-4">
+                <h4 className="font-semibold mb-2">Cálculo Final</h4>
+                <div className="bg-primary/5 p-4 rounded-lg">
+                  <div className="flex justify-between items-center mb-2">
+                    <span className="text-sm font-medium">
+                      Fórmula Utilizada:
+                    </span>
+                    <code className="text-xs bg-background p-1 rounded border">
+                      {detailsDialog?.formulaUsed}
+                    </code>
+                  </div>
+                  <div className="flex justify-between items-center pt-2 border-t border-primary/10">
+                    <span className="text-lg font-bold">
+                      Nota Final Calculada
+                    </span>
+                    <span
+                      className={`text-2xl font-bold ${detailsDialog?.isPassing ? 'text-green-600' : 'text-red-600'}`}
+                    >
+                      {detailsDialog?.finalGrade.toFixed(1)}
+                    </span>
+                  </div>
+                  <div className="text-right mt-1">
+                    <Badge
+                      variant={
+                        detailsDialog?.isPassing ? 'default' : 'destructive'
+                      }
+                    >
+                      {detailsDialog?.status}
+                    </Badge>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </ScrollArea>
+        </DialogContent>
+      </Dialog>
     </Card>
   )
 }

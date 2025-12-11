@@ -1,14 +1,11 @@
 import { useState } from 'react'
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card'
 import {
   Select,
   SelectContent,
@@ -16,224 +13,236 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { ArrowLeft, Printer, Filter } from 'lucide-react'
-import { useNavigate } from 'react-router-dom'
-import useAssessmentStore from '@/stores/useAssessmentStore'
-import useStudentStore from '@/stores/useStudentStore'
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table'
+import { Button } from '@/components/ui/button'
+import { FileDown, Filter } from 'lucide-react'
 import useSchoolStore from '@/stores/useSchoolStore'
 import useCourseStore from '@/stores/useCourseStore'
+import useStudentStore from '@/stores/useStudentStore'
+import useAssessmentStore from '@/stores/useAssessmentStore'
+import { calculateGrades } from '@/lib/grade-calculator'
 
 export default function PerformanceReport() {
-  const navigate = useNavigate()
-  const { assessments } = useAssessmentStore()
-  const { students } = useStudentStore()
   const { schools } = useSchoolStore()
-  const { courses } = useCourseStore()
+  const { courses, evaluationRules } = useCourseStore()
+  const { students } = useStudentStore()
+  const { assessments, assessmentTypes } = useAssessmentStore()
 
-  // Filters
-  const [selectedGrade, setSelectedGrade] = useState<string>('all')
-  const [selectedSubject, setSelectedSubject] = useState<string>('all')
-  const [selectedPeriod, setSelectedPeriod] = useState<string>('all')
+  const [selectedSchool, setSelectedSchool] = useState<string>('')
+  const [selectedYear, setSelectedYear] = useState<string>('')
 
-  // Helper Lists
-  const allGrades = Array.from(
-    new Set(
-      courses.flatMap((c) => c.grades.map((g) => ({ id: g.id, name: g.name }))),
-    ),
-  ).filter(
-    (v, i, a) => a.findIndex((t) => t.name === v.name) === i, // Dedup by name
-  )
+  const activeSchool = schools.find((s) => s.id === selectedSchool)
+  const academicYears = activeSchool?.academicYears || []
+  const activeYear = academicYears.find((y) => y.id === selectedYear)
 
-  const allSubjects = Array.from(
-    new Set(courses.flatMap((c) => c.grades.flatMap((g) => g.subjects))),
-  ).filter(
-    (v, i, a) => a.findIndex((t) => t.name === v.name) === i, // Dedup by name
-  )
+  const generateReport = () => {
+    if (!activeSchool || !activeYear) return []
 
-  const allPeriods = Array.from(
-    new Set(schools.flatMap((s) => s.academicYears.flatMap((y) => y.periods))),
-  ).filter(
-    (v, i, a) => a.findIndex((t) => t.name === v.name) === i, // Dedup by name
-  )
+    const reportData: any[] = []
 
-  // Filter Data
-  const filteredAssessments = assessments.filter((a) => {
-    // Find context
-    // This part is a bit tricky with flattened IDs, simplified matching for report
-    // Assuming simple mock ID matching or comprehensive lookup
-    // For subject and period, direct ID matching is best, but for Grade we need to find the class -> grade
-    // Or we filter by what we can.
+    activeYear.classes.forEach((cls) => {
+      // Find students in this class
+      const classStudents = students.filter((s) => {
+        const enrollment = s.enrollments.find(
+          (e) =>
+            e.schoolId === activeSchool.id &&
+            e.year.toString() === activeYear.name && // Simple year match
+            e.grade === cls.name, // Simple class match
+        )
+        return !!enrollment
+      })
 
-    let matchesGrade = true
-    if (selectedGrade !== 'all') {
-      // Find student grade
-      const student = students.find((s) => s.id === a.studentId)
-      // Check active enrollment
-      const enrollment = student?.enrollments.find(
-        (e) => e.status === 'Cursando',
-      )
-      // This matches grade NAME usually stored in enrollment
-      // And selectedGrade is an ID from CourseStore
-      const gradeObj = courses
+      // Find grade/course info
+      const grade = courses
         .flatMap((c) => c.grades)
-        .find((g) => g.id === selectedGrade)
-      if (enrollment && gradeObj) {
-        matchesGrade = enrollment.grade === gradeObj.name
-      } else {
-        matchesGrade = false
-      }
-    }
+        .find((g) => g.id === cls.gradeId)
 
-    const matchesSubject =
-      selectedSubject === 'all' || a.subjectId === selectedSubject
-    const matchesPeriod =
-      selectedPeriod === 'all' || a.periodId === selectedPeriod
+      if (!grade) return
 
-    return matchesGrade && matchesSubject && matchesPeriod
-  })
+      const rule = evaluationRules.find((r) => r.id === grade.evaluationRuleId)
+      if (!rule) return
 
-  // Aggregate by Student/Subject
-  const aggregation: Record<
-    string,
-    { total: number; count: number; studentName: string; subjectName: string }
-  > = {}
-
-  filteredAssessments.forEach((a) => {
-    if (typeof a.value === 'number') {
-      const key = `${a.studentId}-${a.subjectId}`
-      if (!aggregation[key]) {
-        const student = students.find((s) => s.id === a.studentId)
-        const subject = courses
-          .flatMap((c) => c.grades.flatMap((g) => g.subjects))
-          .find((s) => s.id === a.subjectId)
-
-        aggregation[key] = {
+      classStudents.forEach((student) => {
+        // Calculate per subject
+        const studentStats = {
+          passed: 0,
+          failed: 0,
           total: 0,
-          count: 0,
-          studentName: student?.name || 'Unknown',
-          subjectName: subject?.name || 'Unknown',
+          avg: 0,
         }
-      }
-      aggregation[key].total += a.value
-      aggregation[key].count++
-    }
-  })
 
-  const reportData = Object.values(aggregation).map((item) => ({
-    ...item,
-    average: (item.total / item.count).toFixed(1),
-  }))
+        let gradeSum = 0
+
+        grade.subjects.forEach((subject) => {
+          const subjectAssessments = assessments.filter(
+            (a) =>
+              a.studentId === student.id &&
+              a.subjectId === subject.id &&
+              a.yearId === activeYear.id,
+          )
+
+          const calculation = calculateGrades(
+            subjectAssessments,
+            rule,
+            activeYear.periods || [],
+            assessmentTypes,
+          )
+
+          if (calculation.isPassing) {
+            studentStats.passed++
+          } else {
+            studentStats.failed++
+          }
+          studentStats.total++
+          gradeSum += calculation.finalGrade
+        })
+
+        if (studentStats.total > 0) {
+          studentStats.avg = gradeSum / studentStats.total
+        }
+
+        reportData.push({
+          studentName: student.name,
+          className: cls.name,
+          passedSubjects: studentStats.passed,
+          failedSubjects: studentStats.failed,
+          overallAverage: studentStats.avg.toFixed(1),
+          status: studentStats.failed === 0 ? 'Aprovado' : 'Em Risco',
+        })
+      })
+    })
+
+    return reportData
+  }
+
+  const reportData = generateReport()
 
   return (
     <div className="space-y-6 animate-fade-in">
-      <div className="flex items-center gap-4">
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={() => navigate('/relatorios')}
-        >
-          <ArrowLeft className="h-5 w-5" />
-        </Button>
-        <div className="flex-1">
-          <h2 className="text-3xl font-bold tracking-tight text-primary">
-            Relatório de Desempenho
-          </h2>
-        </div>
-        <Button variant="outline" onClick={() => window.print()}>
-          <Printer className="mr-2 h-4 w-4" /> Imprimir
-        </Button>
+      <div>
+        <h2 className="text-3xl font-bold tracking-tight text-primary">
+          Relatório de Desempenho
+        </h2>
+        <p className="text-muted-foreground">
+          Análise de aprovação e desempenho por turma.
+        </p>
       </div>
 
       <Card>
         <CardHeader>
-          <CardTitle>Filtros de Relatório</CardTitle>
+          <CardTitle>Filtros</CardTitle>
+          <CardDescription>
+            Selecione a escola e o ano letivo para gerar os indicadores.
+          </CardDescription>
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <Select value={selectedGrade} onValueChange={setSelectedGrade}>
-              <SelectTrigger>
-                <div className="flex items-center gap-2">
-                  <Filter className="h-4 w-4 text-muted-foreground" />
-                  <SelectValue placeholder="Série" />
-                </div>
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todas as Séries</SelectItem>
-                {allGrades.map((g) => (
-                  <SelectItem key={g.id} value={g.id}>
-                    {g.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-
-            <Select value={selectedSubject} onValueChange={setSelectedSubject}>
-              <SelectTrigger>
-                <SelectValue placeholder="Disciplina" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todas as Disciplinas</SelectItem>
-                {allSubjects.map((s) => (
-                  <SelectItem key={s.id} value={s.id}>
-                    {s.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-
-            <Select value={selectedPeriod} onValueChange={setSelectedPeriod}>
-              <SelectTrigger>
-                <SelectValue placeholder="Período" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todos os Períodos</SelectItem>
-                {allPeriods.map((p) => (
-                  <SelectItem key={p.id} value={p.id}>
-                    {p.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Escola</label>
+              <Select value={selectedSchool} onValueChange={setSelectedSchool}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {schools.map((s) => (
+                    <SelectItem key={s.id} value={s.id}>
+                      {s.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Ano Letivo</label>
+              <Select
+                value={selectedYear}
+                onValueChange={setSelectedYear}
+                disabled={!selectedSchool}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {academicYears.map((y) => (
+                    <SelectItem key={y.id} value={y.id}>
+                      {y.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex items-end">
+              <Button className="w-full" disabled={!selectedYear}>
+                <Filter className="mr-2 h-4 w-4" /> Atualizar Dados
+              </Button>
+            </div>
           </div>
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Resultados Consolidados</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Aluno</TableHead>
-                <TableHead>Disciplina</TableHead>
-                <TableHead className="text-right">Média Calculada</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {reportData.map((row, index) => (
-                <TableRow key={index}>
-                  <TableCell className="font-medium">
-                    {row.studentName}
-                  </TableCell>
-                  <TableCell>{row.subjectName}</TableCell>
-                  <TableCell className="text-right font-bold">
-                    {row.average}
-                  </TableCell>
-                </TableRow>
-              ))}
-              {reportData.length === 0 && (
+      {reportData.length > 0 && (
+        <Card className="animate-fade-in-up">
+          <CardHeader className="flex flex-row items-center justify-between">
+            <CardTitle>Resultados Consolidados</CardTitle>
+            <Button variant="outline" size="sm">
+              <FileDown className="mr-2 h-4 w-4" /> Exportar CSV
+            </Button>
+          </CardHeader>
+          <CardContent>
+            <Table>
+              <TableHeader>
                 <TableRow>
-                  <TableCell colSpan={3} className="text-center h-24">
-                    Nenhum dado encontrado para os filtros selecionados.
-                  </TableCell>
+                  <TableHead>Aluno</TableHead>
+                  <TableHead>Turma</TableHead>
+                  <TableHead className="text-center">Disc. Aprovadas</TableHead>
+                  <TableHead className="text-center">
+                    Disc. Reprovadas
+                  </TableHead>
+                  <TableHead className="text-center">Média Geral</TableHead>
+                  <TableHead className="text-center">Status Geral</TableHead>
                 </TableRow>
-              )}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
+              </TableHeader>
+              <TableBody>
+                {reportData.map((row, idx) => (
+                  <TableRow key={idx}>
+                    <TableCell className="font-medium">
+                      {row.studentName}
+                    </TableCell>
+                    <TableCell>{row.className}</TableCell>
+                    <TableCell className="text-center text-green-600 font-medium">
+                      {row.passedSubjects}
+                    </TableCell>
+                    <TableCell className="text-center text-red-600 font-medium">
+                      {row.failedSubjects}
+                    </TableCell>
+                    <TableCell className="text-center font-bold">
+                      {row.overallAverage}
+                    </TableCell>
+                    <TableCell className="text-center">
+                      <span
+                        className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
+                          row.status === 'Aprovado'
+                            ? 'bg-green-100 text-green-800'
+                            : 'bg-yellow-100 text-yellow-800'
+                        }`}
+                      >
+                        {row.status}
+                      </span>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+      )}
     </div>
   )
 }
