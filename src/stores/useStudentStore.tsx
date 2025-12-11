@@ -28,7 +28,23 @@ export const StudentProvider = ({
   useEffect(() => {
     const stored = localStorage.getItem('edu_students')
     if (stored) {
-      setStudents(JSON.parse(stored))
+      try {
+        const parsed = JSON.parse(stored)
+        if (Array.isArray(parsed)) {
+          // Robust data sanitization to ensure arrays exist
+          const sanitized = parsed.map((s) => ({
+            ...s,
+            enrollments: Array.isArray(s.enrollments) ? s.enrollments : [],
+            projectIds: Array.isArray(s.projectIds) ? s.projectIds : [],
+          }))
+          setStudents(sanitized)
+        } else {
+          setStudents(mockStudents)
+        }
+      } catch (e) {
+        console.error('Failed to load students from localStorage', e)
+        setStudents(mockStudents)
+      }
     } else {
       localStorage.setItem('edu_students', JSON.stringify(mockStudents))
     }
@@ -108,9 +124,10 @@ export const StudentProvider = ({
             ...enrollmentData,
             id: Math.random().toString(36).substr(2, 9),
           }
+          const currentEnrollments = s.enrollments || []
           return {
             ...s,
-            enrollments: [...s.enrollments, newEnrollment],
+            enrollments: [...currentEnrollments, newEnrollment],
             // Update "current" grade/status if it's a regular enrollment
             ...(enrollmentData.type === 'regular' &&
             enrollmentData.status === 'Cursando'
@@ -129,8 +146,9 @@ export const StudentProvider = ({
   const addProjectEnrollment = (studentId: string, projectId: string) => {
     setStudents((prev) =>
       prev.map((s) => {
-        if (s.id === studentId && !s.projectIds.includes(projectId)) {
-          return { ...s, projectIds: [...s.projectIds, projectId] }
+        const currentProjects = s.projectIds || []
+        if (s.id === studentId && !currentProjects.includes(projectId)) {
+          return { ...s, projectIds: [...currentProjects, projectId] }
         }
         return s
       }),
@@ -141,9 +159,10 @@ export const StudentProvider = ({
     setStudents((prev) =>
       prev.map((s) => {
         if (s.id === studentId) {
+          const currentProjects = s.projectIds || []
           return {
             ...s,
-            projectIds: s.projectIds.filter((id) => id !== projectId),
+            projectIds: currentProjects.filter((id) => id !== projectId),
           }
         }
         return s

@@ -5,7 +5,6 @@ import {
   MoreHorizontal,
   User,
   FileText,
-  Filter,
   ArrowUpDown,
   ArrowUp,
   ArrowDown,
@@ -62,15 +61,6 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
-import {
-  Pagination,
-  PaginationContent,
-  PaginationEllipsis,
-  PaginationItem,
-  PaginationLink,
-  PaginationNext,
-  PaginationPrevious,
-} from '@/components/ui/pagination'
 
 export default function StudentsList() {
   const { students, addStudent, updateStudent, deleteStudent } =
@@ -103,8 +93,10 @@ export default function StudentsList() {
     new Set(
       students
         .map((s) => {
+          if (!s) return null
           // Attempt to get current grade from enrollments or fallback
-          const current = s.enrollments.find((e) => e.status === 'Cursando')
+          const enrollments = s.enrollments || []
+          const current = enrollments.find((e) => e.status === 'Cursando')
           return current ? current.grade : s.grade
         })
         .filter(Boolean),
@@ -115,9 +107,8 @@ export default function StudentsList() {
     if (!student) return false
 
     // Determine current/display grade and status
-    const currentEnrollment = student.enrollments.find(
-      (e) => e.status === 'Cursando',
-    )
+    const enrollments = student.enrollments || []
+    const currentEnrollment = enrollments.find((e) => e.status === 'Cursando')
     const displayGrade = currentEnrollment
       ? currentEnrollment.grade
       : student.grade
@@ -139,8 +130,11 @@ export default function StudentsList() {
   })
 
   const sortedStudents = [...filteredStudents].sort((a, b) => {
-    const aEnrollment = a.enrollments.find((e) => e.status === 'Cursando')
-    const bEnrollment = b.enrollments.find((e) => e.status === 'Cursando')
+    const aEnrollments = a.enrollments || []
+    const bEnrollments = b.enrollments || []
+
+    const aEnrollment = aEnrollments.find((e) => e.status === 'Cursando')
+    const bEnrollment = bEnrollments.find((e) => e.status === 'Cursando')
 
     const aValue =
       sortConfig.key === 'grade'
