@@ -13,6 +13,10 @@ import {
   Building,
   Wifi,
   Accessibility,
+  PlayCircle,
+  StopCircle,
+  CheckCircle2,
+  Clock,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
@@ -30,6 +34,12 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from '@/components/ui/accordion'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import useSchoolStore from '@/stores/useSchoolStore'
 import useCourseStore from '@/stores/useCourseStore'
 import { AcademicYearDialog } from './components/AcademicYearDialog'
@@ -39,7 +49,8 @@ import { useToast } from '@/hooks/use-toast'
 export default function SchoolDetails() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
-  const { getSchool, addAcademicYear, addClassroom } = useSchoolStore()
+  const { getSchool, addAcademicYear, addClassroom, updateAcademicYearStatus } =
+    useSchoolStore()
   const { courses } = useCourseStore()
   const { toast } = useToast()
 
@@ -62,7 +73,7 @@ export default function SchoolDetails() {
     addAcademicYear(school.id, data)
     toast({
       title: 'Ano Letivo Criado',
-      description: `O ano ${data.name} foi adicionado.`,
+      description: `O ano ${data.name} foi adicionado. As turmas foram replicadas.`,
     })
   }
 
@@ -79,6 +90,17 @@ export default function SchoolDetails() {
         description: `Turma ${data.name} adicionada com sucesso.`,
       })
     }
+  }
+
+  const handleStatusChange = (
+    yearId: string,
+    status: 'pending' | 'active' | 'finished',
+  ) => {
+    updateAcademicYearStatus(school.id, yearId, status)
+    toast({
+      title: 'Status Atualizado',
+      description: `O status do ano letivo foi alterado para ${status === 'active' ? 'Ativo' : status === 'finished' ? 'Finalizado' : 'Pendente'}.`,
+    })
   }
 
   return (
@@ -282,9 +304,11 @@ export default function SchoolDetails() {
               type="single"
               collapsible
               className="w-full space-y-4"
-              defaultValue={school.academicYears[0].id}
+              defaultValue={
+                school.academicYears[school.academicYears.length - 1]?.id
+              }
             >
-              {school.academicYears.map((year) => (
+              {[...school.academicYears].reverse().map((year) => (
                 <AccordionItem
                   key={year.id}
                   value={year.id}
@@ -300,13 +324,68 @@ export default function SchoolDetails() {
                         {year.startDate.split('-').reverse().join('/')} a{' '}
                         {year.endDate.split('-').reverse().join('/')}
                       </span>
-                      <Badge variant="secondary" className="ml-auto mr-4">
-                        {year.classes.length} Turmas
-                      </Badge>
+                      <div className="ml-auto flex items-center gap-2 mr-4">
+                        <Badge
+                          variant={
+                            year.status === 'active'
+                              ? 'default'
+                              : year.status === 'finished'
+                                ? 'secondary'
+                                : 'outline'
+                          }
+                          className={
+                            year.status === 'active' ? 'bg-green-600' : ''
+                          }
+                        >
+                          {year.status === 'active'
+                            ? 'Ativo'
+                            : year.status === 'finished'
+                              ? 'Finalizado'
+                              : 'Pendente'}
+                        </Badge>
+                        <span className="text-sm text-muted-foreground ml-2">
+                          {year.classes.length} Turmas
+                        </span>
+                      </div>
                     </div>
                   </AccordionTrigger>
                   <AccordionContent className="pt-2 pb-4">
                     <div className="space-y-4">
+                      <div className="flex justify-end mb-2">
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="outline" size="sm">
+                              Gerenciar Status
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent>
+                            <DropdownMenuItem
+                              onClick={() =>
+                                handleStatusChange(year.id, 'active')
+                              }
+                            >
+                              <PlayCircle className="mr-2 h-4 w-4 text-green-600" />{' '}
+                              Iniciar Ano Letivo
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={() =>
+                                handleStatusChange(year.id, 'finished')
+                              }
+                            >
+                              <CheckCircle2 className="mr-2 h-4 w-4 text-muted-foreground" />{' '}
+                              Finalizar Ano Letivo
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={() =>
+                                handleStatusChange(year.id, 'pending')
+                              }
+                            >
+                              <StopCircle className="mr-2 h-4 w-4" /> Marcar
+                              como Pendente
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </div>
                       <div className="flex justify-between items-center">
                         <h4 className="text-sm font-semibold text-muted-foreground">
                           Turmas Ativas
@@ -315,6 +394,7 @@ export default function SchoolDetails() {
                           size="sm"
                           variant="outline"
                           onClick={() => handleOpenClassDialog(year.id)}
+                          disabled={year.status === 'finished'}
                         >
                           <Plus className="mr-2 h-3 w-3" /> Adicionar Turma
                         </Button>
@@ -341,11 +421,25 @@ export default function SchoolDetails() {
                               </div>
                               <div className="text-sm text-muted-foreground">
                                 {classroom.gradeName}
+                                {classroom.isMultiGrade && (
+                                  <Badge
+                                    variant="secondary"
+                                    className="ml-2 text-[10px]"
+                                  >
+                                    Multi
+                                  </Badge>
+                                )}
                               </div>
                               <div className="flex items-center gap-2 text-xs text-muted-foreground mt-2">
                                 <Users className="h-3 w-3" />
                                 {classroom.studentCount || 0} Alunos
                               </div>
+                              {classroom.operatingHours && (
+                                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                  <Clock className="h-3 w-3" />
+                                  {classroom.operatingHours}
+                                </div>
+                              )}
                             </div>
                           ))}
                         </div>

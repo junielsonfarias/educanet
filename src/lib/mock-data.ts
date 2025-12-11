@@ -14,6 +14,12 @@ export interface Classroom {
   gradeId: string
   gradeName?: string // Helper for display
   studentCount?: number // Helper
+  // Enhanced fields
+  acronym?: string
+  operatingHours?: string
+  minStudents?: number
+  operatingDays?: string[]
+  isMultiGrade?: boolean
 }
 
 export interface AcademicYear {
@@ -21,6 +27,7 @@ export interface AcademicYear {
   name: string
   startDate: string
   endDate: string
+  status: 'pending' | 'active' | 'finished'
   periods: Period[]
   classes: Classroom[]
 }
@@ -182,6 +189,7 @@ export const mockSchools: School[] = [
         name: '2024',
         startDate: '2024-02-01',
         endDate: '2024-12-15',
+        status: 'active',
         periods: [
           {
             id: 'p1',
@@ -216,6 +224,11 @@ export const mockSchools: School[] = [
             gradeId: 'g5',
             gradeName: '5º Ano',
             studentCount: 25,
+            acronym: '5A-M',
+            operatingHours: '07:00 - 12:00',
+            minStudents: 15,
+            operatingDays: ['seg', 'ter', 'qua', 'qui', 'sex'],
+            isMultiGrade: false,
           },
         ],
       },
@@ -319,7 +332,6 @@ export interface Student {
   status?: string
   email?: string
   phone?: string
-  // New Censo Fields
   susCard?: string
   birthCertificate?: string
   nationality?: string
@@ -403,7 +415,6 @@ export const mockProjects: Project[] = [
   },
 ]
 
-// Mock Assessments
 export const mockAssessments: Assessment[] = [
   {
     id: 'as1',
@@ -411,7 +422,7 @@ export const mockAssessments: Assessment[] = [
     schoolId: '1',
     yearId: 'y2024',
     classroomId: 'cl1',
-    subjectId: 's10', // Matematica
+    subjectId: 's10',
     periodId: 'p1',
     type: 'numeric',
     value: 8.5,
@@ -423,7 +434,7 @@ export const mockAssessments: Assessment[] = [
     schoolId: '1',
     yearId: 'y2024',
     classroomId: 'cl1',
-    subjectId: 's10', // Matematica
+    subjectId: 's10',
     periodId: 'p2',
     type: 'numeric',
     value: 7.0,

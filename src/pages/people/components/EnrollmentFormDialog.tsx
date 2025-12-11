@@ -26,6 +26,7 @@ import {
 } from '@/components/ui/select'
 import { Button } from '@/components/ui/button'
 import useSchoolStore from '@/stores/useSchoolStore'
+import useCourseStore from '@/stores/useCourseStore'
 
 const enrollmentSchema = z.object({
   schoolId: z.string().min(1, 'Escola é obrigatória'),
@@ -39,6 +40,7 @@ const enrollmentSchema = z.object({
     'Transferido',
     'Abandono',
   ]),
+  multiSeriesGradeId: z.string().optional(),
 })
 
 interface EnrollmentFormDialogProps {
@@ -53,6 +55,7 @@ export function EnrollmentFormDialog({
   onSubmit,
 }: EnrollmentFormDialogProps) {
   const { schools } = useSchoolStore()
+  const { courses } = useCourseStore()
 
   const form = useForm<z.infer<typeof enrollmentSchema>>({
     resolver: zodResolver(enrollmentSchema),
@@ -62,12 +65,14 @@ export function EnrollmentFormDialog({
       classId: '',
       type: 'regular',
       status: 'Cursando',
+      multiSeriesGradeId: '',
     },
   })
 
   // Dependent dropdown logic
   const selectedSchoolId = form.watch('schoolId')
   const selectedYearId = form.watch('yearId')
+  const selectedClassId = form.watch('classId')
 
   const selectedSchool = schools.find((s) => s.id === selectedSchoolId)
   const academicYears = selectedSchool?.academicYears || []
@@ -75,16 +80,33 @@ export function EnrollmentFormDialog({
   const selectedYear = academicYears.find((y) => y.id === selectedYearId)
   const classes = selectedYear?.classes || []
 
+  const selectedClass = classes.find((c) => c.id === selectedClassId)
+  const isMultiGrade = selectedClass?.isMultiGrade
+
+  // Flatten grades for selection
+  const flattenGrades = courses.flatMap((c) =>
+    c.grades.map((g) => ({ ...g, courseName: c.name })),
+  )
+
   const handleSubmit = (data: z.infer<typeof enrollmentSchema>) => {
     const selectedClass = classes.find((c) => c.id === data.classId)
     // Extract year number from name
     const yearName = selectedYear?.name || new Date().getFullYear().toString()
     const yearNumber = parseInt(yearName) || new Date().getFullYear()
 
+    // Determine grade name: if multiseries, find selected grade name, else use class grade name
+    let gradeName = selectedClass ? selectedClass.name : 'Turma Indefinida'
+    if (isMultiGrade && data.multiSeriesGradeId) {
+      const mg = flattenGrades.find((g) => g.id === data.multiSeriesGradeId)
+      if (mg) gradeName = mg.name
+    } else if (selectedClass?.gradeName) {
+      gradeName = selectedClass.gradeName
+    }
+
     onSubmit({
       schoolId: data.schoolId,
       year: yearNumber,
-      grade: selectedClass ? selectedClass.name : 'Turma Indefinida',
+      grade: gradeName,
       type: data.type,
       status: data.status,
     })
@@ -213,7 +235,8 @@ export function EnrollmentFormDialog({
                     <SelectContent>
                       {academicYears.map((year) => (
                         <SelectItem key={year.id} value={year.id}>
-                          {year.name}
+                          {year.name} (
+                          {year.status === 'active' ? 'Ativo' : year.status})
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -242,7 +265,8 @@ export function EnrollmentFormDialog({
                     <SelectContent>
                       {classes.map((cls) => (
                         <SelectItem key={cls.id} value={cls.id}>
-                          {cls.name} ({cls.gradeName}) - {cls.shift}
+                          {cls.name} ({cls.gradeName}) - {cls.shift}{' '}
+                          {cls.isMultiGrade ? '(Multi)' : ''}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -251,6 +275,36 @@ export function EnrollmentFormDialog({
                 </FormItem>
               )}
             />
+
+            {isMultiGrade && (
+              <FormField
+                control={form.control}
+                name="multiSeriesGradeId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Série do Aluno (Turma Multissérie)</FormLabel>
+                    <Select
+                      onValueChange={field.onChange}
+                      defaultValue={field.value}
+                    >
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Selecione a série específica" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {flattenGrades.map((grade) => (
+                          <SelectItem key={grade.id} value={grade.id}>
+                            {grade.name} ({grade.courseName})
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            )}
 
             <DialogFooter>
               <Button

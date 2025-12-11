@@ -40,7 +40,7 @@ export function AcademicYearDialog({
   const form = useForm<z.infer<typeof yearSchema>>({
     resolver: zodResolver(yearSchema),
     defaultValues: {
-      name: new Date().getFullYear().toString(),
+      name: (new Date().getFullYear() + 1).toString(),
       startDate: '',
       endDate: '',
     },
@@ -49,7 +49,7 @@ export function AcademicYearDialog({
   const handleSubmit = (data: z.infer<typeof yearSchema>) => {
     onSubmit({
       ...data,
-      periods: [], // Initialize with empty periods, logic could be expanded
+      periods: [],
     })
     onOpenChange(false)
     form.reset()
@@ -61,7 +61,8 @@ export function AcademicYearDialog({
         <DialogHeader>
           <DialogTitle>Novo Ano Letivo</DialogTitle>
           <DialogDescription>
-            Defina o calendário acadêmico para a escola.
+            Defina o calendário acadêmico para a escola. As turmas do ano
+            anterior serão replicadas automaticamente.
           </DialogDescription>
         </DialogHeader>
         <Form {...form}>
@@ -74,7 +75,9 @@ export function AcademicYearDialog({
               name="name"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Nome (Ex: 2024)</FormLabel>
+                  <FormLabel>
+                    Nome (Ex: {new Date().getFullYear() + 1})
+                  </FormLabel>
                   <FormControl>
                     <Input {...field} />
                   </FormControl>

@@ -9,13 +9,25 @@ interface SchoolContextType {
   getSchool: (id: string) => School | undefined
   addAcademicYear: (
     schoolId: string,
-    year: Omit<AcademicYear, 'id' | 'classes'>,
+    year: Omit<AcademicYear, 'id' | 'classes' | 'status'>,
+  ) => void
+  updateAcademicYearStatus: (
+    schoolId: string,
+    yearId: string,
+    status: 'pending' | 'active' | 'finished',
   ) => void
   addClassroom: (
     schoolId: string,
     yearId: string,
     classroom: Omit<Classroom, 'id'>,
   ) => void
+  updateClassroom: (
+    schoolId: string,
+    yearId: string,
+    classId: string,
+    data: Partial<Classroom>,
+  ) => void
+  deleteClassroom: (schoolId: string, yearId: string, classId: string) => void
 }
 
 const SchoolContext = createContext<SchoolContextType | null>(null)
@@ -62,21 +74,56 @@ export const SchoolProvider = ({ children }: { children: React.ReactNode }) => {
 
   const addAcademicYear = (
     schoolId: string,
-    yearData: Omit<AcademicYear, 'id' | 'classes'>,
+    yearData: Omit<AcademicYear, 'id' | 'classes' | 'status'>,
   ) => {
     setSchools((prev) =>
       prev.map((s) => {
         if (s.id === schoolId) {
+          // Replication Logic
+          const lastYear =
+            s.academicYears.length > 0
+              ? s.academicYears[s.academicYears.length - 1]
+              : null
+
+          let replicatedClasses: Classroom[] = []
+          if (lastYear && lastYear.classes) {
+            replicatedClasses = lastYear.classes.map((c) => ({
+              ...c,
+              id: Math.random().toString(36).substr(2, 9),
+              studentCount: 0, // Reset student count
+            }))
+          }
+
           const newYear: AcademicYear = {
             ...yearData,
+            status: 'pending', // Default status
             id: Math.random().toString(36).substr(2, 9),
-            classes: [],
+            classes: replicatedClasses,
           }
-          // Ensure academicYears is an array to prevent crashes with corrupted data
           const currentYears = Array.isArray(s.academicYears)
             ? s.academicYears
             : []
           return { ...s, academicYears: [...currentYears, newYear] }
+        }
+        return s
+      }),
+    )
+  }
+
+  const updateAcademicYearStatus = (
+    schoolId: string,
+    yearId: string,
+    status: 'pending' | 'active' | 'finished',
+  ) => {
+    setSchools((prev) =>
+      prev.map((s) => {
+        if (s.id === schoolId) {
+          return {
+            ...s,
+            academicYears: s.academicYears.map((y) =>
+              y.id === yearId ? { ...y, status } : y,
+            ),
+          }
         }
         return s
       }),
@@ -91,7 +138,6 @@ export const SchoolProvider = ({ children }: { children: React.ReactNode }) => {
     setSchools((prev) =>
       prev.map((s) => {
         if (s.id === schoolId) {
-          // Ensure academicYears exists
           const academicYears = Array.isArray(s.academicYears)
             ? s.academicYears
             : []
@@ -99,7 +145,6 @@ export const SchoolProvider = ({ children }: { children: React.ReactNode }) => {
             ...s,
             academicYears: academicYears.map((y) => {
               if (y.id === yearId) {
-                // Ensure classes exists
                 const currentClasses = Array.isArray(y.classes) ? y.classes : []
                 return {
                   ...y,
@@ -107,6 +152,61 @@ export const SchoolProvider = ({ children }: { children: React.ReactNode }) => {
                     ...currentClasses,
                     { ...data, id: Math.random().toString(36).substr(2, 9) },
                   ],
+                }
+              }
+              return y
+            }),
+          }
+        }
+        return s
+      }),
+    )
+  }
+
+  const updateClassroom = (
+    schoolId: string,
+    yearId: string,
+    classId: string,
+    data: Partial<Classroom>,
+  ) => {
+    setSchools((prev) =>
+      prev.map((s) => {
+        if (s.id === schoolId) {
+          return {
+            ...s,
+            academicYears: s.academicYears.map((y) => {
+              if (y.id === yearId) {
+                return {
+                  ...y,
+                  classes: y.classes.map((c) =>
+                    c.id === classId ? { ...c, ...data } : c,
+                  ),
+                }
+              }
+              return y
+            }),
+          }
+        }
+        return s
+      }),
+    )
+  }
+
+  const deleteClassroom = (
+    schoolId: string,
+    yearId: string,
+    classId: string,
+  ) => {
+    setSchools((prev) =>
+      prev.map((s) => {
+        if (s.id === schoolId) {
+          return {
+            ...s,
+            academicYears: s.academicYears.map((y) => {
+              if (y.id === yearId) {
+                return {
+                  ...y,
+                  classes: y.classes.filter((c) => c.id !== classId),
                 }
               }
               return y
@@ -127,7 +227,10 @@ export const SchoolProvider = ({ children }: { children: React.ReactNode }) => {
         deleteSchool,
         getSchool,
         addAcademicYear,
+        updateAcademicYearStatus,
         addClassroom,
+        updateClassroom,
+        deleteClassroom,
       }}
     >
       {children}
