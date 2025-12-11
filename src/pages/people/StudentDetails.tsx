@@ -140,10 +140,20 @@ export default function StudentDetails() {
     return proj ? `${proj.name} (${proj.schedule})` : 'Projeto desconhecido'
   }
 
+  // Robustly handle missing or non-iterable enrollments property
+  const enrollments =
+    student.enrollments && Array.isArray(student.enrollments)
+      ? student.enrollments
+      : []
+
   // Sort enrollments by year descending
-  const sortedEnrollments = [...student.enrollments].sort(
-    (a, b) => b.year - a.year,
-  )
+  const sortedEnrollments = [...enrollments].sort((a, b) => b.year - a.year)
+
+  // Robustly handle missing or non-iterable projectIds property
+  const projectIds =
+    student.projectIds && Array.isArray(student.projectIds)
+      ? student.projectIds
+      : []
 
   return (
     <div className="space-y-6 animate-fade-in pb-10">
@@ -183,7 +193,7 @@ export default function StudentDetails() {
                 src={`https://img.usecurling.com/ppl/medium?seed=${student.id}`}
               />
               <AvatarFallback className="text-2xl">
-                {student.name.substring(0, 2).toUpperCase()}
+                {student.name?.substring(0, 2).toUpperCase() || 'AL'}
               </AvatarFallback>
             </Avatar>
             <h3 className="text-xl font-bold">{student.name}</h3>
@@ -214,11 +224,11 @@ export default function StudentDetails() {
               </div>
               <div className="flex items-center gap-2 text-sm">
                 <Phone className="h-4 w-4 text-muted-foreground" />
-                <span>{student.contacts.phone || 'N/A'}</span>
+                <span>{student.contacts?.phone || 'N/A'}</span>
               </div>
               <div className="flex items-center gap-2 text-sm">
                 <Mail className="h-4 w-4 text-muted-foreground" />
-                <span>{student.contacts.email || 'N/A'}</span>
+                <span>{student.contacts?.email || 'N/A'}</span>
               </div>
             </div>
           </CardContent>
@@ -237,7 +247,7 @@ export default function StudentDetails() {
                 </div>
                 <div>
                   <span className="text-sm text-muted-foreground">NIS</span>
-                  <p className="font-medium">{student.social.nis || '-'}</p>
+                  <p className="font-medium">{student.social?.nis || '-'}</p>
                 </div>
                 <div>
                   <span className="text-sm text-muted-foreground">
@@ -257,14 +267,22 @@ export default function StudentDetails() {
                 <span className="text-sm text-muted-foreground flex items-center gap-2 mb-1">
                   <MapPin className="h-4 w-4" /> Endereço
                 </span>
-                <p className="font-medium">
-                  {student.address.street}, {student.address.number} -{' '}
-                  {student.address.neighborhood}
-                </p>
-                <p className="text-sm text-muted-foreground">
-                  {student.address.city}/{student.address.state} - CEP:{' '}
-                  {student.address.zipCode}
-                </p>
+                {student.address ? (
+                  <>
+                    <p className="font-medium">
+                      {student.address.street}, {student.address.number} -{' '}
+                      {student.address.neighborhood}
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                      {student.address.city}/{student.address.state} - CEP:{' '}
+                      {student.address.zipCode}
+                    </p>
+                  </>
+                ) : (
+                  <p className="text-muted-foreground italic">
+                    Endereço não cadastrado
+                  </p>
+                )}
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-2">
                 <div className="flex flex-col">
@@ -272,10 +290,10 @@ export default function StudentDetails() {
                     <Bus className="h-3 w-3" /> Transporte
                   </span>
                   <Badge
-                    variant={student.transport.uses ? 'default' : 'outline'}
+                    variant={student.transport?.uses ? 'default' : 'outline'}
                     className="w-fit"
                   >
-                    {student.transport.uses
+                    {student.transport?.uses
                       ? `Sim (${student.transport.routeNumber})`
                       : 'Não'}
                   </Badge>
@@ -286,18 +304,18 @@ export default function StudentDetails() {
                   </span>
                   <Badge
                     variant={
-                      student.social.bolsaFamilia ? 'default' : 'outline'
+                      student.social?.bolsaFamilia ? 'default' : 'outline'
                     }
                     className="w-fit"
                   >
-                    {student.social.bolsaFamilia ? 'Beneficiário' : 'Não'}
+                    {student.social?.bolsaFamilia ? 'Beneficiário' : 'Não'}
                   </Badge>
                 </div>
                 <div className="flex flex-col">
                   <span className="text-sm text-muted-foreground flex items-center gap-1 mb-1">
                     <HeartPulse className="h-3 w-3" /> Nec. Especiais
                   </span>
-                  {student.health.hasSpecialNeeds ? (
+                  {student.health?.hasSpecialNeeds ? (
                     <div className="flex flex-col">
                       <Badge variant="destructive" className="w-fit mb-1">
                         Sim
@@ -311,7 +329,7 @@ export default function StudentDetails() {
                   )}
                 </div>
               </div>
-              {student.health.observation && (
+              {student.health?.observation && (
                 <div className="bg-muted/30 p-3 rounded-md text-sm mt-2">
                   <span className="font-semibold block text-xs uppercase text-muted-foreground mb-1">
                     Observações de Saúde
@@ -338,54 +356,60 @@ export default function StudentDetails() {
               )}
             </CardHeader>
             <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Ano</TableHead>
-                    <TableHead>Escola</TableHead>
-                    <TableHead>Série</TableHead>
-                    <TableHead>Tipo</TableHead>
-                    <TableHead>Status</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {sortedEnrollments.map((enrollment) => (
-                    <TableRow key={enrollment.id}>
-                      <TableCell className="font-medium">
-                        {enrollment.year}
-                      </TableCell>
-                      <TableCell>
-                        {getSchoolName(enrollment.schoolId)}
-                      </TableCell>
-                      <TableCell>{enrollment.grade}</TableCell>
-                      <TableCell>
-                        <Badge
-                          variant={
-                            enrollment.type === 'dependency'
-                              ? 'secondary'
-                              : 'outline'
-                          }
-                        >
-                          {enrollment.type === 'dependency'
-                            ? 'Dependência'
-                            : 'Regular'}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <Badge
-                          variant={
-                            enrollment.status === 'Cursando'
-                              ? 'default'
-                              : 'secondary'
-                          }
-                        >
-                          {enrollment.status}
-                        </Badge>
-                      </TableCell>
+              {sortedEnrollments.length === 0 ? (
+                <p className="text-sm text-muted-foreground py-4 text-center">
+                  Nenhuma matrícula registrada.
+                </p>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Ano</TableHead>
+                      <TableHead>Escola</TableHead>
+                      <TableHead>Série</TableHead>
+                      <TableHead>Tipo</TableHead>
+                      <TableHead>Status</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                  </TableHeader>
+                  <TableBody>
+                    {sortedEnrollments.map((enrollment) => (
+                      <TableRow key={enrollment.id}>
+                        <TableCell className="font-medium">
+                          {enrollment.year}
+                        </TableCell>
+                        <TableCell>
+                          {getSchoolName(enrollment.schoolId)}
+                        </TableCell>
+                        <TableCell>{enrollment.grade}</TableCell>
+                        <TableCell>
+                          <Badge
+                            variant={
+                              enrollment.type === 'dependency'
+                                ? 'secondary'
+                                : 'outline'
+                            }
+                          >
+                            {enrollment.type === 'dependency'
+                              ? 'Dependência'
+                              : 'Regular'}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <Badge
+                            variant={
+                              enrollment.status === 'Cursando'
+                                ? 'default'
+                                : 'secondary'
+                            }
+                          >
+                            {enrollment.status}
+                          </Badge>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
             </CardContent>
           </Card>
 
@@ -406,13 +430,13 @@ export default function StudentDetails() {
               )}
             </CardHeader>
             <CardContent>
-              {student.projectIds.length === 0 ? (
+              {projectIds.length === 0 ? (
                 <p className="text-sm text-muted-foreground py-4 text-center">
                   Nenhum projeto matriculado.
                 </p>
               ) : (
                 <div className="space-y-2">
-                  {student.projectIds.map((projectId) => (
+                  {projectIds.map((projectId) => (
                     <div
                       key={projectId}
                       className="flex items-center justify-between p-3 border rounded-md bg-secondary/10"
@@ -461,7 +485,7 @@ export default function StudentDetails() {
         open={isProjectDialogOpen}
         onOpenChange={setIsProjectDialogOpen}
         onSubmit={handleAddProject}
-        excludeProjectIds={student.projectIds}
+        excludeProjectIds={projectIds}
       />
 
       <AlertDialog
