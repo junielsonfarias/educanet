@@ -1,11 +1,15 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import {
   Plus,
   Search,
   MoreHorizontal,
   Shield,
   School,
-  User,
+  User as UserIcon,
+  ArrowUpDown,
+  ArrowUp,
+  ArrowDown,
+  Filter,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -26,6 +30,23 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
+import {
   Card,
   CardContent,
   CardDescription,
@@ -35,21 +56,38 @@ import {
 import { Badge } from '@/components/ui/badge'
 import useUserStore from '@/stores/useUserStore'
 import { UserFormDialog } from './components/UserFormDialog'
-import { mockSchools, User as UserType } from '@/lib/mock-data'
+import { mockSchools, User } from '@/lib/mock-data'
 import { useToast } from '@/hooks/use-toast'
+import { useNavigate } from 'react-router-dom'
 
 export default function UsersList() {
   const { users, currentUser, addUser, updateUser, deleteUser } = useUserStore()
   const [searchTerm, setSearchTerm] = useState('')
-  const [isDialogOpen, setIsDialogOpen] = useState(false)
-  const [editingUser, setEditingUser] = useState<UserType | null>(null)
-  const { toast } = useToast()
+  const [roleFilter, setRoleFilter] = useState('all')
+  const [schoolFilter, setSchoolFilter] = useState('all')
+  const [sortConfig, setSortConfig] = useState<{
+    key: 'name' | 'email'
+    direction: 'asc' | 'desc'
+  }>({ key: 'name', direction: 'asc' })
 
-  const filteredUsers = users.filter(
-    (user) =>
-      user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      user.email.toLowerCase().includes(searchTerm.toLowerCase()),
-  )
+  const [isDialogOpen, setIsDialogOpen] = useState(false)
+  const [editingUser, setEditingUser] = useState<User | null>(null)
+  const [deleteId, setDeleteId] = useState<string | null>(null)
+
+  const { toast } = useToast()
+  const navigate = useNavigate()
+
+  // Access Control
+  useEffect(() => {
+    if (currentUser && !['admin', 'supervisor'].includes(currentUser.role)) {
+      toast({
+        variant: 'destructive',
+        title: 'Acesso Negado',
+        description: 'Você não tem permissão para acessar esta página.',
+      })
+      navigate('/dashboard')
+    }
+  }, [currentUser, navigate, toast])
 
   const handleCreateUser = (data: any) => {
     addUser(data)
@@ -70,17 +108,18 @@ export default function UsersList() {
     }
   }
 
-  const handleDeleteUser = (id: string) => {
-    if (confirm('Tem certeza que deseja excluir este usuário?')) {
-      deleteUser(id)
+  const handleDeleteUser = () => {
+    if (deleteId) {
+      deleteUser(deleteId)
       toast({
         title: 'Usuário removido',
         description: 'O usuário foi removido do sistema.',
       })
+      setDeleteId(null)
     }
   }
 
-  const openEditDialog = (user: UserType) => {
+  const openEditDialog = (user: User) => {
     setEditingUser(user)
     setIsDialogOpen(true)
   }
@@ -90,54 +129,88 @@ export default function UsersList() {
     setIsDialogOpen(true)
   }
 
+  const toggleSort = (key: 'name' | 'email') => {
+    setSortConfig((current) => ({
+      key,
+      direction:
+        current.key === key && current.direction === 'asc' ? 'desc' : 'asc',
+    }))
+  }
+
   const getRoleBadge = (role: string) => {
     switch (role) {
       case 'admin':
-        return <Badge className="bg-purple-600">Administrador</Badge>
+        return (
+          <Badge className="bg-purple-600 hover:bg-purple-700">
+            Administrador
+          </Badge>
+        )
       case 'supervisor':
-        return <Badge className="bg-blue-600">Supervisor</Badge>
+        return (
+          <Badge className="bg-blue-600 hover:bg-blue-700">Supervisor</Badge>
+        )
       case 'coordinator':
-        return <Badge className="bg-orange-600">Coordenador</Badge>
+        return (
+          <Badge className="bg-orange-600 hover:bg-orange-700">
+            Coordenador
+          </Badge>
+        )
       case 'administrative':
-        return <Badge className="bg-slate-600">Administrativo</Badge>
+        return (
+          <Badge className="bg-slate-600 hover:bg-slate-700">
+            Administrativo
+          </Badge>
+        )
       default:
         return <Badge variant="outline">{role}</Badge>
     }
   }
 
-  const getSchoolNames = (user: UserType) => {
+  const getSchoolNames = (user: User) => {
     if (user.role === 'coordinator' && user.schoolIds) {
       if (user.schoolIds.length === 0) return 'Nenhuma'
-      if (user.schoolIds.length === 1) {
-        return (
-          mockSchools.find((s) => s.id === user.schoolIds![0])?.name ||
-          'Desconhecida'
-        )
-      }
-      return `${user.schoolIds.length} escolas vinculadas`
+      const names = user.schoolIds
+        .map((id) => mockSchools.find((s) => s.id === id)?.name)
+        .filter(Boolean)
+        .join(', ')
+      return names || 'Desconhecida'
     }
     if (user.role === 'administrative' && user.schoolId) {
       return (
         mockSchools.find((s) => s.id === user.schoolId)?.name || 'Desconhecida'
       )
     }
-    return 'Todas as escolas'
+    return '-'
   }
 
-  // Permission check
-  const canManageUsers =
-    currentUser?.role === 'admin' || currentUser?.role === 'supervisor'
+  // Filtering and Sorting
+  const filteredUsers = users.filter((user) => {
+    const matchesSearch =
+      user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      user.email.toLowerCase().includes(searchTerm.toLowerCase())
 
-  if (!canManageUsers) {
-    return (
-      <div className="flex flex-col items-center justify-center h-[50vh] text-center">
-        <Shield className="h-16 w-16 text-muted-foreground mb-4" />
-        <h2 className="text-2xl font-bold">Acesso Negado</h2>
-        <p className="text-muted-foreground">
-          Você não tem permissão para gerenciar usuários.
-        </p>
-      </div>
-    )
+    const matchesRole = roleFilter === 'all' || user.role === roleFilter
+
+    const matchesSchool =
+      schoolFilter === 'all' ||
+      user.schoolId === schoolFilter ||
+      (user.schoolIds && user.schoolIds.includes(schoolFilter))
+
+    return matchesSearch && matchesRole && matchesSchool
+  })
+
+  const sortedUsers = [...filteredUsers].sort((a, b) => {
+    const aValue = a[sortConfig.key].toLowerCase()
+    const bValue = b[sortConfig.key].toLowerCase()
+
+    if (aValue < bValue) return sortConfig.direction === 'asc' ? -1 : 1
+    if (aValue > bValue) return sortConfig.direction === 'asc' ? 1 : -1
+    return 0
+  })
+
+  // Block rendering if not authorized (UX improvement while useEffect redirects)
+  if (currentUser && !['admin', 'supervisor'].includes(currentUser.role)) {
+    return null
   }
 
   return (
@@ -159,21 +232,60 @@ export default function UsersList() {
 
       <Card>
         <CardHeader className="pb-3">
-          <CardTitle>Usuários Cadastrados</CardTitle>
+          <CardTitle>Listagem de Usuários</CardTitle>
           <CardDescription>
-            Lista de todos os usuários com acesso ao sistema.
+            Visualize, filtre e gerencie todos os usuários cadastrados.
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="flex items-center justify-between gap-4 mb-4">
-            <div className="relative flex-1 max-w-sm">
+          <div className="flex flex-col lg:flex-row gap-4 mb-6">
+            <div className="relative flex-1">
               <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
               <Input
-                placeholder="Buscar por nome ou e-mail..."
+                placeholder="Buscar por nome ou login..."
                 className="pl-8"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
+            </div>
+            <div className="flex flex-col sm:flex-row gap-4">
+              <div className="w-full sm:w-[200px]">
+                <Select value={roleFilter} onValueChange={setRoleFilter}>
+                  <SelectTrigger>
+                    <div className="flex items-center gap-2">
+                      <Filter className="h-4 w-4 text-muted-foreground" />
+                      <SelectValue placeholder="Filtrar por Perfil" />
+                    </div>
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos os Perfis</SelectItem>
+                    <SelectItem value="admin">Administrador</SelectItem>
+                    <SelectItem value="supervisor">Supervisor</SelectItem>
+                    <SelectItem value="coordinator">Coordenador</SelectItem>
+                    <SelectItem value="administrative">
+                      Administrativo
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="w-full sm:w-[250px]">
+                <Select value={schoolFilter} onValueChange={setSchoolFilter}>
+                  <SelectTrigger>
+                    <div className="flex items-center gap-2">
+                      <School className="h-4 w-4 text-muted-foreground" />
+                      <SelectValue placeholder="Filtrar por Escola" />
+                    </div>
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todas as Escolas</SelectItem>
+                    {mockSchools.map((school) => (
+                      <SelectItem key={school.id} value={school.id}>
+                        {school.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
           </div>
 
@@ -181,70 +293,106 @@ export default function UsersList() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Nome / E-mail</TableHead>
-                  <TableHead>Perfil</TableHead>
-                  <TableHead>Acesso</TableHead>
-                  <TableHead>Data Criação</TableHead>
-                  <TableHead className="text-right">Ações</TableHead>
+                  <TableHead className="w-[30%]">
+                    <Button
+                      variant="ghost"
+                      onClick={() => toggleSort('name')}
+                      className="-ml-4 h-8 data-[state=open]:bg-accent"
+                    >
+                      Nome
+                      {sortConfig.key === 'name' ? (
+                        sortConfig.direction === 'asc' ? (
+                          <ArrowUp className="ml-2 h-4 w-4" />
+                        ) : (
+                          <ArrowDown className="ml-2 h-4 w-4" />
+                        )
+                      ) : (
+                        <ArrowUpDown className="ml-2 h-4 w-4" />
+                      )}
+                    </Button>
+                  </TableHead>
+                  <TableHead className="w-[25%]">
+                    <Button
+                      variant="ghost"
+                      onClick={() => toggleSort('email')}
+                      className="-ml-4 h-8 data-[state=open]:bg-accent"
+                    >
+                      Login (E-mail)
+                      {sortConfig.key === 'email' ? (
+                        sortConfig.direction === 'asc' ? (
+                          <ArrowUp className="ml-2 h-4 w-4" />
+                        ) : (
+                          <ArrowDown className="ml-2 h-4 w-4" />
+                        )
+                      ) : (
+                        <ArrowUpDown className="ml-2 h-4 w-4" />
+                      )}
+                    </Button>
+                  </TableHead>
+                  <TableHead className="w-[15%]">Perfil</TableHead>
+                  <TableHead className="w-[20%]">Escolas</TableHead>
+                  <TableHead className="text-right w-[10%]">Ações</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredUsers.map((user) => (
-                  <TableRow key={user.id}>
-                    <TableCell>
-                      <div className="flex flex-col">
-                        <span className="font-medium flex items-center gap-2">
-                          <User className="h-3 w-3 text-muted-foreground" />
-                          {user.name}
-                        </span>
-                        <span className="text-xs text-muted-foreground">
-                          {user.email}
-                        </span>
-                      </div>
+                {sortedUsers.length === 0 ? (
+                  <TableRow>
+                    <TableCell
+                      colSpan={5}
+                      className="h-24 text-center text-muted-foreground"
+                    >
+                      Nenhum usuário encontrado.
                     </TableCell>
-                    <TableCell>{getRoleBadge(user.role)}</TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                        <School className="h-3 w-3" />
-                        <span
-                          className="truncate max-w-[200px]"
+                  </TableRow>
+                ) : (
+                  sortedUsers.map((user) => (
+                    <TableRow key={user.id}>
+                      <TableCell className="font-medium">
+                        <div className="flex items-center gap-2">
+                          <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-xs">
+                            {user.name.substring(0, 2).toUpperCase()}
+                          </div>
+                          {user.name}
+                        </div>
+                      </TableCell>
+                      <TableCell>{user.email}</TableCell>
+                      <TableCell>{getRoleBadge(user.role)}</TableCell>
+                      <TableCell>
+                        <div
+                          className="text-sm text-muted-foreground line-clamp-2"
                           title={getSchoolNames(user)}
                         >
                           {getSchoolNames(user)}
-                        </span>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      {new Date(user.createdAt).toLocaleDateString()}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" className="h-8 w-8 p-0">
-                            <span className="sr-only">Abrir menu</span>
-                            <MoreHorizontal className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuLabel>Ações</DropdownMenuLabel>
-                          <DropdownMenuItem
-                            onClick={() => openEditDialog(user)}
-                          >
-                            Editar Dados
-                          </DropdownMenuItem>
-                          <DropdownMenuItem>Redefinir Senha</DropdownMenuItem>
-                          <DropdownMenuSeparator />
-                          <DropdownMenuItem
-                            className="text-destructive"
-                            onClick={() => handleDeleteUser(user.id)}
-                          >
-                            Excluir Usuário
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </TableCell>
-                  </TableRow>
-                ))}
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" className="h-8 w-8 p-0">
+                              <span className="sr-only">Abrir menu</span>
+                              <MoreHorizontal className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuLabel>Ações</DropdownMenuLabel>
+                            <DropdownMenuItem
+                              onClick={() => openEditDialog(user)}
+                            >
+                              Editar Dados
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem
+                              className="text-destructive focus:text-destructive"
+                              onClick={() => setDeleteId(user.id)}
+                            >
+                              Excluir Usuário
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
               </TableBody>
             </Table>
           </div>
@@ -257,6 +405,31 @@ export default function UsersList() {
         onSubmit={editingUser ? handleUpdateUser : handleCreateUser}
         initialData={editingUser}
       />
+
+      <AlertDialog
+        open={!!deleteId}
+        onOpenChange={(open) => !open && setDeleteId(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirmar exclusão</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tem certeza que deseja excluir este usuário? Esta ação não pode
+              ser desfeita e o usuário perderá o acesso ao sistema
+              imediatamente.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteUser}
+              className="bg-destructive hover:bg-destructive/90"
+            >
+              Excluir Definitivamente
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

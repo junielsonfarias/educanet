@@ -1,8 +1,8 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import * as z from 'zod'
-import { Check, ChevronsUpDown } from 'lucide-react'
+import { Check, ChevronsUpDown, Eye, EyeOff } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 import {
@@ -45,52 +45,25 @@ import {
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { ScrollArea } from '@/components/ui/scroll-area'
 import { mockSchools, User } from '@/lib/mock-data'
 
-const formSchema = z
-  .object({
-    name: z.string().min(2, 'Nome deve ter pelo menos 2 caracteres'),
-    email: z.string().email('E-mail inválido'),
-    password: z.string().min(6, 'Senha deve ter pelo menos 6 caracteres'),
-    role: z.enum(['admin', 'supervisor', 'coordinator', 'administrative'], {
-      required_error: 'Selecione um perfil',
-    }),
-    schoolIds: z.array(z.string()).optional(),
-    schoolId: z.string().optional(),
-  })
-  .refine(
-    (data) => {
-      if (
-        data.role === 'coordinator' &&
-        (!data.schoolIds || data.schoolIds.length === 0)
-      ) {
-        return false
-      }
-      return true
-    },
-    {
-      message: 'Selecione pelo menos uma escola',
-      path: ['schoolIds'],
-    },
-  )
-  .refine(
-    (data) => {
-      if (data.role === 'administrative' && !data.schoolId) {
-        return false
-      }
-      return true
-    },
-    {
-      message: 'Selecione uma escola',
-      path: ['schoolId'],
-    },
-  )
+// Validation Schema
+const baseSchema = z.object({
+  name: z.string().min(2, 'Nome deve ter pelo menos 2 caracteres'),
+  email: z.string().email('E-mail inválido'),
+  password: z.string().optional(),
+  confirmPassword: z.string().optional(),
+  role: z.enum(['admin', 'supervisor', 'coordinator', 'administrative'], {
+    required_error: 'Selecione um perfil',
+  }),
+  schoolIds: z.array(z.string()).optional(),
+  schoolId: z.string().optional(),
+})
 
 interface UserFormDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
-  onSubmit: (data: z.infer<typeof formSchema>) => void
+  onSubmit: (data: any) => void
   initialData?: User | null
 }
 
@@ -100,12 +73,67 @@ export function UserFormDialog({
   onSubmit,
   initialData,
 }: UserFormDialogProps) {
-  const form = useForm<z.infer<typeof formSchema>>({
+  const [showPassword, setShowPassword] = useState(false)
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false)
+  const [comboboxOpen, setComboboxOpen] = useState(false)
+
+  // Dynamic schema based on initialData (Create vs Edit)
+  const formSchema = useMemo(() => {
+    return baseSchema.superRefine((data, ctx) => {
+      // Password validation
+      if (!initialData && !data.password) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'Senha é obrigatória para novos usuários',
+          path: ['password'],
+        })
+      }
+
+      if (data.password && data.password.length < 6) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'A senha deve ter no mínimo 6 caracteres',
+          path: ['password'],
+        })
+      }
+
+      if (data.password !== data.confirmPassword) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'As senhas não conferem',
+          path: ['confirmPassword'],
+        })
+      }
+
+      // Role specific validation
+      if (
+        data.role === 'coordinator' &&
+        (!data.schoolIds || data.schoolIds.length === 0)
+      ) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'Selecione pelo menos uma escola',
+          path: ['schoolIds'],
+        })
+      }
+
+      if (data.role === 'administrative' && !data.schoolId) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'Selecione uma escola',
+          path: ['schoolId'],
+        })
+      }
+    })
+  }, [initialData])
+
+  const form = useForm<z.infer<typeof baseSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
       name: '',
       email: '',
       password: '',
+      confirmPassword: '',
       role: 'administrative',
       schoolIds: [],
       schoolId: '',
@@ -118,7 +146,8 @@ export function UserFormDialog({
         form.reset({
           name: initialData.name,
           email: initialData.email,
-          password: initialData.password || '',
+          password: '',
+          confirmPassword: '',
           role: initialData.role,
           schoolIds: initialData.schoolIds || [],
           schoolId: initialData.schoolId || '',
@@ -128,32 +157,54 @@ export function UserFormDialog({
           name: '',
           email: '',
           password: '',
+          confirmPassword: '',
           role: 'administrative',
           schoolIds: [],
           schoolId: '',
         })
       }
+      setShowPassword(false)
+      setShowConfirmPassword(false)
     }
   }, [open, initialData, form])
 
   const role = form.watch('role')
-  const [comboboxOpen, setComboboxOpen] = useState(false)
 
-  const handleSubmit = (data: z.infer<typeof formSchema>) => {
-    onSubmit(data)
+  const handleSubmit = (data: z.infer<typeof baseSchema>) => {
+    const submitData = { ...data }
+
+    // Remove password if empty (edit mode)
+    if (!submitData.password) {
+      delete submitData.password
+    }
+    // Always remove confirmPassword
+    delete (submitData as any).confirmPassword
+
+    // Clean up school data based on role
+    if (submitData.role === 'admin' || submitData.role === 'supervisor') {
+      delete submitData.schoolId
+      delete submitData.schoolIds
+    } else if (submitData.role === 'coordinator') {
+      delete submitData.schoolId
+    } else if (submitData.role === 'administrative') {
+      delete submitData.schoolIds
+    }
+
+    onSubmit(submitData)
     onOpenChange(false)
   }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[600px]">
+      <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>
             {initialData ? 'Editar Usuário' : 'Novo Usuário'}
           </DialogTitle>
           <DialogDescription>
-            Preencha os dados abaixo para {initialData ? 'editar' : 'criar'} um
-            usuário.
+            {initialData
+              ? 'Atualize as informações do usuário.'
+              : 'Preencha os dados para criar um novo usuário.'}
           </DialogDescription>
         </DialogHeader>
 
@@ -162,7 +213,7 @@ export function UserFormDialog({
             onSubmit={form.handleSubmit(handleSubmit)}
             className="space-y-4"
           >
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <FormField
                 control={form.control}
                 name="name"
@@ -170,7 +221,7 @@ export function UserFormDialog({
                   <FormItem>
                     <FormLabel>Nome Completo</FormLabel>
                     <FormControl>
-                      <Input placeholder="João Silva" {...field} />
+                      <Input placeholder="Nome do usuário" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -183,7 +234,7 @@ export function UserFormDialog({
                   <FormItem>
                     <FormLabel>E-mail (Login)</FormLabel>
                     <FormControl>
-                      <Input placeholder="joao@escola.com" {...field} />
+                      <Input placeholder="usuario@escola.com" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -191,13 +242,13 @@ export function UserFormDialog({
               />
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <FormField
                 control={form.control}
                 name="role"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Perfil de Acesso</FormLabel>
+                    <FormLabel>Nível de Perfil</FormLabel>
                     <Select
                       onValueChange={field.onChange}
                       defaultValue={field.value}
@@ -216,23 +267,75 @@ export function UserFormDialog({
                         </SelectItem>
                       </SelectContent>
                     </Select>
-                    <FormDescription>
-                      Define o nível de permissão no sistema.
-                    </FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}
               />
+            </div>
 
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <FormField
                 control={form.control}
                 name="password"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Senha</FormLabel>
-                    <FormControl>
-                      <Input type="password" placeholder="******" {...field} />
-                    </FormControl>
+                    <FormLabel>Senha {initialData && '(Opcional)'}</FormLabel>
+                    <div className="relative">
+                      <FormControl>
+                        <Input
+                          type={showPassword ? 'text' : 'password'}
+                          placeholder={initialData ? 'Nova senha' : 'Senha'}
+                          {...field}
+                        />
+                      </FormControl>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                        onClick={() => setShowPassword(!showPassword)}
+                      >
+                        {showPassword ? (
+                          <EyeOff className="h-4 w-4 text-muted-foreground" />
+                        ) : (
+                          <Eye className="h-4 w-4 text-muted-foreground" />
+                        )}
+                      </Button>
+                    </div>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="confirmPassword"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Confirmar Senha</FormLabel>
+                    <div className="relative">
+                      <FormControl>
+                        <Input
+                          type={showConfirmPassword ? 'text' : 'password'}
+                          placeholder="Confirme a senha"
+                          {...field}
+                        />
+                      </FormControl>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                        onClick={() =>
+                          setShowConfirmPassword(!showConfirmPassword)
+                        }
+                      >
+                        {showConfirmPassword ? (
+                          <EyeOff className="h-4 w-4 text-muted-foreground" />
+                        ) : (
+                          <Eye className="h-4 w-4 text-muted-foreground" />
+                        )}
+                      </Button>
+                    </div>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -365,7 +468,7 @@ export function UserFormDialog({
               >
                 Cancelar
               </Button>
-              <Button type="submit">Salvar Usuário</Button>
+              <Button type="submit">Salvar</Button>
             </DialogFooter>
           </form>
         </Form>
