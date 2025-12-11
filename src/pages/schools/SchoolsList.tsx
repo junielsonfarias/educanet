@@ -33,55 +33,7 @@ import {
   CardTitle,
 } from '@/components/ui/card'
 import { Link } from 'react-router-dom'
-
-interface School {
-  id: string
-  code: string
-  name: string
-  address: string
-  phone: string
-  director: string
-  status: 'active' | 'inactive'
-}
-
-const mockSchools: School[] = [
-  {
-    id: '1',
-    code: 'ESC-001',
-    name: 'Escola Municipal Monteiro Lobato',
-    address: 'Rua das Flores, 123 - Centro',
-    phone: '(11) 3456-7890',
-    director: 'Maria Silva',
-    status: 'active',
-  },
-  {
-    id: '2',
-    code: 'ESC-002',
-    name: 'CMEI Pequeno Príncipe',
-    address: 'Av. Brasil, 450 - Jardim América',
-    phone: '(11) 3456-7891',
-    director: "Joana D'arc",
-    status: 'active',
-  },
-  {
-    id: '3',
-    code: 'ESC-003',
-    name: 'Escola Estadual Tiradentes',
-    address: 'Rua da Liberdade, 88 - Vila Nova',
-    phone: '(11) 3456-7892',
-    director: 'Carlos Souza',
-    status: 'inactive',
-  },
-  {
-    id: '4',
-    code: 'ESC-004',
-    name: 'Escola Técnica Santos Dumont',
-    address: 'Rodovia SP-50, Km 12',
-    phone: '(11) 3456-7893',
-    director: 'Fernanda Lima',
-    status: 'active',
-  },
-]
+import { mockSchools } from '@/lib/mock-data'
 
 export default function SchoolsList() {
   const [searchTerm, setSearchTerm] = useState('')

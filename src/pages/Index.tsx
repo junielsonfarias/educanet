@@ -13,6 +13,7 @@ import {
   CardTitle,
 } from '@/components/ui/card'
 import { useToast } from '@/hooks/use-toast'
+import useUserStore from '@/stores/useUserStore'
 
 export default function Index() {
   const [isLoading, setIsLoading] = useState(false)
@@ -21,15 +22,18 @@ export default function Index() {
   const [password, setPassword] = useState('')
   const navigate = useNavigate()
   const { toast } = useToast()
+  const { login } = useUserStore()
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsLoading(true)
 
-    // Simulate API call
-    setTimeout(() => {
+    // Simulate API call latency
+    setTimeout(async () => {
+      const success = await login(email, password)
       setIsLoading(false)
-      if (email === 'admin@escola.com' && password === 'admin') {
+
+      if (success) {
         toast({
           title: 'Login realizado com sucesso!',
           description: 'Bem-vindo ao Sistema de Gestão Escolar.',
@@ -39,7 +43,7 @@ export default function Index() {
         toast({
           variant: 'destructive',
           title: 'Erro no login',
-          description: 'Credenciais inválidas. Tente admin@escola.com / admin',
+          description: 'Credenciais inválidas. Verifique e-mail e senha.',
         })
       }
     }, 1500)
@@ -67,7 +71,7 @@ export default function Index() {
           <form onSubmit={handleLogin}>
             <div className="grid gap-4">
               <div className="grid gap-2">
-                <Label htmlFor="email">E-mail ou CPF</Label>
+                <Label htmlFor="email">E-mail ou Login</Label>
                 <Input
                   id="email"
                   type="email"
