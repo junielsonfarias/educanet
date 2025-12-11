@@ -20,6 +20,7 @@ export interface Classroom {
   minStudents?: number
   operatingDays?: string[]
   isMultiGrade?: boolean
+  maxDependencySubjects?: number // New field: Max subjects allowed for dependency
 }
 
 export interface AcademicYear {
@@ -66,8 +67,11 @@ export interface EvaluationRule {
   name: string
   type: 'numeric' | 'descriptive'
   description: string
-  minGrade?: number
-  maxGrade?: number
+  minGrade?: number // Scale Min (e.g., 0)
+  maxGrade?: number // Scale Max (e.g., 10)
+  passingGrade?: number // Min grade to pass (e.g., 6.0)
+  minDependencyGrade?: number // Min grade to be eligible for dependency (e.g., 4.0)
+  minAttendance?: number // Min attendance percentage (e.g., 75)
 }
 
 export interface Grade {
@@ -126,12 +130,16 @@ export const mockEvaluationRules: EvaluationRule[] = [
     description: 'Avaliação baseada em notas de 0 a 10 com média 6.0.',
     minGrade: 0,
     maxGrade: 10,
+    passingGrade: 6.0,
+    minDependencyGrade: 4.0,
+    minAttendance: 75,
   },
   {
     id: 'rule2',
     name: 'Parecer Descritivo',
     type: 'descriptive',
     description: 'Avaliação qualitativa através de relatórios semestrais.',
+    minAttendance: 75,
   },
 ]
 
@@ -229,6 +237,7 @@ export const mockSchools: School[] = [
             minStudents: 15,
             operatingDays: ['seg', 'ter', 'qua', 'qui', 'sex'],
             isMultiGrade: false,
+            maxDependencySubjects: 2,
           },
         ],
       },

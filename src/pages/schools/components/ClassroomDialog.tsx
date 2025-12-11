@@ -38,6 +38,7 @@ const classroomSchema = z.object({
   gradeId: z.string().optional(),
   operatingHours: z.string().optional(),
   minStudents: z.coerce.number().min(0).optional(),
+  maxDependencySubjects: z.coerce.number().min(0).optional(),
   operatingDays: z.array(z.string()).optional(),
   isMultiGrade: z.boolean().default(false),
   // Context fields for when created from list
@@ -80,6 +81,7 @@ export function ClassroomDialog({
       gradeId: '',
       operatingHours: '',
       minStudents: 0,
+      maxDependencySubjects: 0,
       operatingDays: ['seg', 'ter', 'qua', 'qui', 'sex'],
       isMultiGrade: false,
       schoolId: '',
@@ -97,6 +99,7 @@ export function ClassroomDialog({
           gradeId: initialData.gradeId || '',
           operatingHours: initialData.operatingHours || '',
           minStudents: initialData.minStudents || 0,
+          maxDependencySubjects: initialData.maxDependencySubjects || 0,
           operatingDays: initialData.operatingDays || [
             'seg',
             'ter',
@@ -116,6 +119,7 @@ export function ClassroomDialog({
           gradeId: '',
           operatingHours: '',
           minStudents: 0,
+          maxDependencySubjects: 0,
           operatingDays: ['seg', 'ter', 'qua', 'qui', 'sex'],
           isMultiGrade: false,
           schoolId: '',
@@ -354,6 +358,29 @@ export function ClassroomDialog({
                     <FormControl>
                       <Input type="number" {...field} />
                     </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            <div className="border rounded-md p-4 bg-secondary/10">
+              <h4 className="font-medium text-sm mb-3">
+                Critérios de Dependência
+              </h4>
+              <FormField
+                control={form.control}
+                name="maxDependencySubjects"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Máximo de Disciplinas em Dependência</FormLabel>
+                    <FormControl>
+                      <Input type="number" min={0} {...field} />
+                    </FormControl>
+                    <FormDescription>
+                      Número máximo de disciplinas reprovadas que o aluno pode
+                      levar para o próximo ano.
+                    </FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}

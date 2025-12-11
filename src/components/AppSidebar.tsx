@@ -57,6 +57,7 @@ export function AppSidebar() {
       items: [
         { title: 'Cursos', url: '/academico/cursos' },
         { title: 'Turmas', url: '/academico/turmas' },
+        { title: 'Regras de Avaliação', url: '/academico/regras-avaliacao' },
         { title: 'Calendário', url: '/calendario' },
       ],
     },

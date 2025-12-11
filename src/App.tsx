@@ -20,6 +20,7 @@ import EnrollmentReport from './pages/reports/EnrollmentReport'
 import PerformanceReport from './pages/reports/PerformanceReport'
 import TeacherAllocationReport from './pages/reports/TeacherAllocationReport'
 import ReportCard from './pages/public/ReportCard'
+import EvaluationRulesList from './pages/academic/EvaluationRulesList'
 import NotFound from './pages/NotFound'
 import Layout from './components/Layout'
 import UsersList from './pages/settings/UsersList'
@@ -92,6 +93,10 @@ const App = () => (
                         <Route
                           path="/academico/turmas"
                           element={<ClassesList />}
+                        />
+                        <Route
+                          path="/academico/regras-avaliacao"
+                          element={<EvaluationRulesList />}
                         />
                         <Route
                           path="/avaliacao/lancamento"
