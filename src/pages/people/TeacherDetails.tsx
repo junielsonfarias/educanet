@@ -8,6 +8,9 @@ import {
   Trash2,
   Calendar,
   Plus,
+  Briefcase,
+  GraduationCap,
+  FileText,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
@@ -37,6 +40,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 import { useToast } from '@/hooks/use-toast'
+import { format } from 'date-fns'
 
 export default function TeacherDetails() {
   const { id } = useParams<{ id: string }>()
@@ -73,6 +77,13 @@ export default function TeacherDetails() {
   const email = teacher.email || 'N/A'
   const phone = teacher.phone || 'N/A'
   const status = teacher.status || 'inactive'
+  const cpf = teacher.cpf || 'Não informado'
+  const role = teacher.role || 'Não informado'
+  const bond = teacher.employmentBond || 'Não informado'
+  const admission = teacher.admissionDate
+    ? format(new Date(teacher.admissionDate), 'dd/MM/yyyy')
+    : 'Não informada'
+  const academic = teacher.academicBackground || 'Não informada'
 
   const handleUpdate = (data: any) => {
     updateTeacher(teacher.id, data)
@@ -156,7 +167,7 @@ export default function TeacherDetails() {
       </div>
 
       <div className="grid gap-6 md:grid-cols-3">
-        <Card className="col-span-1">
+        <Card className="col-span-1 h-fit">
           <CardContent className="pt-6 flex flex-col items-center text-center">
             <Avatar className="h-32 w-32 mb-4 border-4 border-primary/10">
               <AvatarImage
@@ -167,7 +178,7 @@ export default function TeacherDetails() {
               </AvatarFallback>
             </Avatar>
             <h3 className="text-xl font-bold">{name}</h3>
-            <p className="text-sm text-muted-foreground mb-2">Docente</p>
+            <p className="text-sm text-muted-foreground mb-2">{role}</p>
             <Badge
               variant={status === 'active' ? 'default' : 'secondary'}
               className="mt-2"
@@ -180,7 +191,9 @@ export default function TeacherDetails() {
         <Card className="col-span-1 md:col-span-2">
           <CardHeader>
             <CardTitle>Informações Profissionais</CardTitle>
-            <CardDescription>Detalhes do cadastro docente.</CardDescription>
+            <CardDescription>
+              Dados completos e vínculo empregatício.
+            </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
@@ -196,12 +209,47 @@ export default function TeacherDetails() {
                 </span>
                 <p className="font-medium">{phone}</p>
               </div>
-              <div className="space-y-1 sm:col-span-2">
+              <div className="space-y-1">
                 <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">
                   <Mail className="h-4 w-4" /> E-mail Institucional
                 </span>
                 <p className="font-medium">{email}</p>
               </div>
+              <div className="space-y-1">
+                <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                  <FileText className="h-4 w-4" /> CPF
+                </span>
+                <p className="font-medium">{cpf}</p>
+              </div>
+              <div className="space-y-1">
+                <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                  <Briefcase className="h-4 w-4" /> Cargo/Função
+                </span>
+                <p className="font-medium">{role}</p>
+              </div>
+              <div className="space-y-1">
+                <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                  <Briefcase className="h-4 w-4" /> Vínculo
+                </span>
+                <p className="font-medium">{bond}</p>
+              </div>
+              <div className="space-y-1">
+                <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                  <Calendar className="h-4 w-4" /> Data de Admissão
+                </span>
+                <p className="font-medium">{admission}</p>
+              </div>
+            </div>
+
+            <Separator />
+
+            <div className="space-y-1">
+              <span className="text-sm font-medium text-muted-foreground flex items-center gap-2 mb-2">
+                <GraduationCap className="h-4 w-4" /> Formação Acadêmica
+              </span>
+              <p className="text-sm leading-relaxed text-justify bg-muted/20 p-3 rounded-md">
+                {academic}
+              </p>
             </div>
 
             <Separator />

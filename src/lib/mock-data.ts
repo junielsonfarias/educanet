@@ -108,6 +108,12 @@ export interface Teacher {
   phone: string
   status: 'active' | 'inactive'
   allocations: TeacherAllocation[]
+  // New fields
+  cpf?: string
+  employmentBond?: 'Contratado' | 'Efetivo'
+  admissionDate?: string
+  role?: string
+  academicBackground?: string
 }
 
 // Assessment Data Types
@@ -320,6 +326,12 @@ export const mockTeachers: Teacher[] = [
     subject: 'Matemática',
     phone: '(11) 91234-5678',
     status: 'active',
+    cpf: '123.456.789-00',
+    employmentBond: 'Efetivo',
+    admissionDate: '2020-02-01',
+    role: 'Professor II',
+    academicBackground:
+      'Licenciatura em Matemática pela USP. Pós-graduação em Educação Matemática.',
     allocations: [
       {
         id: 'a1',

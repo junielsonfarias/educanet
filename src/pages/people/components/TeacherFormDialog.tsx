@@ -27,6 +27,7 @@ import {
 } from '@/components/ui/select'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
+import { Textarea } from '@/components/ui/textarea'
 import { Teacher } from '@/lib/mock-data'
 
 const teacherSchema = z.object({
@@ -35,6 +36,13 @@ const teacherSchema = z.object({
   subject: z.string().min(2, 'Disciplina é obrigatória'),
   phone: z.string().min(8, 'Telefone inválido'),
   status: z.enum(['active', 'inactive']),
+  cpf: z.string().min(11, 'CPF inválido'),
+  employmentBond: z.enum(['Contratado', 'Efetivo'], {
+    required_error: 'Selecione o vínculo',
+  }),
+  admissionDate: z.string().min(1, 'Data de admissão obrigatória'),
+  role: z.string().min(2, 'Cargo/Função é obrigatório'),
+  academicBackground: z.string().min(5, 'Formação acadêmica é obrigatória'),
 })
 
 interface TeacherFormDialogProps {
@@ -58,13 +66,29 @@ export function TeacherFormDialog({
       subject: '',
       phone: '',
       status: 'active',
+      cpf: '',
+      employmentBond: 'Contratado',
+      admissionDate: '',
+      role: '',
+      academicBackground: '',
     },
   })
 
   useEffect(() => {
     if (open) {
       if (initialData) {
-        form.reset(initialData)
+        form.reset({
+          name: initialData.name,
+          email: initialData.email,
+          subject: initialData.subject,
+          phone: initialData.phone,
+          status: initialData.status,
+          cpf: initialData.cpf || '',
+          employmentBond: initialData.employmentBond || 'Contratado',
+          admissionDate: initialData.admissionDate || '',
+          role: initialData.role || '',
+          academicBackground: initialData.academicBackground || '',
+        })
       } else {
         form.reset({
           name: '',
@@ -72,6 +96,11 @@ export function TeacherFormDialog({
           subject: '',
           phone: '',
           status: 'active',
+          cpf: '',
+          employmentBond: 'Contratado',
+          admissionDate: '',
+          role: '',
+          academicBackground: '',
         })
       }
     }
@@ -84,15 +113,15 @@ export function TeacherFormDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[500px]">
+      <DialogContent className="sm:max-w-[800px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>
             {initialData ? 'Editar Professor' : 'Novo Professor'}
           </DialogTitle>
           <DialogDescription>
             {initialData
-              ? 'Atualize os dados do professor.'
-              : 'Cadastre um novo professor na rede.'}
+              ? 'Atualize os dados profissionais e acadêmicos.'
+              : 'Cadastre um novo professor na rede municipal.'}
           </DialogDescription>
         </DialogHeader>
 
@@ -101,52 +130,53 @@ export function TeacherFormDialog({
             onSubmit={form.handleSubmit(handleSubmit)}
             className="space-y-4"
           >
-            <FormField
-              control={form.control}
-              name="name"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Nome Completo</FormLabel>
-                  <FormControl>
-                    <Input placeholder="Nome do professor" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name="email"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>E-mail Institucional</FormLabel>
-                  <FormControl>
-                    <Input
-                      type="email"
-                      placeholder="professor@edu.gov"
-                      {...field}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <FormField
                 control={form.control}
-                name="subject"
+                name="name"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Disciplina</FormLabel>
+                    <FormLabel>Nome Completo</FormLabel>
                     <FormControl>
-                      <Input placeholder="Ex: Matemática" {...field} />
+                      <Input placeholder="Nome do professor" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
               />
+
+              <FormField
+                control={form.control}
+                name="cpf"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>CPF</FormLabel>
+                    <FormControl>
+                      <Input placeholder="000.000.000-00" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="email"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>E-mail Institucional</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="email"
+                        placeholder="professor@edu.gov"
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
               <FormField
                 control={form.control}
                 name="phone"
@@ -162,26 +192,115 @@ export function TeacherFormDialog({
               />
             </div>
 
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <FormField
+                control={form.control}
+                name="role"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Cargo/Função</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Ex: Professor II" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="subject"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Disciplina Principal</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Ex: Matemática" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="admissionDate"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Data de Admissão</FormLabel>
+                    <FormControl>
+                      <Input type="date" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="employmentBond"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Vínculo Empregatício</FormLabel>
+                    <Select
+                      onValueChange={field.onChange}
+                      defaultValue={field.value}
+                    >
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Selecione o vínculo" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="Contratado">Contratado</SelectItem>
+                        <SelectItem value="Efetivo">Efetivo</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="status"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Status</FormLabel>
+                    <Select
+                      onValueChange={field.onChange}
+                      defaultValue={field.value}
+                    >
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Selecione o status" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="active">Ativo</SelectItem>
+                        <SelectItem value="inactive">Inativo</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
             <FormField
               control={form.control}
-              name="status"
+              name="academicBackground"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Status</FormLabel>
-                  <Select
-                    onValueChange={field.onChange}
-                    defaultValue={field.value}
-                  >
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Selecione o status" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      <SelectItem value="active">Ativo</SelectItem>
-                      <SelectItem value="inactive">Inativo</SelectItem>
-                    </SelectContent>
-                  </Select>
+                  <FormLabel>Formação Acadêmica</FormLabel>
+                  <FormControl>
+                    <Textarea
+                      placeholder="Descreva a formação acadêmica, graduação, pós-graduação, etc."
+                      className="min-h-[100px]"
+                      {...field}
+                    />
+                  </FormControl>
                   <FormMessage />
                 </FormItem>
               )}
