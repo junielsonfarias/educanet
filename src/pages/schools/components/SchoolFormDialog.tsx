@@ -32,6 +32,16 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { School } from '@/lib/mock-data'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 
+const educationTypesList = [
+  'Educação Infantil',
+  'Ensino Fundamental - Anos Iniciais',
+  'Ensino Fundamental - Anos Finais',
+  'Ensino Médio',
+  'Educação Profissional',
+  'Educação de Jovens e Adultos (EJA)',
+  'Educação Especial',
+]
+
 const schoolSchema = z.object({
   name: z.string().min(3, 'Nome deve ter pelo menos 3 caracteres'),
   code: z.string().min(2, 'Código deve ter pelo menos 2 caracteres'),
@@ -44,6 +54,7 @@ const schoolSchema = z.object({
     .enum(['Federal', 'Estadual', 'Municipal', 'Privada'])
     .optional(),
   locationType: z.enum(['Urbana', 'Rural']).optional(),
+  educationTypes: z.array(z.string()).optional(),
   infrastructure: z.object({
     classrooms: z.coerce.number().min(0),
     accessible: z.boolean(),
@@ -78,6 +89,7 @@ export function SchoolFormDialog({
       status: 'active',
       administrativeDependency: 'Municipal',
       locationType: 'Urbana',
+      educationTypes: [],
       infrastructure: {
         classrooms: 0,
         accessible: false,
@@ -102,6 +114,7 @@ export function SchoolFormDialog({
           administrativeDependency:
             initialData.administrativeDependency || 'Municipal',
           locationType: initialData.locationType || 'Urbana',
+          educationTypes: initialData.educationTypes || [],
           infrastructure: initialData.infrastructure || {
             classrooms: 0,
             accessible: false,
@@ -121,6 +134,7 @@ export function SchoolFormDialog({
           status: 'active',
           administrativeDependency: 'Municipal',
           locationType: 'Urbana',
+          educationTypes: [],
           infrastructure: {
             classrooms: 0,
             accessible: false,
@@ -333,6 +347,59 @@ export function SchoolFormDialog({
                 </div>
 
                 <div className="space-y-3 border rounded-md p-4">
+                  <h4 className="font-medium text-sm">
+                    Níveis de Ensino Ofertados
+                  </h4>
+                  <FormField
+                    control={form.control}
+                    name="educationTypes"
+                    render={() => (
+                      <FormItem>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                          {educationTypesList.map((type) => (
+                            <FormField
+                              key={type}
+                              control={form.control}
+                              name="educationTypes"
+                              render={({ field }) => {
+                                return (
+                                  <FormItem
+                                    key={type}
+                                    className="flex flex-row items-start space-x-3 space-y-0"
+                                  >
+                                    <FormControl>
+                                      <Checkbox
+                                        checked={field.value?.includes(type)}
+                                        onCheckedChange={(checked) => {
+                                          return checked
+                                            ? field.onChange([
+                                                ...(field.value || []),
+                                                type,
+                                              ])
+                                            : field.onChange(
+                                                field.value?.filter(
+                                                  (value) => value !== type,
+                                                ),
+                                              )
+                                        }}
+                                      />
+                                    </FormControl>
+                                    <FormLabel className="font-normal">
+                                      {type}
+                                    </FormLabel>
+                                  </FormItem>
+                                )
+                              }}
+                            />
+                          ))}
+                        </div>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+
+                <div className="space-y-3 border rounded-md p-4">
                   <h4 className="font-medium text-sm">Infraestrutura</h4>
 
                   <FormField
@@ -364,7 +431,7 @@ export function SchoolFormDialog({
                           <div className="space-y-1 leading-none">
                             <FormLabel>Acessibilidade</FormLabel>
                             <FormDescription>
-                              Possui recursos de acessibilidade?
+                              Recursos disponíveis?
                             </FormDescription>
                           </div>
                         </FormItem>

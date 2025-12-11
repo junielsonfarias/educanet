@@ -9,7 +9,10 @@ import {
   Calendar,
   Users,
   Plus,
-  Clock,
+  Info,
+  Building,
+  Wifi,
+  Accessibility,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
@@ -150,6 +153,110 @@ export default function SchoolDetails() {
                     alt="Escola"
                     className="w-full h-full object-cover"
                   />
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="col-span-2 lg:col-span-3">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Info className="h-5 w-5" />
+                  Dados do Censo Escolar / INEP
+                </CardTitle>
+                <CardDescription>
+                  Informações para relatórios oficiais e censo escolar.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  <div className="space-y-3">
+                    <div>
+                      <span className="text-sm font-medium text-muted-foreground">
+                        Código INEP
+                      </span>
+                      <p className="font-semibold text-lg">
+                        {school.inepCode || '-'}
+                      </p>
+                    </div>
+                    <div>
+                      <span className="text-sm font-medium text-muted-foreground">
+                        Dependência Adm.
+                      </span>
+                      <p className="font-medium">
+                        {school.administrativeDependency || '-'}
+                      </p>
+                    </div>
+                    <div>
+                      <span className="text-sm font-medium text-muted-foreground">
+                        Localização
+                      </span>
+                      <p className="font-medium">
+                        {school.locationType || '-'}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="space-y-3">
+                    <span className="text-sm font-medium text-muted-foreground block mb-2">
+                      Infraestrutura
+                    </span>
+                    <div className="grid grid-cols-1 gap-2">
+                      <div className="flex items-center gap-2 text-sm">
+                        <Building className="h-4 w-4 text-primary" />
+                        <span>
+                          {school.infrastructure?.classrooms || 0} Salas de Aula
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2 text-sm">
+                        <Accessibility
+                          className={`h-4 w-4 ${school.infrastructure?.accessible ? 'text-primary' : 'text-muted-foreground/40'}`}
+                        />
+                        <span
+                          className={
+                            school.infrastructure?.accessible
+                              ? ''
+                              : 'text-muted-foreground'
+                          }
+                        >
+                          Acessibilidade
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2 text-sm">
+                        <Wifi
+                          className={`h-4 w-4 ${school.infrastructure?.internet ? 'text-primary' : 'text-muted-foreground/40'}`}
+                        />
+                        <span
+                          className={
+                            school.infrastructure?.internet
+                              ? ''
+                              : 'text-muted-foreground'
+                          }
+                        >
+                          Internet
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <span className="text-sm font-medium text-muted-foreground block">
+                      Níveis de Ensino
+                    </span>
+                    {school.educationTypes &&
+                    school.educationTypes.length > 0 ? (
+                      <div className="flex flex-wrap gap-2">
+                        {school.educationTypes.map((type) => (
+                          <Badge key={type} variant="secondary">
+                            {type}
+                          </Badge>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-sm text-muted-foreground italic">
+                        Nenhum nível informado
+                      </p>
+                    )}
+                  </div>
                 </div>
               </CardContent>
             </Card>

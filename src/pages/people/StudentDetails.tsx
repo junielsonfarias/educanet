@@ -15,6 +15,7 @@ import {
   Plus,
   Trophy,
   Filter,
+  FileText,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
@@ -178,15 +179,10 @@ export default function StudentDetails() {
 
   // Calculate Consolidated Performance for an enrollment
   const getEnrollmentPerformance = (enrollment: any) => {
-    // Filter assessments for this school/year
-    // Note: Enrollment mock data doesn't have academicYearId directly in mock-data interface used in useSchoolStore,
-    // but in a real app we would link it. Here we approximate by year number match if possible, or just all assessments.
-    // For this mock, let's filter by matching schoolId.
     const relevantAssessments = assessments.filter(
       (a) => a.schoolId === enrollment.schoolId,
-    ) // Simplification
+    )
 
-    // Group by subject
     const subjects: Record<string, { total: number; count: number }> = {}
     relevantAssessments.forEach((a) => {
       if (typeof a.value === 'number') {
@@ -306,6 +302,14 @@ export default function StudentDetails() {
                   </span>
                   <p className="font-medium">{student.susCard || '-'}</p>
                 </div>
+                <div className="col-span-1 sm:col-span-2">
+                  <span className="text-sm text-muted-foreground flex items-center gap-1">
+                    <FileText className="h-3 w-3" /> Certidão de Nascimento
+                  </span>
+                  <p className="font-medium">
+                    {student.birthCertificate || '-'}
+                  </p>
+                </div>
                 <div>
                   <span className="text-sm text-muted-foreground">NIS</span>
                   <p className="font-medium">{student.social?.nis || '-'}</p>
@@ -321,12 +325,18 @@ export default function StudentDetails() {
                     Nome do Pai
                   </span>
                   <p className="font-medium">{student.fatherName || '-'}</p>
+                  <span className="text-xs text-muted-foreground block mt-0.5">
+                    {student.fatherEducation || 'Escolaridade não inf.'}
+                  </span>
                 </div>
                 <div>
                   <span className="text-sm text-muted-foreground">
                     Nome da Mãe
                   </span>
                   <p className="font-medium">{student.motherName || '-'}</p>
+                  <span className="text-xs text-muted-foreground block mt-0.5">
+                    {student.motherEducation || 'Escolaridade não inf.'}
+                  </span>
                 </div>
                 <div>
                   <span className="text-sm text-muted-foreground">
