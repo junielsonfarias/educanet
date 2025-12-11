@@ -1,0 +1,162 @@
+import {
+  Sidebar,
+  SidebarContent,
+  SidebarFooter,
+  SidebarGroup,
+  SidebarGroupContent,
+  SidebarGroupLabel,
+  SidebarHeader,
+  SidebarMenu,
+  SidebarMenuButton,
+  SidebarMenuItem,
+  SidebarRail,
+} from '@/components/ui/sidebar'
+import {
+  BookOpen,
+  Calendar,
+  GraduationCap,
+  LayoutDashboard,
+  LogOut,
+  School,
+  Settings,
+  Users,
+  FileText,
+  UserCircle,
+} from 'lucide-react'
+import { Link, useLocation } from 'react-router-dom'
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+
+export function AppSidebar() {
+  const location = useLocation()
+  const pathname = location.pathname
+
+  const menuItems = [
+    {
+      title: 'Dashboard',
+      url: '/dashboard',
+      icon: LayoutDashboard,
+    },
+    {
+      title: 'Escolas',
+      url: '/escolas',
+      icon: School,
+    },
+    {
+      title: 'Pessoas',
+      icon: Users,
+      items: [
+        { title: 'Alunos', url: '/pessoas/alunos' },
+        { title: 'Professores', url: '/pessoas/professores' },
+      ],
+    },
+    {
+      title: 'Acadêmico',
+      icon: BookOpen,
+      items: [{ title: 'Turmas', url: '/academico/turmas' }],
+    },
+    {
+      title: 'Avaliação',
+      icon: GraduationCap,
+      url: '/avaliacao',
+    },
+    {
+      title: 'Relatórios',
+      icon: FileText,
+      url: '/relatorios',
+    },
+    {
+      title: 'Configurações',
+      url: '/configuracoes',
+      icon: Settings,
+    },
+  ]
+
+  return (
+    <Sidebar collapsible="icon">
+      <SidebarHeader>
+        <div className="flex items-center gap-2 px-2 py-2">
+          <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
+            <School className="size-4" />
+          </div>
+          <div className="flex flex-col gap-0.5 leading-none">
+            <span className="font-semibold">EduGestão</span>
+            <span className="text-xs text-muted-foreground">
+              Municipal v1.0
+            </span>
+          </div>
+        </div>
+      </SidebarHeader>
+      <SidebarContent>
+        <SidebarGroup>
+          <SidebarGroupLabel>Menu Principal</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {menuItems.map((item) => (
+                <SidebarMenuItem key={item.title}>
+                  {item.items ? (
+                    <div className="space-y-1">
+                      <div className="px-2 py-1.5 text-sm font-medium text-muted-foreground flex items-center gap-2">
+                        <item.icon className="h-4 w-4" />
+                        <span className="group-data-[collapsible=icon]:hidden">
+                          {item.title}
+                        </span>
+                      </div>
+                      <div className="pl-4 space-y-1 group-data-[collapsible=icon]:hidden">
+                        {item.items.map((subItem) => (
+                          <SidebarMenuButton
+                            key={subItem.url}
+                            asChild
+                            isActive={pathname === subItem.url}
+                            tooltip={subItem.title}
+                          >
+                            <Link to={subItem.url}>
+                              <span>{subItem.title}</span>
+                            </Link>
+                          </SidebarMenuButton>
+                        ))}
+                      </div>
+                    </div>
+                  ) : (
+                    <SidebarMenuButton
+                      asChild
+                      isActive={pathname === item.url}
+                      tooltip={item.title}
+                    >
+                      <Link to={item.url!}>
+                        <item.icon />
+                        <span>{item.title}</span>
+                      </Link>
+                    </SidebarMenuButton>
+                  )}
+                </SidebarMenuItem>
+              ))}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+      </SidebarContent>
+      <SidebarFooter>
+        <SidebarMenu>
+          <SidebarMenuItem>
+            <SidebarMenuButton size="lg" asChild>
+              <div className="flex items-center gap-2">
+                <Avatar className="h-8 w-8 rounded-lg">
+                  <AvatarImage
+                    src="https://img.usecurling.com/ppl/thumbnail?gender=female"
+                    alt="User"
+                  />
+                  <AvatarFallback className="rounded-lg">AD</AvatarFallback>
+                </Avatar>
+                <div className="grid flex-1 text-left text-sm leading-tight">
+                  <span className="truncate font-semibold">Ana Diretora</span>
+                  <span className="truncate text-xs">ana.diretora@edu.gov</span>
+                </div>
+                <LogOut className="ml-auto size-4" />
+              </div>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+        </SidebarMenu>
+      </SidebarFooter>
+      <SidebarRail />
+    </Sidebar>
+  )
+}
