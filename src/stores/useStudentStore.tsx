@@ -12,6 +12,11 @@ interface StudentContextType {
   deleteStudent: (id: string) => void
   getStudent: (id: string) => Student | undefined
   addEnrollment: (studentId: string, enrollment: Omit<Enrollment, 'id'>) => void
+  updateEnrollment: (
+    studentId: string,
+    enrollmentId: string,
+    data: Partial<Enrollment>,
+  ) => void
   addProjectEnrollment: (studentId: string, projectId: string) => void
   removeProjectEnrollment: (studentId: string, projectId: string) => void
 }
@@ -166,6 +171,26 @@ export const StudentProvider = ({
     )
   }
 
+  const updateEnrollment = (
+    studentId: string,
+    enrollmentId: string,
+    data: Partial<Enrollment>,
+  ) => {
+    setStudents((prev) =>
+      prev.map((s) => {
+        if (s.id === studentId) {
+          return {
+            ...s,
+            enrollments: s.enrollments.map((e) =>
+              e.id === enrollmentId ? { ...e, ...data } : e,
+            ),
+          }
+        }
+        return s
+      }),
+    )
+  }
+
   const addProjectEnrollment = (studentId: string, projectId: string) => {
     setStudents((prev) =>
       prev.map((s) => {
@@ -202,6 +227,7 @@ export const StudentProvider = ({
         deleteStudent,
         getStudent,
         addEnrollment,
+        updateEnrollment,
         addProjectEnrollment,
         removeProjectEnrollment,
       }}

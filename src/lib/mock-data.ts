@@ -111,6 +111,13 @@ export interface Teacher {
 }
 
 // Assessment Data Types
+export interface AssessmentType {
+  id: string
+  name: string
+  applicableGradeIds: string[]
+  excludeFromAverage: boolean
+}
+
 export interface Assessment {
   id: string
   studentId: string
@@ -123,6 +130,7 @@ export interface Assessment {
   category?: 'regular' | 'recuperation' // New field to distinguish regular vs recovery exams
   value: number | string // Grade or text
   date: string
+  assessmentTypeId?: string
 }
 
 // General Settings
@@ -205,6 +213,27 @@ export const mockCourses: Course[] = [
         ],
       },
     ],
+  },
+]
+
+export const mockAssessmentTypes: AssessmentType[] = [
+  {
+    id: 'at1',
+    name: 'Prova Bimestral',
+    applicableGradeIds: ['g5'],
+    excludeFromAverage: false,
+  },
+  {
+    id: 'at2',
+    name: 'Trabalho em Grupo',
+    applicableGradeIds: ['g5'],
+    excludeFromAverage: false,
+  },
+  {
+    id: 'at3',
+    name: 'Simulado Extra',
+    applicableGradeIds: ['g5'],
+    excludeFromAverage: true,
   },
 ]
 
@@ -475,6 +504,7 @@ export const mockAssessments: Assessment[] = [
     category: 'regular',
     value: 5.5, // Low grade
     date: '2024-04-10',
+    assessmentTypeId: 'at1',
   },
   {
     id: 'as1_rec',
@@ -488,6 +518,7 @@ export const mockAssessments: Assessment[] = [
     category: 'recuperation',
     value: 8.0, // Recovery grade
     date: '2024-04-15',
+    assessmentTypeId: 'at1',
   },
   {
     id: 'as2',
@@ -501,5 +532,6 @@ export const mockAssessments: Assessment[] = [
     category: 'regular',
     value: 7.0,
     date: '2024-06-20',
+    assessmentTypeId: 'at1',
   },
 ]

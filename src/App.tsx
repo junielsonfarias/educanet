@@ -21,6 +21,7 @@ import PerformanceReport from './pages/reports/PerformanceReport'
 import TeacherAllocationReport from './pages/reports/TeacherAllocationReport'
 import ReportCard from './pages/public/ReportCard'
 import EvaluationRulesList from './pages/academic/EvaluationRulesList'
+import AssessmentTypesList from './pages/academic/AssessmentTypesList'
 import NotFound from './pages/NotFound'
 import Layout from './components/Layout'
 import UsersList from './pages/settings/UsersList'
@@ -103,6 +104,10 @@ const App = () => (
                           <Route
                             path="/academico/regras-avaliacao"
                             element={<EvaluationRulesList />}
+                          />
+                          <Route
+                            path="/academico/tipos-avaliacao"
+                            element={<AssessmentTypesList />}
                           />
                           <Route
                             path="/avaliacao/lancamento"

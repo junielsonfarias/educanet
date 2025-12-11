@@ -1,4 +1,15 @@
 import {
+  Calendar,
+  LayoutDashboard,
+  School,
+  Users,
+  BookOpen,
+  Settings,
+  FileText,
+  LogOut,
+  GraduationCap,
+} from 'lucide-react'
+import {
   Sidebar,
   SidebarContent,
   SidebarFooter,
@@ -10,180 +21,219 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarRail,
+  SidebarSeparator,
 } from '@/components/ui/sidebar'
-import {
-  BookOpen,
-  GraduationCap,
-  LayoutDashboard,
-  LogOut,
-  School,
-  Settings,
-  Users,
-  FileText,
-  Calendar,
-  ClipboardList,
-} from 'lucide-react'
 import { Link, useLocation } from 'react-router-dom'
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import useUserStore from '@/stores/useUserStore'
+import { Avatar, AvatarFallback } from '@/components/ui/avatar'
+import { Button } from '@/components/ui/button'
+
+const menuItems = [
+  {
+    title: 'Dashboard',
+    url: '/dashboard',
+    icon: LayoutDashboard,
+  },
+  {
+    title: 'Escolas',
+    url: '/escolas',
+    icon: School,
+  },
+  {
+    title: 'Calendário',
+    url: '/calendario',
+    icon: Calendar,
+  },
+]
+
+const peopleItems = [
+  {
+    title: 'Alunos',
+    url: '/pessoas/alunos',
+    icon: Users,
+  },
+  {
+    title: 'Professores',
+    url: '/pessoas/professores',
+    icon: GraduationCap,
+  },
+]
+
+const academicItems = [
+  {
+    title: 'Cursos e Séries',
+    url: '/academico/cursos',
+    icon: BookOpen,
+  },
+  {
+    title: 'Turmas',
+    url: '/academico/turmas',
+    icon: Users,
+  },
+  {
+    title: 'Regras de Avaliação',
+    url: '/academico/regras-avaliacao',
+    icon: FileText,
+  },
+  {
+    title: 'Tipos de Avaliação',
+    url: '/academico/tipos-avaliacao',
+    icon: FileText,
+  },
+  {
+    title: 'Lançamento de Notas',
+    url: '/avaliacao/lancamento',
+    icon: GraduationCap,
+  },
+]
+
+const reportsItems = [
+  {
+    title: 'Relatórios',
+    url: '/relatorios',
+    icon: FileText,
+  },
+]
 
 export function AppSidebar() {
-  const location = useLocation()
-  const pathname = location.pathname
+  const { pathname } = useLocation()
   const { currentUser, logout } = useUserStore()
 
-  const menuItems = [
-    {
-      title: 'Dashboard',
-      url: '/dashboard',
-      icon: LayoutDashboard,
-    },
-    {
-      title: 'Escolas',
-      url: '/escolas',
-      icon: School,
-    },
-    {
-      title: 'Pessoas',
-      icon: Users,
-      items: [
-        { title: 'Alunos', url: '/pessoas/alunos' },
-        { title: 'Professores', url: '/pessoas/professores' },
-      ],
-    },
-    {
-      title: 'Acadêmico',
-      icon: BookOpen,
-      items: [
-        { title: 'Cursos', url: '/academico/cursos' },
-        { title: 'Turmas', url: '/academico/turmas' },
-        { title: 'Regras de Avaliação', url: '/academico/regras-avaliacao' },
-        { title: 'Calendário', url: '/calendario' },
-      ],
-    },
-    {
-      title: 'Avaliação',
-      icon: GraduationCap,
-      items: [{ title: 'Lançamento de Notas', url: '/avaliacao/lancamento' }],
-    },
-    {
-      title: 'Relatórios',
-      icon: FileText,
-      url: '/relatorios',
-    },
-    {
-      title: 'Configurações',
-      icon: Settings,
-      items: [
-        { title: 'Geral', url: '/configuracoes' },
-        { title: 'Usuários', url: '/configuracoes/usuarios' },
-      ],
-    },
-  ]
-
-  const displayItems = menuItems.map((item) => {
-    if (item.title === 'Configurações') {
-      return {
-        ...item,
-        items:
-          currentUser?.role === 'admin' || currentUser?.role === 'supervisor'
-            ? item.items
-            : item.items?.filter((i) => i.title !== 'Usuários'),
-      }
-    }
-    return item
-  })
+  const isActive = (url: string) => pathname.startsWith(url)
 
   return (
-    <Sidebar collapsible="icon">
-      <SidebarHeader>
-        <div className="flex items-center gap-2 px-2 py-2">
-          <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-            <School className="size-4" />
-          </div>
-          <div className="flex flex-col gap-0.5 leading-none">
-            <span className="font-semibold">EduGestão</span>
-            <span className="text-xs text-muted-foreground">
-              Municipal v1.0
-            </span>
-          </div>
+    <Sidebar>
+      <SidebarHeader className="p-4 border-b">
+        <div className="flex items-center gap-2 font-bold text-xl text-primary">
+          <GraduationCap className="h-6 w-6" />
+          <span>EduGestão</span>
         </div>
       </SidebarHeader>
       <SidebarContent>
         <SidebarGroup>
-          <SidebarGroupLabel>Menu Principal</SidebarGroupLabel>
+          <SidebarGroupLabel>Principal</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {displayItems.map((item) => (
+              {menuItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
-                  {item.items && item.items.length > 0 ? (
-                    <div className="space-y-1">
-                      <div className="px-2 py-1.5 text-sm font-medium text-muted-foreground flex items-center gap-2">
-                        <item.icon className="h-4 w-4" />
-                        <span className="group-data-[collapsible=icon]:hidden">
-                          {item.title}
-                        </span>
-                      </div>
-                      <div className="pl-4 space-y-1 group-data-[collapsible=icon]:hidden">
-                        {item.items.map((subItem) => (
-                          <SidebarMenuButton
-                            key={subItem.url}
-                            asChild
-                            isActive={pathname === subItem.url}
-                            tooltip={subItem.title}
-                          >
-                            <Link to={subItem.url}>
-                              <span>{subItem.title}</span>
-                            </Link>
-                          </SidebarMenuButton>
-                        ))}
-                      </div>
-                    </div>
-                  ) : !item.items ? (
-                    <SidebarMenuButton
-                      asChild
-                      isActive={pathname === item.url}
-                      tooltip={item.title}
-                    >
-                      <Link to={item.url!}>
-                        <item.icon />
-                        <span>{item.title}</span>
-                      </Link>
-                    </SidebarMenuButton>
-                  ) : null}
+                  <SidebarMenuButton
+                    asChild
+                    isActive={isActive(item.url)}
+                    tooltip={item.title}
+                  >
+                    <Link to={item.url}>
+                      <item.icon className="h-4 w-4" />
+                      <span>{item.title}</span>
+                    </Link>
+                  </SidebarMenuButton>
                 </SidebarMenuItem>
               ))}
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
+
+        <SidebarGroup>
+          <SidebarGroupLabel>Pessoas</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {peopleItems.map((item) => (
+                <SidebarMenuItem key={item.title}>
+                  <SidebarMenuButton
+                    asChild
+                    isActive={isActive(item.url)}
+                    tooltip={item.title}
+                  >
+                    <Link to={item.url}>
+                      <item.icon className="h-4 w-4" />
+                      <span>{item.title}</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+
+        <SidebarGroup>
+          <SidebarGroupLabel>Acadêmico</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {academicItems.map((item) => (
+                <SidebarMenuItem key={item.title}>
+                  <SidebarMenuButton
+                    asChild
+                    isActive={isActive(item.url)}
+                    tooltip={item.title}
+                  >
+                    <Link to={item.url}>
+                      <item.icon className="h-4 w-4" />
+                      <span>{item.title}</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+
+        <SidebarGroup>
+          <SidebarGroupLabel>Gestão</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {reportsItems.map((item) => (
+                <SidebarMenuItem key={item.title}>
+                  <SidebarMenuButton
+                    asChild
+                    isActive={isActive(item.url)}
+                    tooltip={item.title}
+                  >
+                    <Link to={item.url}>
+                      <item.icon className="h-4 w-4" />
+                      <span>{item.title}</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  asChild
+                  isActive={isActive('/configuracoes')}
+                  tooltip="Configurações"
+                >
+                  <Link to="/configuracoes">
+                    <Settings className="h-4 w-4" />
+                    <span>Configurações</span>
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
       </SidebarContent>
-      <SidebarFooter>
-        <SidebarMenu>
-          <SidebarMenuItem>
-            <SidebarMenuButton size="lg" asChild>
-              <div className="flex items-center gap-2">
-                <Avatar className="h-8 w-8 rounded-lg">
-                  <AvatarImage
-                    src={`https://img.usecurling.com/ppl/thumbnail?seed=${currentUser?.id}`}
-                    alt="User"
-                  />
-                  <AvatarFallback className="rounded-lg">
-                    {currentUser?.name.substring(0, 2).toUpperCase() || 'US'}
-                  </AvatarFallback>
-                </Avatar>
-                <div className="grid flex-1 text-left text-sm leading-tight">
-                  <span className="truncate font-semibold">
-                    {currentUser?.name || 'Usuário'}
-                  </span>
-                  <span className="truncate text-xs">
-                    {currentUser?.email || 'email@edu.gov'}
-                  </span>
-                </div>
-                <LogOut className="ml-auto size-4" onClick={logout} />
-              </div>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-        </SidebarMenu>
+
+      <SidebarFooter className="border-t p-4">
+        <div className="flex items-center gap-3 mb-4">
+          <Avatar className="h-9 w-9">
+            <AvatarFallback className="bg-primary/10 text-primary">
+              {currentUser?.name.substring(0, 2).toUpperCase() || 'AD'}
+            </AvatarFallback>
+          </Avatar>
+          <div className="flex flex-col overflow-hidden">
+            <span className="text-sm font-medium truncate">
+              {currentUser?.name || 'Admin'}
+            </span>
+            <span className="text-xs text-muted-foreground truncate">
+              {currentUser?.email || 'admin@escola.com'}
+            </span>
+          </div>
+        </div>
+        <Button
+          variant="outline"
+          className="w-full justify-start text-muted-foreground hover:text-foreground"
+          onClick={logout}
+        >
+          <LogOut className="mr-2 h-4 w-4" /> Sair
+        </Button>
       </SidebarFooter>
       <SidebarRail />
     </Sidebar>

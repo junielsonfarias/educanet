@@ -41,13 +41,14 @@ const filterSchema = z.object({
   periodId: z.string().min(1, 'Selecione o período'),
   subjectId: z.string().min(1, 'Selecione a disciplina'),
   category: z.enum(['regular', 'recuperation']).default('regular'),
+  assessmentTypeId: z.string().optional(),
 })
 
 export default function AssessmentInput() {
   const { schools } = useSchoolStore()
   const { courses, evaluationRules } = useCourseStore()
   const { students } = useStudentStore()
-  const { assessments, addAssessment } = useAssessmentStore()
+  const { assessments, addAssessment, assessmentTypes } = useAssessmentStore()
   const { toast } = useToast()
 
   const [selectedClass, setSelectedClass] = useState<any>(null)
@@ -65,6 +66,7 @@ export default function AssessmentInput() {
       periodId: '',
       subjectId: '',
       category: 'regular',
+      assessmentTypeId: '',
     },
   })
 
@@ -90,6 +92,11 @@ export default function AssessmentInput() {
     (r) => r.id === classGrade?.evaluationRuleId,
   )
 
+  // Filter assessment types applicable to this grade
+  const availableAssessmentTypes = assessmentTypes.filter(
+    (type) => classGrade && type.applicableGradeIds.includes(classGrade.id),
+  )
+
   const handleFilter = (data: z.infer<typeof filterSchema>) => {
     setSelectedClass(currentClass)
     setSelectedSubject(subjects.find((s) => s.id === data.subjectId))
@@ -110,7 +117,10 @@ export default function AssessmentInput() {
           a.classroomId === data.classId &&
           a.subjectId === data.subjectId &&
           a.periodId === data.periodId &&
-          (a.category || 'regular') === data.category,
+          (a.category || 'regular') === data.category &&
+          (data.assessmentTypeId
+            ? a.assessmentTypeId === data.assessmentTypeId
+            : true),
       )
       if (assessment) {
         currentGrades[student.id] = assessment.value
@@ -145,6 +155,7 @@ export default function AssessmentInput() {
           category: values.category,
           value: value,
           date: new Date().toISOString().split('T')[0],
+          assessmentTypeId: values.assessmentTypeId || undefined,
         })
       }
     })
@@ -325,7 +336,7 @@ export default function AssessmentInput() {
                 name="category"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Tipo de Lançamento</FormLabel>
+                    <FormLabel>Categoria</FormLabel>
                     <Select onValueChange={field.onChange} value={field.value}>
                       <FormControl>
                         <SelectTrigger>
@@ -339,6 +350,30 @@ export default function AssessmentInput() {
                         <SelectItem value="recuperation">
                           Recuperação
                         </SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="assessmentTypeId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Tipo de Avaliação</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Selecione..." />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {availableAssessmentTypes.map((t) => (
+                          <SelectItem key={t.id} value={t.id}>
+                            {t.name}
+                          </SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                     <FormMessage />
@@ -373,6 +408,18 @@ export default function AssessmentInput() {
                     ? 'Regular'
                     : 'Recuperação'}
                 </Badge>
+                {form.getValues('assessmentTypeId') && (
+                  <Badge
+                    variant="outline"
+                    className="border-primary text-primary"
+                  >
+                    {
+                      assessmentTypes.find(
+                        (t) => t.id === form.getValues('assessmentTypeId'),
+                      )?.name
+                    }
+                  </Badge>
+                )}
               </div>
             </CardTitle>
             <CardDescription>

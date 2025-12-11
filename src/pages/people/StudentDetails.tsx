@@ -83,13 +83,14 @@ export default function StudentDetails() {
     updateStudent,
     deleteStudent,
     addEnrollment,
+    updateEnrollment,
     addProjectEnrollment,
     removeProjectEnrollment,
   } = useStudentStore()
   const { schools } = useSchoolStore()
   const { projects } = useProjectStore()
   const { currentUser } = useUserStore()
-  const { getStudentAssessments } = useAssessmentStore()
+  const { getStudentAssessments, assessmentTypes } = useAssessmentStore()
   const { toast } = useToast()
 
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
@@ -169,10 +170,24 @@ export default function StudentDetails() {
     destination: string,
     notes?: string,
   ) => {
-    // In a real app, this would create a transfer record/history
+    // Determine status
+    const newStatus = 'Transferido'
+
+    // Update Student Status
     updateStudent(student.id, {
-      status: 'Transferido',
+      status: newStatus,
     })
+
+    // Update active enrollment status
+    const activeEnrollment = student.enrollments.find(
+      (e) => e.status === 'Cursando',
+    )
+    if (activeEnrollment) {
+      updateEnrollment(student.id, activeEnrollment.id, {
+        status: 'Transferido',
+      })
+    }
+
     toast({
       title: 'Processo Iniciado',
       description: `Transferência para ${destination} registrada. Status alterado para Transferido.`,
@@ -214,9 +229,16 @@ export default function StudentDetails() {
 
   // Calculate Consolidated Performance for an enrollment
   const getEnrollmentPerformance = (enrollment: any) => {
-    const relevantAssessments = assessments.filter(
-      (a) => a.schoolId === enrollment.schoolId,
-    )
+    // Only include assessments from same school year AND where type does not exclude from average
+    const relevantAssessments = assessments.filter((a) => {
+      if (a.schoolId !== enrollment.schoolId) return false
+      // Check type exclusion
+      if (a.assessmentTypeId) {
+        const type = assessmentTypes.find((t) => t.id === a.assessmentTypeId)
+        if (type?.excludeFromAverage) return false
+      }
+      return true
+    })
 
     const subjects: Record<string, { total: number; count: number }> = {}
     relevantAssessments.forEach((a) => {
@@ -513,7 +535,7 @@ export default function StudentDetails() {
           <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <div className="flex flex-col gap-1">
-                <CardTitle>Histórico de Matrículas</CardTitle>
+                <CardTitle>Histórico de Matrícula</CardTitle>
                 <CardDescription>Registro acadêmico completo</CardDescription>
               </div>
               <div className="flex items-center gap-2">
@@ -548,11 +570,9 @@ export default function StudentDetails() {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Ano</TableHead>
-                      <TableHead>Escola</TableHead>
-                      <TableHead>Série</TableHead>
-                      <TableHead>Tipo</TableHead>
+                      <TableHead>Ano Letivo</TableHead>
                       <TableHead>Status</TableHead>
+                      <TableHead>Série</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -566,33 +586,19 @@ export default function StudentDetails() {
                           {enrollment.year}
                         </TableCell>
                         <TableCell>
-                          {getSchoolName(enrollment.schoolId)}
-                        </TableCell>
-                        <TableCell>{enrollment.grade}</TableCell>
-                        <TableCell>
-                          <Badge
-                            variant={
-                              enrollment.type === 'dependency'
-                                ? 'secondary'
-                                : 'outline'
-                            }
-                          >
-                            {enrollment.type === 'dependency'
-                              ? 'Dependência'
-                              : 'Regular'}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
                           <Badge
                             variant={
                               enrollment.status === 'Cursando'
                                 ? 'default'
-                                : 'secondary'
+                                : enrollment.status === 'Aprovado'
+                                  ? 'default' // Should use success color ideally
+                                  : 'secondary'
                             }
                           >
                             {enrollment.status}
                           </Badge>
                         </TableCell>
+                        <TableCell>{enrollment.grade}</TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
@@ -736,6 +742,10 @@ export default function StudentDetails() {
               <h4 className="text-sm font-semibold">
                 Desempenho Consolidado (Disciplinas Cursadas)
               </h4>
+              <p className="text-xs text-muted-foreground mb-2">
+                Nota: Avaliações configuradas para "Não considerar no cálculo"
+                são excluídas desta média.
+              </p>
               {performanceData.length > 0 ? (
                 <Table>
                   <TableHeader>
@@ -764,7 +774,7 @@ export default function StudentDetails() {
                 </Table>
               ) : (
                 <p className="text-sm text-muted-foreground text-center py-4">
-                  Nenhuma avaliação lançada para este período.
+                  Nenhuma avaliação contabilizada para este período.
                 </p>
               )}
             </div>
