@@ -64,6 +64,16 @@ export default function TeacherDetails() {
     )
   }
 
+  // Safely access properties
+  const allocations = Array.isArray(teacher.allocations)
+    ? teacher.allocations
+    : []
+  const name = teacher.name || 'Sem nome'
+  const subject = teacher.subject || 'N/A'
+  const email = teacher.email || 'N/A'
+  const phone = teacher.phone || 'N/A'
+  const status = teacher.status || 'inactive'
+
   const handleUpdate = (data: any) => {
     updateTeacher(teacher.id, data)
     toast({
@@ -90,15 +100,26 @@ export default function TeacherDetails() {
   }
 
   const getAllocationDetails = (allocation: any) => {
+    if (!allocation)
+      return {
+        schoolName: 'N/A',
+        yearName: 'N/A',
+        className: 'N/A',
+        subjectName: 'N/A',
+      }
+
     const school = getSchool(allocation.schoolId)
-    const year = school?.academicYears.find(
+    const year = school?.academicYears?.find(
       (y) => y.id === allocation.academicYearId,
     )
-    const classroom = year?.classes.find((c) => c.id === allocation.classroomId)
+    const classroom = year?.classes?.find(
+      (c) => c.id === allocation.classroomId,
+    )
 
     // Flatten grades to find subject
-    const allGrades = courses.flatMap((c) => c.grades)
-    const allSubjects = allGrades.flatMap((g) => g.subjects)
+    const safeCourses = Array.isArray(courses) ? courses : []
+    const allGrades = safeCourses.flatMap((c) => c.grades || [])
+    const allSubjects = allGrades.flatMap((g) => g.subjects || [])
     const subject = allSubjects.find((s) => s.id === allocation.subjectId)
 
     return {
@@ -142,16 +163,16 @@ export default function TeacherDetails() {
                 src={`https://img.usecurling.com/ppl/medium?gender=male&seed=${teacher.id}`}
               />
               <AvatarFallback className="text-2xl">
-                {teacher.name.substring(0, 2).toUpperCase()}
+                {name.substring(0, 2).toUpperCase()}
               </AvatarFallback>
             </Avatar>
-            <h3 className="text-xl font-bold">{teacher.name}</h3>
+            <h3 className="text-xl font-bold">{name}</h3>
             <p className="text-sm text-muted-foreground mb-2">Docente</p>
             <Badge
-              variant={teacher.status === 'active' ? 'default' : 'secondary'}
+              variant={status === 'active' ? 'default' : 'secondary'}
               className="mt-2"
             >
-              {teacher.status === 'active' ? 'Ativo' : 'Inativo'}
+              {status === 'active' ? 'Ativo' : 'Inativo'}
             </Badge>
           </CardContent>
         </Card>
@@ -167,19 +188,19 @@ export default function TeacherDetails() {
                 <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">
                   <BookOpen className="h-4 w-4" /> Disciplina Principal
                 </span>
-                <p className="font-medium">{teacher.subject}</p>
+                <p className="font-medium">{subject}</p>
               </div>
               <div className="space-y-1">
                 <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">
                   <Phone className="h-4 w-4" /> Telefone
                 </span>
-                <p className="font-medium">{teacher.phone}</p>
+                <p className="font-medium">{phone}</p>
               </div>
               <div className="space-y-1 sm:col-span-2">
                 <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">
                   <Mail className="h-4 w-4" /> E-mail Institucional
                 </span>
-                <p className="font-medium">{teacher.email}</p>
+                <p className="font-medium">{email}</p>
               </div>
             </div>
 
@@ -199,13 +220,13 @@ export default function TeacherDetails() {
                 </Button>
               </div>
 
-              {teacher.allocations.length === 0 ? (
+              {allocations.length === 0 ? (
                 <p className="text-sm text-muted-foreground italic text-center py-4">
                   Nenhuma alocação registrada.
                 </p>
               ) : (
                 <div className="grid gap-2">
-                  {teacher.allocations.map((alloc) => {
+                  {allocations.map((alloc) => {
                     const details = getAllocationDetails(alloc)
                     return (
                       <div

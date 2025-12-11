@@ -1,13 +1,5 @@
 import { useState } from 'react'
-import {
-  Plus,
-  Search,
-  MoreHorizontal,
-  Mail,
-  Phone,
-  BookOpen,
-  Filter,
-} from 'lucide-react'
+import { Plus, Search, MoreHorizontal, Mail, Phone, Filter } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
@@ -61,11 +53,19 @@ export default function TeachersList() {
   const navigate = useNavigate()
   const { toast } = useToast()
 
-  const filteredTeachers = teachers.filter(
-    (teacher) =>
-      teacher.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      teacher.subject.toLowerCase().includes(searchTerm.toLowerCase()),
-  )
+  // Safely ensure teachers is an array
+  const safeTeachers = Array.isArray(teachers) ? teachers : []
+
+  const filteredTeachers = safeTeachers.filter((teacher) => {
+    if (!teacher) return false
+    const name = teacher.name || ''
+    const subject = teacher.subject || ''
+    const term = searchTerm || ''
+    return (
+      name.toLowerCase().includes(term.toLowerCase()) ||
+      subject.toLowerCase().includes(term.toLowerCase())
+    )
+  })
 
   const handleCreate = (data: any) => {
     addTeacher(data)
@@ -169,104 +169,109 @@ export default function TeachersList() {
                     </TableCell>
                   </TableRow>
                 ) : (
-                  filteredTeachers.map((teacher) => (
-                    <TableRow
-                      key={teacher.id}
-                      className="cursor-pointer hover:bg-muted/50"
-                      onClick={() =>
-                        navigate(`/pessoas/professores/${teacher.id}`)
-                      }
-                    >
-                      <TableCell>
-                        <Avatar className="h-9 w-9">
-                          <AvatarImage
-                            src={`https://img.usecurling.com/ppl/thumbnail?gender=male&seed=${teacher.id}`}
-                          />
-                          <AvatarFallback>
-                            {teacher.name.substring(0, 2).toUpperCase()}
-                          </AvatarFallback>
-                        </Avatar>
-                      </TableCell>
-                      <TableCell className="font-medium">
-                        <div className="flex flex-col">
-                          <span>{teacher.name}</span>
-                          <span className="text-xs text-muted-foreground md:hidden">
-                            {teacher.email}
-                          </span>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="outline" className="font-normal">
-                          {teacher.subject}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="hidden md:table-cell">
-                        <div className="flex flex-col text-sm">
-                          <div className="flex items-center gap-1">
-                            <Mail className="h-3 w-3 text-muted-foreground" />
-                            {teacher.email}
+                  filteredTeachers.map((teacher) => {
+                    if (!teacher) return null
+                    return (
+                      <TableRow
+                        key={teacher.id}
+                        className="cursor-pointer hover:bg-muted/50"
+                        onClick={() =>
+                          navigate(`/pessoas/professores/${teacher.id}`)
+                        }
+                      >
+                        <TableCell>
+                          <Avatar className="h-9 w-9">
+                            <AvatarImage
+                              src={`https://img.usecurling.com/ppl/thumbnail?gender=male&seed=${teacher.id}`}
+                            />
+                            <AvatarFallback>
+                              {(teacher.name || '')
+                                .substring(0, 2)
+                                .toUpperCase()}
+                            </AvatarFallback>
+                          </Avatar>
+                        </TableCell>
+                        <TableCell className="font-medium">
+                          <div className="flex flex-col">
+                            <span>{teacher.name}</span>
+                            <span className="text-xs text-muted-foreground md:hidden">
+                              {teacher.email}
+                            </span>
                           </div>
-                          <div className="flex items-center gap-1 mt-0.5">
-                            <Phone className="h-3 w-3 text-muted-foreground" />
-                            {teacher.phone}
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="outline" className="font-normal">
+                            {teacher.subject}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="hidden md:table-cell">
+                          <div className="flex flex-col text-sm">
+                            <div className="flex items-center gap-1">
+                              <Mail className="h-3 w-3 text-muted-foreground" />
+                              {teacher.email}
+                            </div>
+                            <div className="flex items-center gap-1 mt-0.5">
+                              <Phone className="h-3 w-3 text-muted-foreground" />
+                              {teacher.phone}
+                            </div>
                           </div>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <Badge
-                          variant={
-                            teacher.status === 'active'
-                              ? 'default'
-                              : 'secondary'
-                          }
-                        >
-                          {teacher.status === 'active' ? 'Ativo' : 'Inativo'}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button
-                              variant="ghost"
-                              className="h-8 w-8 p-0"
-                              onClick={(e) => e.stopPropagation()}
-                            >
-                              <span className="sr-only">Abrir menu</span>
-                              <MoreHorizontal className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuLabel>Ações</DropdownMenuLabel>
-                            <DropdownMenuItem
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                navigate(`/pessoas/professores/${teacher.id}`)
-                              }}
-                            >
-                              Ver Detalhes
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                openEditDialog(teacher)
-                              }}
-                            >
-                              Editar Dados
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                              className="text-destructive"
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                setDeleteId(teacher.id)
-                              }}
-                            >
-                              Excluir
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </TableCell>
-                    </TableRow>
-                  ))
+                        </TableCell>
+                        <TableCell>
+                          <Badge
+                            variant={
+                              teacher.status === 'active'
+                                ? 'default'
+                                : 'secondary'
+                            }
+                          >
+                            {teacher.status === 'active' ? 'Ativo' : 'Inativo'}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                className="h-8 w-8 p-0"
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                <span className="sr-only">Abrir menu</span>
+                                <MoreHorizontal className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuLabel>Ações</DropdownMenuLabel>
+                              <DropdownMenuItem
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  navigate(`/pessoas/professores/${teacher.id}`)
+                                }}
+                              >
+                                Ver Detalhes
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  openEditDialog(teacher)
+                                }}
+                              >
+                                Editar Dados
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                className="text-destructive"
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  setDeleteId(teacher.id)
+                                }}
+                              >
+                                Excluir
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </TableCell>
+                      </TableRow>
+                    )
+                  })
                 )}
               </TableBody>
             </Table>
