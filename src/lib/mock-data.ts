@@ -1,3 +1,5 @@
+import { addDays, format } from 'date-fns'
+
 export interface Period {
   id: string
   name: string
@@ -32,6 +34,18 @@ export interface School {
   director: string
   status: 'active' | 'inactive'
   academicYears: AcademicYear[]
+  // New INEP/Censo fields
+  inepCode?: string
+  administrativeDependency?: 'Federal' | 'Estadual' | 'Municipal' | 'Privada'
+  locationType?: 'Urbana' | 'Rural'
+  infrastructure?: {
+    classrooms: number
+    accessible: boolean
+    internet: boolean
+    library: boolean
+    lab: boolean
+  }
+  educationTypes?: string[]
 }
 
 export interface Subject {
@@ -43,7 +57,10 @@ export interface Subject {
 export interface EvaluationRule {
   id: string
   name: string
+  type: 'numeric' | 'descriptive'
   description: string
+  minGrade?: number
+  maxGrade?: number
 }
 
 export interface Grade {
@@ -78,17 +95,35 @@ export interface Teacher {
   allocations: TeacherAllocation[]
 }
 
+// Assessment Data Types
+export interface Assessment {
+  id: string
+  studentId: string
+  schoolId: string
+  yearId: string
+  classroomId: string
+  subjectId: string
+  periodId: string
+  type: 'numeric' | 'descriptive'
+  value: number | string // Grade or text
+  date: string
+}
+
 // Mock Data Initialization
 
 export const mockEvaluationRules: EvaluationRule[] = [
   {
     id: 'rule1',
     name: 'Nota Numérica (0-10)',
+    type: 'numeric',
     description: 'Avaliação baseada em notas de 0 a 10 com média 6.0.',
+    minGrade: 0,
+    maxGrade: 10,
   },
   {
     id: 'rule2',
     name: 'Parecer Descritivo',
+    type: 'descriptive',
     description: 'Avaliação qualitativa através de relatórios semestrais.',
   },
 ]
@@ -105,15 +140,6 @@ export const mockCourses: Course[] = [
         subjects: [
           { id: 's1', name: 'Português', workload: 200 },
           { id: 's2', name: 'Matemática', workload: 200 },
-        ],
-      },
-      {
-        id: 'g2',
-        name: '2º Ano',
-        evaluationRuleId: 'rule2',
-        subjects: [
-          { id: 's3', name: 'Português', workload: 200 },
-          { id: 's4', name: 'Matemática', workload: 200 },
         ],
       },
       {
@@ -139,6 +165,17 @@ export const mockSchools: School[] = [
     phone: '(11) 3456-7890',
     director: 'Maria Silva',
     status: 'active',
+    inepCode: '12345678',
+    administrativeDependency: 'Municipal',
+    locationType: 'Urbana',
+    infrastructure: {
+      classrooms: 12,
+      accessible: true,
+      internet: true,
+      library: true,
+      lab: false,
+    },
+    educationTypes: ['Ensino Fundamental'],
     academicYears: [
       {
         id: 'y2024',
@@ -158,6 +195,18 @@ export const mockSchools: School[] = [
             startDate: '2024-04-16',
             endDate: '2024-06-30',
           },
+          {
+            id: 'p3',
+            name: '3º Bimestre',
+            startDate: '2024-08-01',
+            endDate: '2024-09-30',
+          },
+          {
+            id: 'p4',
+            name: '4º Bimestre',
+            startDate: '2024-10-01',
+            endDate: '2024-12-15',
+          },
         ],
         classes: [
           {
@@ -171,16 +220,6 @@ export const mockSchools: School[] = [
         ],
       },
     ],
-  },
-  {
-    id: '2',
-    code: 'ESC-002',
-    name: 'CMEI Pequeno Príncipe',
-    address: 'Av. Brasil, 450 - Jardim América',
-    phone: '(11) 3456-7891',
-    director: "Joana D'arc",
-    status: 'active',
-    academicYears: [],
   },
 ]
 
@@ -203,18 +242,7 @@ export const mockTeachers: Teacher[] = [
       },
     ],
   },
-  {
-    id: '2',
-    name: 'Prof. Bianca Torres',
-    email: 'bianca.torres@prof.edu.gov',
-    subject: 'Português',
-    phone: '(11) 91234-5679',
-    status: 'active',
-    allocations: [],
-  },
 ]
-
-// ... (Rest of existing mock data types for User, Student, Project need to be preserved or re-exported if needed)
 
 export type UserRole = 'admin' | 'supervisor' | 'coordinator' | 'administrative'
 
@@ -236,14 +264,6 @@ export const initialUsers: User[] = [
     email: 'junielsonfarias@gmail.com',
     password: 'Tiko6273@',
     role: 'admin',
-    createdAt: new Date().toISOString(),
-  },
-  {
-    id: '2',
-    name: 'Ana Supervisora',
-    email: 'ana.supervisora@edu.gov',
-    password: 'password123',
-    role: 'supervisor',
     createdAt: new Date().toISOString(),
   },
 ]
@@ -290,6 +310,7 @@ export interface Student {
     hasSpecialNeeds: boolean
     cid?: string
     observation?: string
+    specialNeedsDetails?: string[]
   }
   enrollments: Enrollment[]
   projectIds: string[]
@@ -298,6 +319,20 @@ export interface Student {
   status?: string
   email?: string
   phone?: string
+  // New Censo Fields
+  susCard?: string
+  birthCertificate?: string
+  nationality?: string
+  birthCountry?: string
+  raceColor?:
+    | 'Branca'
+    | 'Preta'
+    | 'Parda'
+    | 'Amarela'
+    | 'Indígena'
+    | 'Não declarada'
+  motherEducation?: string
+  fatherEducation?: string
 }
 
 export const mockStudents: Student[] = [
@@ -344,6 +379,9 @@ export const mockStudents: Student[] = [
     status: 'Cursando',
     email: 'alice.souza@aluno.edu.gov',
     phone: '(11) 98765-4321',
+    susCard: '789456123000',
+    nationality: 'Brasileira',
+    raceColor: 'Parda',
   },
 ]
 
@@ -362,5 +400,33 @@ export const mockProjects: Project[] = [
     description: 'Treino de futsal para iniciantes e intermediários.',
     instructor: 'Prof. Pedro',
     schedule: 'Ter/Qui 14:00',
+  },
+]
+
+// Mock Assessments
+export const mockAssessments: Assessment[] = [
+  {
+    id: 'as1',
+    studentId: '1',
+    schoolId: '1',
+    yearId: 'y2024',
+    classroomId: 'cl1',
+    subjectId: 's10', // Matematica
+    periodId: 'p1',
+    type: 'numeric',
+    value: 8.5,
+    date: '2024-04-10',
+  },
+  {
+    id: 'as2',
+    studentId: '1',
+    schoolId: '1',
+    yearId: 'y2024',
+    classroomId: 'cl1',
+    subjectId: 's10', // Matematica
+    periodId: 'p2',
+    type: 'numeric',
+    value: 7.0,
+    date: '2024-06-20',
   },
 ]

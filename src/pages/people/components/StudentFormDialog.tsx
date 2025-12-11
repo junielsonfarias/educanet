@@ -41,6 +41,17 @@ const studentSchema = z.object({
   motherName: z.string().optional(),
   guardian: z.string().min(3, 'Nome do responsável é obrigatório'),
 
+  // New Censo Fields
+  susCard: z.string().optional(),
+  birthCertificate: z.string().optional(),
+  nationality: z.string().optional(),
+  birthCountry: z.string().optional(),
+  raceColor: z
+    .enum(['Branca', 'Preta', 'Parda', 'Amarela', 'Indígena', 'Não declarada'])
+    .optional(),
+  motherEducation: z.string().optional(),
+  fatherEducation: z.string().optional(),
+
   // Address
   street: z.string().min(3, 'Rua é obrigatória'),
   number: z.string().min(1, 'Número é obrigatório'),
@@ -119,6 +130,13 @@ export function StudentFormDialog({
       enrollmentSchoolId: '',
       enrollmentYearId: '',
       enrollmentClassId: '',
+      susCard: '',
+      birthCertificate: '',
+      nationality: 'Brasileira',
+      birthCountry: 'Brasil',
+      raceColor: 'Não declarada',
+      motherEducation: '',
+      fatherEducation: '',
     },
   })
 
@@ -151,6 +169,13 @@ export function StudentFormDialog({
           enrollmentSchoolId: '',
           enrollmentYearId: '',
           enrollmentClassId: '',
+          susCard: initialData.susCard || '',
+          birthCertificate: initialData.birthCertificate || '',
+          nationality: initialData.nationality || 'Brasileira',
+          birthCountry: initialData.birthCountry || 'Brasil',
+          raceColor: initialData.raceColor || 'Não declarada',
+          motherEducation: initialData.motherEducation || '',
+          fatherEducation: initialData.fatherEducation || '',
         })
       } else {
         form.reset({
@@ -179,6 +204,13 @@ export function StudentFormDialog({
           enrollmentSchoolId: '',
           enrollmentYearId: '',
           enrollmentClassId: '',
+          susCard: '',
+          birthCertificate: '',
+          nationality: 'Brasileira',
+          birthCountry: 'Brasil',
+          raceColor: 'Não declarada',
+          motherEducation: '',
+          fatherEducation: '',
         })
       }
       setActiveTab('personal')
@@ -232,6 +264,13 @@ export function StudentFormDialog({
         observation:
           values.hasSpecialNeeds === 'yes' ? values.observation : undefined,
       },
+      susCard: values.susCard,
+      birthCertificate: values.birthCertificate,
+      nationality: values.nationality,
+      birthCountry: values.birthCountry,
+      raceColor: values.raceColor,
+      motherEducation: values.motherEducation,
+      fatherEducation: values.fatherEducation,
     }
 
     let enrollmentData = undefined
@@ -239,15 +278,13 @@ export function StudentFormDialog({
       const selectedClass = classes.find(
         (c) => c.id === values.enrollmentClassId,
       )
-      // Extract year number from name or use current date?
-      // Mock data AcademicYear.name usually is "2024".
       const yearName = selectedYear?.name || new Date().getFullYear().toString()
       const yearNumber = parseInt(yearName) || new Date().getFullYear()
 
       enrollmentData = {
         year: yearNumber,
         schoolId: values.enrollmentSchoolId,
-        grade: selectedClass ? selectedClass.name : 'Turma Indefinida', // Using Class Name as grade string for compatibility
+        grade: selectedClass ? selectedClass.name : 'Turma Indefinida',
       }
     }
 
@@ -282,8 +319,9 @@ export function StudentFormDialog({
               onValueChange={setActiveTab}
               className="w-full"
             >
-              <TabsList className="grid w-full grid-cols-4">
+              <TabsList className="grid w-full grid-cols-4 lg:grid-cols-5">
                 <TabsTrigger value="personal">Pessoal</TabsTrigger>
+                <TabsTrigger value="documents">Documentos</TabsTrigger>
                 <TabsTrigger value="address">Endereço</TabsTrigger>
                 <TabsTrigger value="social">Social/Saúde</TabsTrigger>
                 {!initialData && (
@@ -321,19 +359,6 @@ export function StudentFormDialog({
                   />
                   <FormField
                     control={form.control}
-                    name="cpf"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>CPF</FormLabel>
-                        <FormControl>
-                          <Input placeholder="000.000.000-00" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
                     name="birthDate"
                     render={({ field }) => (
                       <FormItem>
@@ -341,6 +366,36 @@ export function StudentFormDialog({
                         <FormControl>
                           <Input type="date" {...field} />
                         </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="raceColor"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Raça/Cor</FormLabel>
+                        <Select
+                          onValueChange={field.onChange}
+                          defaultValue={field.value}
+                        >
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Selecione" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="Branca">Branca</SelectItem>
+                            <SelectItem value="Preta">Preta</SelectItem>
+                            <SelectItem value="Parda">Parda</SelectItem>
+                            <SelectItem value="Amarela">Amarela</SelectItem>
+                            <SelectItem value="Indígena">Indígena</SelectItem>
+                            <SelectItem value="Não declarada">
+                              Não declarada
+                            </SelectItem>
+                          </SelectContent>
+                        </Select>
                         <FormMessage />
                       </FormItem>
                     )}
@@ -405,6 +460,81 @@ export function StudentFormDialog({
                         <FormLabel>E-mail</FormLabel>
                         <FormControl>
                           <Input type="email" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+              </TabsContent>
+
+              <TabsContent value="documents" className="space-y-4 py-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="cpf"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>CPF</FormLabel>
+                        <FormControl>
+                          <Input placeholder="000.000.000-00" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="susCard"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Cartão SUS</FormLabel>
+                        <FormControl>
+                          <Input {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="birthCertificate"
+                    render={({ field }) => (
+                      <FormItem className="col-span-1 md:col-span-2">
+                        <FormLabel>
+                          Certidão de Nascimento (Matrícula)
+                        </FormLabel>
+                        <FormControl>
+                          <Input
+                            placeholder="Matrícula da certidão"
+                            {...field}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="nationality"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Nacionalidade</FormLabel>
+                        <FormControl>
+                          <Input {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="birthCountry"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>País de Nascimento</FormLabel>
+                        <FormControl>
+                          <Input {...field} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -531,6 +661,38 @@ export function StudentFormDialog({
                             <SelectItem value="no">Não</SelectItem>
                           </SelectContent>
                         </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="motherEducation"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Escolaridade da Mãe</FormLabel>
+                        <FormControl>
+                          <Input
+                            placeholder="Ex: Ensino Médio Completo"
+                            {...field}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="fatherEducation"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Escolaridade do Pai</FormLabel>
+                        <FormControl>
+                          <Input
+                            placeholder="Ex: Ensino Fundamental"
+                            {...field}
+                          />
+                        </FormControl>
                         <FormMessage />
                       </FormItem>
                     )}

@@ -20,7 +20,8 @@ import {
   Settings,
   Users,
   FileText,
-  Library,
+  Calendar,
+  ClipboardList,
 } from 'lucide-react'
 import { Link, useLocation } from 'react-router-dom'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
@@ -56,12 +57,13 @@ export function AppSidebar() {
       items: [
         { title: 'Cursos', url: '/academico/cursos' },
         { title: 'Turmas', url: '/academico/turmas' },
+        { title: 'Calendário', url: '/calendario' },
       ],
     },
     {
       title: 'Avaliação',
       icon: GraduationCap,
-      url: '/avaliacao',
+      items: [{ title: 'Lançamento de Notas', url: '/avaliacao/lancamento' }],
     },
     {
       title: 'Relatórios',

@@ -13,6 +13,12 @@ import TeacherDetails from './pages/people/TeacherDetails'
 import CoursesList from './pages/academic/CoursesList'
 import CourseDetails from './pages/academic/CourseDetails'
 import ClassesList from './pages/academic/ClassesList'
+import AssessmentInput from './pages/academic/AssessmentInput'
+import SchoolCalendar from './pages/calendar/SchoolCalendar'
+import ReportsDashboard from './pages/reports/ReportsDashboard'
+import EnrollmentReport from './pages/reports/EnrollmentReport'
+import PerformanceReport from './pages/reports/PerformanceReport'
+import TeacherAllocationReport from './pages/reports/TeacherAllocationReport'
 import ReportCard from './pages/public/ReportCard'
 import NotFound from './pages/NotFound'
 import Layout from './components/Layout'
@@ -23,6 +29,7 @@ import { StudentProvider } from './stores/useStudentStore'
 import { TeacherProvider } from './stores/useTeacherStore'
 import { ProjectProvider } from './stores/useProjectStore'
 import { CourseProvider } from './stores/useCourseStore'
+import { AssessmentProvider } from './stores/useAssessmentStore'
 
 const App = () => (
   <UserProvider>
@@ -31,69 +38,102 @@ const App = () => (
         <ProjectProvider>
           <StudentProvider>
             <TeacherProvider>
-              <BrowserRouter
-                future={{
-                  v7_startTransition: false,
-                  v7_relativeSplatPath: false,
-                }}
-              >
-                <TooltipProvider>
-                  <Toaster />
-                  <Sonner />
-                  <Routes>
-                    <Route path="/" element={<Index />} />
-                    <Route path="/publico/boletim" element={<ReportCard />} />
+              <AssessmentProvider>
+                <BrowserRouter
+                  future={{
+                    v7_startTransition: false,
+                    v7_relativeSplatPath: false,
+                  }}
+                >
+                  <TooltipProvider>
+                    <Toaster />
+                    <Sonner />
+                    <Routes>
+                      <Route path="/" element={<Index />} />
+                      <Route path="/publico/boletim" element={<ReportCard />} />
 
-                    <Route element={<Layout />}>
-                      <Route path="/dashboard" element={<Dashboard />} />
+                      <Route element={<Layout />}>
+                        <Route path="/dashboard" element={<Dashboard />} />
 
-                      {/* Schools Routes */}
-                      <Route path="/escolas" element={<SchoolsList />} />
-                      <Route path="/escolas/:id" element={<SchoolDetails />} />
+                        {/* Schools Routes */}
+                        <Route path="/escolas" element={<SchoolsList />} />
+                        <Route
+                          path="/escolas/:id"
+                          element={<SchoolDetails />}
+                        />
 
-                      {/* People Routes */}
-                      <Route
-                        path="/pessoas/alunos"
-                        element={<StudentsList />}
-                      />
-                      <Route
-                        path="/pessoas/alunos/:id"
-                        element={<StudentDetails />}
-                      />
-                      <Route
-                        path="/pessoas/professores"
-                        element={<TeachersList />}
-                      />
-                      <Route
-                        path="/pessoas/professores/:id"
-                        element={<TeacherDetails />}
-                      />
+                        {/* People Routes */}
+                        <Route
+                          path="/pessoas/alunos"
+                          element={<StudentsList />}
+                        />
+                        <Route
+                          path="/pessoas/alunos/:id"
+                          element={<StudentDetails />}
+                        />
+                        <Route
+                          path="/pessoas/professores"
+                          element={<TeachersList />}
+                        />
+                        <Route
+                          path="/pessoas/professores/:id"
+                          element={<TeacherDetails />}
+                        />
 
-                      <Route
-                        path="/academico/cursos"
-                        element={<CoursesList />}
-                      />
-                      <Route
-                        path="/academico/cursos/:id"
-                        element={<CourseDetails />}
-                      />
-                      <Route
-                        path="/academico/turmas"
-                        element={<ClassesList />}
-                      />
-                      <Route path="/avaliacao" element={<NotFound />} />
-                      <Route path="/relatorios" element={<NotFound />} />
-                      <Route path="/configuracoes" element={<NotFound />} />
-                      <Route
-                        path="/configuracoes/usuarios"
-                        element={<UsersList />}
-                      />
-                    </Route>
+                        {/* Academic Routes */}
+                        <Route
+                          path="/academico/cursos"
+                          element={<CoursesList />}
+                        />
+                        <Route
+                          path="/academico/cursos/:id"
+                          element={<CourseDetails />}
+                        />
+                        <Route
+                          path="/academico/turmas"
+                          element={<ClassesList />}
+                        />
+                        <Route
+                          path="/avaliacao/lancamento"
+                          element={<AssessmentInput />}
+                        />
 
-                    <Route path="*" element={<NotFound />} />
-                  </Routes>
-                </TooltipProvider>
-              </BrowserRouter>
+                        {/* Calendar */}
+                        <Route
+                          path="/calendario"
+                          element={<SchoolCalendar />}
+                        />
+
+                        {/* Reports */}
+                        <Route
+                          path="/relatorios"
+                          element={<ReportsDashboard />}
+                        />
+                        <Route
+                          path="/relatorios/matriculas"
+                          element={<EnrollmentReport />}
+                        />
+                        <Route
+                          path="/relatorios/desempenho"
+                          element={<PerformanceReport />}
+                        />
+                        <Route
+                          path="/relatorios/professores"
+                          element={<TeacherAllocationReport />}
+                        />
+
+                        <Route path="/configuracoes" element={<NotFound />} />
+                        <Route
+                          path="/configuracoes/usuarios"
+                          element={<UsersList />}
+                        />
+                      </Route>
+
+                      <Route path="*" element={<NotFound />} />
+                    </Routes>
+                  </TooltipProvider>
+                </BrowserRouter>
+              </AssessmentProvider>
             </TeacherProvider>
           </StudentProvider>
         </ProjectProvider>

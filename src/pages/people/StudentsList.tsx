@@ -6,6 +6,11 @@ import {
   User,
   FileText,
   Filter,
+  ArrowUpDown,
+  ArrowUp,
+  ArrowDown,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -25,6 +30,13 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import {
   Card,
@@ -50,12 +62,32 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
+import {
+  Pagination,
+  PaginationContent,
+  PaginationEllipsis,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from '@/components/ui/pagination'
 
 export default function StudentsList() {
   const { students, addStudent, updateStudent, deleteStudent } =
     useStudentStore()
   const { currentUser } = useUserStore()
   const [searchTerm, setSearchTerm] = useState('')
+  const [gradeFilter, setGradeFilter] = useState('all')
+  const [statusFilter, setStatusFilter] = useState('all')
+  const [sortConfig, setSortConfig] = useState<{
+    key: 'name' | 'grade'
+    direction: 'asc' | 'desc'
+  }>({ key: 'name', direction: 'asc' })
+
+  // Pagination
+  const [currentPage, setCurrentPage] = useState(1)
+  const itemsPerPage = 10
+
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [editingStudent, setEditingStudent] = useState<Student | null>(null)
   const [deleteId, setDeleteId] = useState<string | null>(null)
@@ -66,16 +98,81 @@ export default function StudentsList() {
   const isAdminOrSupervisor =
     currentUser?.role === 'admin' || currentUser?.role === 'supervisor'
 
+  // Unique grades for filter
+  const uniqueGrades = Array.from(
+    new Set(
+      students
+        .map((s) => {
+          // Attempt to get current grade from enrollments or fallback
+          const current = s.enrollments.find((e) => e.status === 'Cursando')
+          return current ? current.grade : s.grade
+        })
+        .filter(Boolean),
+    ),
+  ) as string[]
+
   const filteredStudents = students.filter((student) => {
-    // Safety check for student object and required fields
     if (!student) return false
-    const name = student.name || ''
-    const registration = student.registration || ''
-    return (
-      name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      registration.toLowerCase().includes(searchTerm.toLowerCase())
+
+    // Determine current/display grade and status
+    const currentEnrollment = student.enrollments.find(
+      (e) => e.status === 'Cursando',
     )
+    const displayGrade = currentEnrollment
+      ? currentEnrollment.grade
+      : student.grade
+    const displayStatus = currentEnrollment
+      ? currentEnrollment.status
+      : student.status
+
+    const matchesSearch =
+      (student.name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (student.registration || '')
+        .toLowerCase()
+        .includes(searchTerm.toLowerCase())
+
+    const matchesGrade = gradeFilter === 'all' || displayGrade === gradeFilter
+    const matchesStatus =
+      statusFilter === 'all' || displayStatus === statusFilter
+
+    return matchesSearch && matchesGrade && matchesStatus
   })
+
+  const sortedStudents = [...filteredStudents].sort((a, b) => {
+    const aEnrollment = a.enrollments.find((e) => e.status === 'Cursando')
+    const bEnrollment = b.enrollments.find((e) => e.status === 'Cursando')
+
+    const aValue =
+      sortConfig.key === 'grade'
+        ? aEnrollment?.grade || a.grade || ''
+        : a.name || ''
+    const bValue =
+      sortConfig.key === 'grade'
+        ? bEnrollment?.grade || b.grade || ''
+        : b.name || ''
+
+    if (aValue.toLowerCase() < bValue.toLowerCase())
+      return sortConfig.direction === 'asc' ? -1 : 1
+    if (aValue.toLowerCase() > bValue.toLowerCase())
+      return sortConfig.direction === 'asc' ? 1 : -1
+    return 0
+  })
+
+  // Pagination Logic
+  const totalPages = Math.ceil(sortedStudents.length / itemsPerPage)
+  const startIndex = (currentPage - 1) * itemsPerPage
+  const paginatedStudents = sortedStudents.slice(
+    startIndex,
+    startIndex + itemsPerPage,
+  )
+
+  const toggleSort = (key: 'name' | 'grade') => {
+    setSortConfig((current) => ({
+      key,
+      direction:
+        current.key === key && current.direction === 'asc' ? 'desc' : 'asc',
+    }))
+  }
 
   const handleCreate = (data: any, initialEnrollment: any) => {
     addStudent(data, initialEnrollment)
@@ -149,8 +246,8 @@ export default function StudentsList() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="flex items-center justify-between gap-4 mb-4">
-            <div className="relative flex-1 max-w-sm">
+          <div className="flex flex-col md:flex-row items-center justify-between gap-4 mb-4">
+            <div className="relative flex-1 w-full md:max-w-sm">
               <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
               <Input
                 placeholder="Buscar por nome ou matrícula..."
@@ -159,9 +256,34 @@ export default function StudentsList() {
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
             </div>
-            <Button variant="outline" size="icon">
-              <Filter className="h-4 w-4" />
-            </Button>
+            <div className="flex flex-col sm:flex-row gap-2 w-full md:w-auto">
+              <Select value={gradeFilter} onValueChange={setGradeFilter}>
+                <SelectTrigger className="w-full sm:w-[180px]">
+                  <SelectValue placeholder="Série/Ano" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todas as Séries</SelectItem>
+                  {uniqueGrades.map((grade) => (
+                    <SelectItem key={grade} value={grade}>
+                      {grade}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Select value={statusFilter} onValueChange={setStatusFilter}>
+                <SelectTrigger className="w-full sm:w-[180px]">
+                  <SelectValue placeholder="Status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos os Status</SelectItem>
+                  <SelectItem value="Cursando">Cursando</SelectItem>
+                  <SelectItem value="Transferido">Transferido</SelectItem>
+                  <SelectItem value="Abandono">Abandono</SelectItem>
+                  <SelectItem value="Aprovado">Aprovado</SelectItem>
+                  <SelectItem value="Reprovado">Reprovado</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
 
           <div className="rounded-md border">
@@ -169,23 +291,56 @@ export default function StudentsList() {
               <TableHeader>
                 <TableRow>
                   <TableHead className="w-[80px]">Avatar</TableHead>
-                  <TableHead>Nome</TableHead>
+                  <TableHead>
+                    <Button
+                      variant="ghost"
+                      onClick={() => toggleSort('name')}
+                      className="-ml-4 h-8"
+                    >
+                      Nome
+                      {sortConfig.key === 'name' ? (
+                        sortConfig.direction === 'asc' ? (
+                          <ArrowUp className="ml-2 h-4 w-4" />
+                        ) : (
+                          <ArrowDown className="ml-2 h-4 w-4" />
+                        )
+                      ) : (
+                        <ArrowUpDown className="ml-2 h-4 w-4" />
+                      )}
+                    </Button>
+                  </TableHead>
                   <TableHead>Matrícula</TableHead>
-                  <TableHead>Série/Turma</TableHead>
+                  <TableHead>
+                    <Button
+                      variant="ghost"
+                      onClick={() => toggleSort('grade')}
+                      className="-ml-4 h-8"
+                    >
+                      Série/Turma
+                      {sortConfig.key === 'grade' ? (
+                        sortConfig.direction === 'asc' ? (
+                          <ArrowUp className="ml-2 h-4 w-4" />
+                        ) : (
+                          <ArrowDown className="ml-2 h-4 w-4" />
+                        )
+                      ) : (
+                        <ArrowUpDown className="ml-2 h-4 w-4" />
+                      )}
+                    </Button>
+                  </TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead className="text-right">Ações</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredStudents.length === 0 ? (
+                {paginatedStudents.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={6} className="h-24 text-center">
                       Nenhum aluno encontrado.
                     </TableCell>
                   </TableRow>
                 ) : (
-                  filteredStudents.map((student) => {
-                    // Safe access to enrollments to avoid TypeError
+                  paginatedStudents.map((student) => {
                     const enrollments = student.enrollments || []
                     const activeEnrollment = enrollments.find(
                       (e) => e && e.status === 'Cursando',
@@ -301,6 +456,34 @@ export default function StudentsList() {
               </TableBody>
             </Table>
           </div>
+
+          {totalPages > 1 && (
+            <div className="flex items-center justify-end space-x-2 py-4">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                disabled={currentPage === 1}
+              >
+                <ChevronLeft className="h-4 w-4" />
+                Anterior
+              </Button>
+              <div className="text-sm font-medium">
+                Página {currentPage} de {totalPages}
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() =>
+                  setCurrentPage((p) => Math.min(totalPages, p + 1))
+                }
+                disabled={currentPage === totalPages}
+              >
+                Próximo
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            </div>
+          )}
         </CardContent>
       </Card>
 

@@ -14,6 +14,7 @@ import {
   Users,
   Plus,
   Trophy,
+  Filter,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
@@ -30,6 +31,7 @@ import useStudentStore from '@/stores/useStudentStore'
 import useSchoolStore from '@/stores/useSchoolStore'
 import useProjectStore from '@/stores/useProjectStore'
 import useUserStore from '@/stores/useUserStore'
+import useAssessmentStore from '@/stores/useAssessmentStore'
 import { useState } from 'react'
 import { StudentFormDialog } from './components/StudentFormDialog'
 import { EnrollmentFormDialog } from './components/EnrollmentFormDialog'
@@ -53,6 +55,19 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 
 export default function StudentDetails() {
   const { id } = useParams<{ id: string }>()
@@ -68,12 +83,21 @@ export default function StudentDetails() {
   const { schools } = useSchoolStore()
   const { projects } = useProjectStore()
   const { currentUser } = useUserStore()
+  const { getStudentAssessments } = useAssessmentStore()
   const { toast } = useToast()
 
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
   const [isEnrollmentDialogOpen, setIsEnrollmentDialogOpen] = useState(false)
   const [isProjectDialogOpen, setIsProjectDialogOpen] = useState(false)
   const [deleteId, setDeleteId] = useState<string | null>(null)
+
+  // Enrollment List State
+  const [enrollmentSort, setEnrollmentSort] = useState<'year' | 'status'>(
+    'year',
+  )
+  const [selectedEnrollmentId, setSelectedEnrollmentId] = useState<
+    string | null
+  >(null)
 
   const student = getStudent(id || '')
   const isAdminOrSupervisor =
@@ -89,6 +113,8 @@ export default function StudentDetails() {
       </div>
     )
   }
+
+  const assessments = getStudentAssessments(student.id)
 
   const handleUpdate = (data: any) => {
     updateStudent(student.id, data)
@@ -140,20 +166,49 @@ export default function StudentDetails() {
     return proj ? `${proj.name} (${proj.schedule})` : 'Projeto desconhecido'
   }
 
-  // Robustly handle missing or non-iterable enrollments property
-  const enrollments =
-    student.enrollments && Array.isArray(student.enrollments)
-      ? student.enrollments
-      : []
+  const enrollments = student.enrollments || []
 
-  // Sort enrollments by year descending
-  const sortedEnrollments = [...enrollments].sort((a, b) => b.year - a.year)
+  // Sort enrollments
+  const sortedEnrollments = [...enrollments].sort((a, b) => {
+    if (enrollmentSort === 'year') {
+      return b.year - a.year
+    }
+    return a.status.localeCompare(b.status)
+  })
 
-  // Robustly handle missing or non-iterable projectIds property
-  const projectIds =
-    student.projectIds && Array.isArray(student.projectIds)
-      ? student.projectIds
-      : []
+  // Calculate Consolidated Performance for an enrollment
+  const getEnrollmentPerformance = (enrollment: any) => {
+    // Filter assessments for this school/year
+    // Note: Enrollment mock data doesn't have academicYearId directly in mock-data interface used in useSchoolStore,
+    // but in a real app we would link it. Here we approximate by year number match if possible, or just all assessments.
+    // For this mock, let's filter by matching schoolId.
+    const relevantAssessments = assessments.filter(
+      (a) => a.schoolId === enrollment.schoolId,
+    ) // Simplification
+
+    // Group by subject
+    const subjects: Record<string, { total: number; count: number }> = {}
+    relevantAssessments.forEach((a) => {
+      if (typeof a.value === 'number') {
+        if (!subjects[a.subjectId])
+          subjects[a.subjectId] = { total: 0, count: 0 }
+        subjects[a.subjectId].total += a.value
+        subjects[a.subjectId].count++
+      }
+    })
+
+    return Object.entries(subjects).map(([subjectId, data]) => ({
+      subjectId,
+      average: data.count > 0 ? (data.total / data.count).toFixed(1) : '-',
+    }))
+  }
+
+  const selectedEnrollment = enrollments.find(
+    (e) => e.id === selectedEnrollmentId,
+  )
+  const performanceData = selectedEnrollment
+    ? getEnrollmentPerformance(selectedEnrollment)
+    : []
 
   return (
     <div className="space-y-6 animate-fade-in pb-10">
@@ -246,8 +301,20 @@ export default function StudentDetails() {
                   <p className="font-medium">{student.cpf || '-'}</p>
                 </div>
                 <div>
+                  <span className="text-sm text-muted-foreground">
+                    Cartão SUS
+                  </span>
+                  <p className="font-medium">{student.susCard || '-'}</p>
+                </div>
+                <div>
                   <span className="text-sm text-muted-foreground">NIS</span>
                   <p className="font-medium">{student.social?.nis || '-'}</p>
+                </div>
+                <div>
+                  <span className="text-sm text-muted-foreground">
+                    Raça/Cor
+                  </span>
+                  <p className="font-medium">{student.raceColor || '-'}</p>
                 </div>
                 <div>
                   <span className="text-sm text-muted-foreground">
@@ -260,6 +327,14 @@ export default function StudentDetails() {
                     Nome da Mãe
                   </span>
                   <p className="font-medium">{student.motherName || '-'}</p>
+                </div>
+                <div>
+                  <span className="text-sm text-muted-foreground">
+                    Nacionalidade
+                  </span>
+                  <p className="font-medium">
+                    {student.nationality} - {student.birthCountry}
+                  </p>
                 </div>
               </div>
               <Separator />
@@ -342,18 +417,32 @@ export default function StudentDetails() {
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <div>
+              <div className="flex flex-col gap-1">
                 <CardTitle>Histórico de Matrículas</CardTitle>
                 <CardDescription>Registro acadêmico completo</CardDescription>
               </div>
-              {isAdminOrSupervisor && (
-                <Button
-                  size="sm"
-                  onClick={() => setIsEnrollmentDialogOpen(true)}
+              <div className="flex items-center gap-2">
+                <Select
+                  value={enrollmentSort}
+                  onValueChange={(v: any) => setEnrollmentSort(v)}
                 >
-                  <Plus className="h-4 w-4 mr-1" /> Nova Matrícula
-                </Button>
-              )}
+                  <SelectTrigger className="w-[140px] h-8 text-xs">
+                    <SelectValue placeholder="Ordenar" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="year">Por Ano</SelectItem>
+                    <SelectItem value="status">Por Status</SelectItem>
+                  </SelectContent>
+                </Select>
+                {isAdminOrSupervisor && (
+                  <Button
+                    size="sm"
+                    onClick={() => setIsEnrollmentDialogOpen(true)}
+                  >
+                    <Plus className="h-4 w-4 mr-1" /> Nova
+                  </Button>
+                )}
+              </div>
             </CardHeader>
             <CardContent>
               {sortedEnrollments.length === 0 ? (
@@ -373,7 +462,11 @@ export default function StudentDetails() {
                   </TableHeader>
                   <TableBody>
                     {sortedEnrollments.map((enrollment) => (
-                      <TableRow key={enrollment.id}>
+                      <TableRow
+                        key={enrollment.id}
+                        className="cursor-pointer hover:bg-muted/50"
+                        onClick={() => setSelectedEnrollmentId(enrollment.id)}
+                      >
                         <TableCell className="font-medium">
                           {enrollment.year}
                         </TableCell>
@@ -430,13 +523,13 @@ export default function StudentDetails() {
               )}
             </CardHeader>
             <CardContent>
-              {projectIds.length === 0 ? (
+              {student.projectIds.length === 0 ? (
                 <p className="text-sm text-muted-foreground py-4 text-center">
                   Nenhum projeto matriculado.
                 </p>
               ) : (
                 <div className="space-y-2">
-                  {projectIds.map((projectId) => (
+                  {student.projectIds.map((projectId) => (
                     <div
                       key={projectId}
                       className="flex items-center justify-between p-3 border rounded-md bg-secondary/10"
@@ -485,7 +578,7 @@ export default function StudentDetails() {
         open={isProjectDialogOpen}
         onOpenChange={setIsProjectDialogOpen}
         onSubmit={handleAddProject}
-        excludeProjectIds={projectIds}
+        excludeProjectIds={student.projectIds}
       />
 
       <AlertDialog
@@ -511,6 +604,71 @@ export default function StudentDetails() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Enrollment Detail Dialog */}
+      <Dialog
+        open={!!selectedEnrollment}
+        onOpenChange={(open) => !open && setSelectedEnrollmentId(null)}
+      >
+        <DialogContent className="sm:max-w-[600px]">
+          <DialogHeader>
+            <DialogTitle>Detalhes da Matrícula</DialogTitle>
+          </DialogHeader>
+          {selectedEnrollment && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4 text-sm">
+                <div>
+                  <span className="text-muted-foreground block">Escola</span>
+                  <span className="font-medium">
+                    {getSchoolName(selectedEnrollment.schoolId)}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-muted-foreground block">Série/Ano</span>
+                  <span className="font-medium">
+                    {selectedEnrollment.grade} ({selectedEnrollment.year})
+                  </span>
+                </div>
+              </div>
+              <Separator />
+              <h4 className="text-sm font-semibold">
+                Desempenho Consolidado (Disciplinas Cursadas)
+              </h4>
+              {performanceData.length > 0 ? (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Disciplina</TableHead>
+                      <TableHead className="text-right">Média Atual</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {performanceData.map((p) => (
+                      <TableRow key={p.subjectId}>
+                        <TableCell>
+                          {/* In a real app we'd fetch the subject name properly */}
+                          {p.subjectId === 's10'
+                            ? 'Matemática'
+                            : p.subjectId === 's9'
+                              ? 'Português'
+                              : `Disciplina ${p.subjectId}`}
+                        </TableCell>
+                        <TableCell className="text-right font-medium">
+                          {p.average}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              ) : (
+                <p className="text-sm text-muted-foreground text-center py-4">
+                  Nenhuma avaliação lançada para este período.
+                </p>
+              )}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
