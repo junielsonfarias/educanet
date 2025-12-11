@@ -41,7 +41,14 @@ export const SchoolProvider = ({ children }: { children: React.ReactNode }) => {
       try {
         const parsed = JSON.parse(stored)
         if (Array.isArray(parsed)) {
-          setSchools(parsed)
+          // Sanitize data to ensure arrays exist
+          const sanitized = parsed.map((s) => ({
+            ...s,
+            academicYears: Array.isArray(s.academicYears)
+              ? s.academicYears
+              : [],
+          }))
+          setSchools(sanitized)
         }
       } catch (error) {
         console.error('Failed to parse schools from local storage:', error)

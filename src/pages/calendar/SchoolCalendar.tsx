@@ -9,7 +9,7 @@ import {
 } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import useSchoolStore from '@/stores/useSchoolStore'
-import { addDays, isSameDay, parseISO } from 'date-fns'
+import { parseISO } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 
 export default function SchoolCalendar() {
@@ -17,18 +17,22 @@ export default function SchoolCalendar() {
   const [date, setDate] = useState<Date | undefined>(new Date())
 
   // Consolidate all periods from all schools for visualization
-  const events = schools.flatMap((school) =>
-    school.academicYears.flatMap((year) =>
-      year.periods.map((period) => ({
+  const events = (schools || []).flatMap((school) => {
+    if (!school || !Array.isArray(school.academicYears)) return []
+
+    return school.academicYears.flatMap((year) => {
+      if (!year || !Array.isArray(year.periods)) return []
+
+      return year.periods.map((period) => ({
         schoolName: school.name,
         yearName: year.name,
         periodName: period.name,
         start: parseISO(period.startDate),
         end: parseISO(period.endDate),
         type: 'period',
-      })),
-    ),
-  )
+      }))
+    })
+  })
 
   const selectedDayEvents = date
     ? events.filter((event) => date >= event.start && date <= event.end)
