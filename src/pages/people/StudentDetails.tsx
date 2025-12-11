@@ -30,6 +30,7 @@ import { Separator } from '@/components/ui/separator'
 import useStudentStore from '@/stores/useStudentStore'
 import useProjectStore from '@/stores/useProjectStore'
 import useUserStore from '@/stores/useUserStore'
+import useSchoolStore from '@/stores/useSchoolStore'
 import { useState } from 'react'
 import { StudentFormDialog } from './components/StudentFormDialog'
 import { EnrollmentFormDialog } from './components/EnrollmentFormDialog'
@@ -78,6 +79,7 @@ export default function StudentDetails() {
   } = useStudentStore()
   const { projects } = useProjectStore()
   const { currentUser } = useUserStore()
+  const { schools } = useSchoolStore()
   const { toast } = useToast()
 
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
@@ -323,7 +325,7 @@ export default function StudentDetails() {
           <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <div className="flex flex-col gap-1">
-                <CardTitle>Histórico de Matrícula</CardTitle>
+                <CardTitle>Histórico de Matrículas</CardTitle>
                 <CardDescription>Registro acadêmico completo</CardDescription>
               </div>
               <div className="flex items-center gap-2">
@@ -359,35 +361,44 @@ export default function StudentDetails() {
                   <TableHeader>
                     <TableRow>
                       <TableHead>Ano Letivo</TableHead>
+                      <TableHead>Série / Turma</TableHead>
+                      <TableHead>Escola</TableHead>
                       <TableHead>Status</TableHead>
-                      <TableHead>Série</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {sortedEnrollments.map((enrollment) => (
-                      <TableRow
-                        key={enrollment.id}
-                        className="hover:bg-muted/50"
-                      >
-                        <TableCell className="font-medium">
-                          {enrollment.year}
-                        </TableCell>
-                        <TableCell>
-                          <Badge
-                            variant={
-                              enrollment.status === 'Cursando'
-                                ? 'default'
-                                : enrollment.status === 'Aprovado'
+                    {sortedEnrollments.map((enrollment) => {
+                      const schoolName =
+                        schools.find((s) => s.id === enrollment.schoolId)
+                          ?.name || 'Escola Externa'
+                      return (
+                        <TableRow
+                          key={enrollment.id}
+                          className="hover:bg-muted/50"
+                        >
+                          <TableCell className="font-medium">
+                            {enrollment.year}
+                          </TableCell>
+                          <TableCell>{enrollment.grade}</TableCell>
+                          <TableCell className="text-muted-foreground text-xs">
+                            {schoolName}
+                          </TableCell>
+                          <TableCell>
+                            <Badge
+                              variant={
+                                enrollment.status === 'Cursando'
                                   ? 'default'
-                                  : 'secondary'
-                            }
-                          >
-                            {enrollment.status}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>{enrollment.grade}</TableCell>
-                      </TableRow>
-                    ))}
+                                  : enrollment.status === 'Aprovado'
+                                    ? 'default'
+                                    : 'secondary'
+                              }
+                            >
+                              {enrollment.status}
+                            </Badge>
+                          </TableCell>
+                        </TableRow>
+                      )
+                    })}
                   </TableBody>
                 </Table>
               )}

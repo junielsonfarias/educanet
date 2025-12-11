@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import * as z from 'zod'
@@ -30,6 +31,7 @@ interface SubjectFormDialogProps {
   onOpenChange: (open: boolean) => void
   onSubmit: (data: any) => void
   gradeName?: string
+  initialData?: any
 }
 
 export function SubjectFormDialog({
@@ -37,6 +39,7 @@ export function SubjectFormDialog({
   onOpenChange,
   onSubmit,
   gradeName,
+  initialData,
 }: SubjectFormDialogProps) {
   const form = useForm<z.infer<typeof subjectSchema>>({
     resolver: zodResolver(subjectSchema),
@@ -46,19 +49,38 @@ export function SubjectFormDialog({
     },
   })
 
+  useEffect(() => {
+    if (open) {
+      if (initialData) {
+        form.reset({
+          name: initialData.name,
+          workload: initialData.workload || 0,
+        })
+      } else {
+        form.reset({
+          name: '',
+          workload: 0,
+        })
+      }
+    }
+  }, [open, initialData, form])
+
   const handleSubmit = (data: z.infer<typeof subjectSchema>) => {
     onSubmit(data)
     onOpenChange(false)
-    form.reset()
   }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
-          <DialogTitle>Nova Disciplina</DialogTitle>
+          <DialogTitle>
+            {initialData ? 'Editar Disciplina' : 'Nova Disciplina'}
+          </DialogTitle>
           <DialogDescription>
-            Adicionar componente curricular para {gradeName}.
+            {initialData
+              ? 'Modificar componente curricular.'
+              : `Adicionar componente curricular para ${gradeName || 'Série'}.`}
           </DialogDescription>
         </DialogHeader>
         <Form {...form}>
@@ -100,7 +122,7 @@ export function SubjectFormDialog({
               >
                 Cancelar
               </Button>
-              <Button type="submit">Adicionar</Button>
+              <Button type="submit">Salvar</Button>
             </DialogFooter>
           </form>
         </Form>

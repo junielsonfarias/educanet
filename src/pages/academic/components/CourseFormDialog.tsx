@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import * as z from 'zod'
@@ -28,12 +29,14 @@ interface CourseFormDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   onSubmit: (data: any) => void
+  initialData?: any
 }
 
 export function CourseFormDialog({
   open,
   onOpenChange,
   onSubmit,
+  initialData,
 }: CourseFormDialogProps) {
   const form = useForm<z.infer<typeof courseSchema>>({
     resolver: zodResolver(courseSchema),
@@ -42,19 +45,36 @@ export function CourseFormDialog({
     },
   })
 
+  useEffect(() => {
+    if (open) {
+      if (initialData) {
+        form.reset({
+          name: initialData.name,
+        })
+      } else {
+        form.reset({
+          name: '',
+        })
+      }
+    }
+  }, [open, initialData, form])
+
   const handleSubmit = (data: z.infer<typeof courseSchema>) => {
     onSubmit(data)
     onOpenChange(false)
-    form.reset()
   }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
-          <DialogTitle>Novo Curso</DialogTitle>
+          <DialogTitle>
+            {initialData ? 'Editar Curso' : 'Novo Curso'}
+          </DialogTitle>
           <DialogDescription>
-            Crie um novo curso para a rede de ensino.
+            {initialData
+              ? 'Atualize o nome do curso.'
+              : 'Crie um novo curso para a rede de ensino.'}
           </DialogDescription>
         </DialogHeader>
         <Form {...form}>
@@ -83,7 +103,7 @@ export function CourseFormDialog({
               >
                 Cancelar
               </Button>
-              <Button type="submit">Criar Curso</Button>
+              <Button type="submit">Salvar</Button>
             </DialogFooter>
           </form>
         </Form>

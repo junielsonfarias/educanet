@@ -74,6 +74,9 @@ export interface EvaluationRule {
   formula?: string
   isStandard?: boolean
   periodCount?: number
+  // New flexible configuration fields
+  typeWeights?: Record<string, number> // Map of AssessmentType ID to Weight percentage (0-100)
+  allowedExclusions?: boolean // Allow excluding lowest grade
 }
 
 export interface Grade {
@@ -162,6 +165,7 @@ export const mockEvaluationRules: EvaluationRule[] = [
     formula: '(eval1 + eval2 + eval3 + eval4) / 4',
     isStandard: true,
     periodCount: 4,
+    allowedExclusions: false,
   },
   {
     id: 'rule2',
@@ -184,6 +188,7 @@ export const mockEvaluationRules: EvaluationRule[] = [
     formula: '((eval1 * 2) + (eval2 * 3) + (eval3 * 2) + (eval4 * 3)) / 10',
     isStandard: false,
     periodCount: 4,
+    allowedExclusions: true,
   },
 ]
 

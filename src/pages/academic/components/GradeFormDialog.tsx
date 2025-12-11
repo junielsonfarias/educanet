@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import * as z from 'zod'
@@ -38,6 +39,7 @@ interface GradeFormDialogProps {
   onOpenChange: (open: boolean) => void
   onSubmit: (data: any) => void
   evaluationRules: EvaluationRule[]
+  initialData?: any
 }
 
 export function GradeFormDialog({
@@ -45,6 +47,7 @@ export function GradeFormDialog({
   onOpenChange,
   onSubmit,
   evaluationRules,
+  initialData,
 }: GradeFormDialogProps) {
   const form = useForm<z.infer<typeof gradeSchema>>({
     resolver: zodResolver(gradeSchema),
@@ -54,18 +57,39 @@ export function GradeFormDialog({
     },
   })
 
+  useEffect(() => {
+    if (open) {
+      if (initialData) {
+        form.reset({
+          name: initialData.name,
+          evaluationRuleId: initialData.evaluationRuleId || '',
+        })
+      } else {
+        form.reset({
+          name: '',
+          evaluationRuleId: '',
+        })
+      }
+    }
+  }, [open, initialData, form])
+
   const handleSubmit = (data: z.infer<typeof gradeSchema>) => {
     onSubmit(data)
     onOpenChange(false)
-    form.reset()
   }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
-          <DialogTitle>Nova Série/Ano</DialogTitle>
-          <DialogDescription>Adicione uma série ao curso.</DialogDescription>
+          <DialogTitle>
+            {initialData ? 'Editar Série/Ano' : 'Nova Série/Ano'}
+          </DialogTitle>
+          <DialogDescription>
+            {initialData
+              ? 'Modifique os detalhes da série e regra de avaliação.'
+              : 'Adicione uma série ao curso e vincule uma regra de avaliação.'}
+          </DialogDescription>
         </DialogHeader>
         <Form {...form}>
           <form
@@ -120,7 +144,7 @@ export function GradeFormDialog({
               >
                 Cancelar
               </Button>
-              <Button type="submit">Adicionar Série</Button>
+              <Button type="submit">Salvar</Button>
             </DialogFooter>
           </form>
         </Form>
