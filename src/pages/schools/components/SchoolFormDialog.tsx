@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import * as z from 'zod'
@@ -31,6 +31,8 @@ import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { School } from '@/lib/mock-data'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Upload, X } from 'lucide-react'
+import { fileToBase64 } from '@/lib/file-utils'
 
 const educationTypesList = [
   'Educação Infantil',
@@ -50,6 +52,7 @@ const schoolSchema = z.object({
   address: z.string().min(5, 'Endereço é obrigatório'),
   phone: z.string().min(8, 'Telefone inválido'),
   status: z.enum(['active', 'inactive']),
+  logo: z.string().optional(),
   administrativeDependency: z
     .enum(['Federal', 'Estadual', 'Municipal', 'Privada'])
     .optional(),
@@ -77,6 +80,9 @@ export function SchoolFormDialog({
   onSubmit,
   initialData,
 }: SchoolFormDialogProps) {
+  const [logoPreview, setLogoPreview] = useState<string | null>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
   const form = useForm<z.infer<typeof schoolSchema>>({
     resolver: zodResolver(schoolSchema),
     defaultValues: {
@@ -87,6 +93,7 @@ export function SchoolFormDialog({
       address: '',
       phone: '',
       status: 'active',
+      logo: '',
       administrativeDependency: 'Municipal',
       locationType: 'Urbana',
       educationTypes: [],
@@ -111,6 +118,7 @@ export function SchoolFormDialog({
           address: initialData.address,
           phone: initialData.phone,
           status: initialData.status,
+          logo: initialData.logo || '',
           administrativeDependency:
             initialData.administrativeDependency || 'Municipal',
           locationType: initialData.locationType || 'Urbana',
@@ -123,6 +131,7 @@ export function SchoolFormDialog({
             lab: false,
           },
         })
+        setLogoPreview(initialData.logo || null)
       } else {
         form.reset({
           name: '',
@@ -132,6 +141,7 @@ export function SchoolFormDialog({
           address: '',
           phone: '',
           status: 'active',
+          logo: '',
           administrativeDependency: 'Municipal',
           locationType: 'Urbana',
           educationTypes: [],
@@ -143,9 +153,29 @@ export function SchoolFormDialog({
             lab: false,
           },
         })
+        setLogoPreview(null)
       }
     }
   }, [open, initialData, form])
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file) {
+      try {
+        const base64 = await fileToBase64(file)
+        setLogoPreview(base64)
+        form.setValue('logo', base64)
+      } catch (error) {
+        console.error('Error reading file', error)
+      }
+    }
+  }
+
+  const removeLogo = () => {
+    setLogoPreview(null)
+    form.setValue('logo', '')
+    if (fileInputRef.current) fileInputRef.current.value = ''
+  }
 
   const handleSubmit = (data: z.infer<typeof schoolSchema>) => {
     onSubmit(data)
@@ -178,62 +208,108 @@ export function SchoolFormDialog({
               </TabsList>
 
               <TabsContent value="general" className="space-y-4 py-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <FormField
-                    control={form.control}
-                    name="code"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Código Interno</FormLabel>
-                        <FormControl>
-                          <Input placeholder="EX: 001" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="status"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Situação</FormLabel>
-                        <Select
-                          onValueChange={field.onChange}
-                          defaultValue={field.value}
-                        >
-                          <FormControl>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Selecione" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            <SelectItem value="active">Ativa</SelectItem>
-                            <SelectItem value="inactive">Inativa</SelectItem>
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
+                <div className="flex gap-4">
+                  {/* Logo Upload Section */}
+                  <div className="w-32 shrink-0">
+                    <FormLabel>Logo da Escola</FormLabel>
+                    <div
+                      className="mt-2 w-32 h-32 border-2 border-dashed rounded-lg flex items-center justify-center bg-muted/20 relative cursor-pointer hover:bg-muted/40 transition-colors"
+                      onClick={() => fileInputRef.current?.click()}
+                    >
+                      {logoPreview ? (
+                        <>
+                          <img
+                            src={logoPreview}
+                            alt="Logo Preview"
+                            className="w-full h-full object-contain p-1"
+                          />
+                          <div
+                            className="absolute -top-2 -right-2 bg-destructive text-destructive-foreground rounded-full p-1 cursor-pointer shadow-md hover:bg-destructive/90"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              removeLogo()
+                            }}
+                          >
+                            <X className="h-3 w-3" />
+                          </div>
+                        </>
+                      ) : (
+                        <div className="flex flex-col items-center text-muted-foreground">
+                          <Upload className="h-6 w-6 mb-1" />
+                          <span className="text-[10px]">Enviar Logo</span>
+                        </div>
+                      )}
+                    </div>
+                    <input
+                      type="file"
+                      ref={fileInputRef}
+                      className="hidden"
+                      accept="image/*"
+                      onChange={handleFileChange}
+                    />
+                  </div>
 
-                <FormField
-                  control={form.control}
-                  name="name"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Nome da Escola</FormLabel>
-                      <FormControl>
-                        <Input
-                          placeholder="Ex: Escola Municipal..."
-                          {...field}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                  <div className="flex-1 space-y-4">
+                    <div className="grid grid-cols-2 gap-4">
+                      <FormField
+                        control={form.control}
+                        name="code"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Código Interno</FormLabel>
+                            <FormControl>
+                              <Input placeholder="EX: 001" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="status"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Situação</FormLabel>
+                            <Select
+                              onValueChange={field.onChange}
+                              defaultValue={field.value}
+                            >
+                              <FormControl>
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Selecione" />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                <SelectItem value="active">Ativa</SelectItem>
+                                <SelectItem value="inactive">
+                                  Inativa
+                                </SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+
+                    <FormField
+                      control={form.control}
+                      name="name"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Nome da Escola</FormLabel>
+                          <FormControl>
+                            <Input
+                              placeholder="Ex: Escola Municipal..."
+                              {...field}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                </div>
 
                 <FormField
                   control={form.control}

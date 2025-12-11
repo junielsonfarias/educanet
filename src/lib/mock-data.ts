@@ -41,6 +41,7 @@ export interface School {
   phone: string
   director: string
   status: 'active' | 'inactive'
+  logo?: string // New field for School Logo
   academicYears: AcademicYear[]
   // New INEP/Censo fields
   inepCode?: string
@@ -124,6 +125,19 @@ export interface Assessment {
   date: string
 }
 
+// General Settings
+export interface GeneralSettings {
+  municipalityName: string
+  educationSecretaryName: string
+  municipalityLogo?: string
+  secretaryLogo?: string
+}
+
+export const initialSettings: GeneralSettings = {
+  municipalityName: 'Prefeitura Municipal',
+  educationSecretaryName: 'Secretaria Municipal de Educação',
+}
+
 // Mock Data Initialization
 
 export const mockEvaluationRules: EvaluationRule[] = [
@@ -203,6 +217,7 @@ export const mockSchools: School[] = [
     phone: '(11) 3456-7890',
     director: 'Maria Silva',
     status: 'active',
+    logo: 'https://img.usecurling.com/i?q=school&shape=outline&color=blue',
     inepCode: '12345678',
     administrativeDependency: 'Municipal',
     locationType: 'Urbana',

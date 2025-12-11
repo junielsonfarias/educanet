@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { Toaster } from '@/components/ui/toaster'
 import { Toaster as Sonner } from '@/components/ui/sonner'
 import { TooltipProvider } from '@/components/ui/tooltip'
@@ -24,6 +24,7 @@ import EvaluationRulesList from './pages/academic/EvaluationRulesList'
 import NotFound from './pages/NotFound'
 import Layout from './components/Layout'
 import UsersList from './pages/settings/UsersList'
+import GeneralSettings from './pages/settings/GeneralSettings'
 import { UserProvider } from './stores/useUserStore'
 import { SchoolProvider } from './stores/useSchoolStore'
 import { StudentProvider } from './stores/useStudentStore'
@@ -31,119 +32,133 @@ import { TeacherProvider } from './stores/useTeacherStore'
 import { ProjectProvider } from './stores/useProjectStore'
 import { CourseProvider } from './stores/useCourseStore'
 import { AssessmentProvider } from './stores/useAssessmentStore'
+import { SettingsProvider } from './stores/useSettingsStore'
 
 const App = () => (
   <UserProvider>
-    <SchoolProvider>
-      <CourseProvider>
-        <ProjectProvider>
-          <StudentProvider>
-            <TeacherProvider>
-              <AssessmentProvider>
-                <BrowserRouter
-                  future={{
-                    v7_startTransition: false,
-                    v7_relativeSplatPath: false,
-                  }}
-                >
-                  <TooltipProvider>
-                    <Toaster />
-                    <Sonner />
-                    <Routes>
-                      <Route path="/" element={<Index />} />
-                      <Route path="/publico/boletim" element={<ReportCard />} />
-
-                      <Route element={<Layout />}>
-                        <Route path="/dashboard" element={<Dashboard />} />
-
-                        {/* Schools Routes */}
-                        <Route path="/escolas" element={<SchoolsList />} />
+    <SettingsProvider>
+      <SchoolProvider>
+        <CourseProvider>
+          <ProjectProvider>
+            <StudentProvider>
+              <TeacherProvider>
+                <AssessmentProvider>
+                  <BrowserRouter
+                    future={{
+                      v7_startTransition: false,
+                      v7_relativeSplatPath: false,
+                    }}
+                  >
+                    <TooltipProvider>
+                      <Toaster />
+                      <Sonner />
+                      <Routes>
+                        <Route path="/" element={<Index />} />
                         <Route
-                          path="/escolas/:id"
-                          element={<SchoolDetails />}
+                          path="/publico/boletim"
+                          element={<ReportCard />}
                         />
 
-                        {/* People Routes */}
-                        <Route
-                          path="/pessoas/alunos"
-                          element={<StudentsList />}
-                        />
-                        <Route
-                          path="/pessoas/alunos/:id"
-                          element={<StudentDetails />}
-                        />
-                        <Route
-                          path="/pessoas/professores"
-                          element={<TeachersList />}
-                        />
-                        <Route
-                          path="/pessoas/professores/:id"
-                          element={<TeacherDetails />}
-                        />
+                        <Route element={<Layout />}>
+                          <Route path="/dashboard" element={<Dashboard />} />
 
-                        {/* Academic Routes */}
-                        <Route
-                          path="/academico/cursos"
-                          element={<CoursesList />}
-                        />
-                        <Route
-                          path="/academico/cursos/:id"
-                          element={<CourseDetails />}
-                        />
-                        <Route
-                          path="/academico/turmas"
-                          element={<ClassesList />}
-                        />
-                        <Route
-                          path="/academico/regras-avaliacao"
-                          element={<EvaluationRulesList />}
-                        />
-                        <Route
-                          path="/avaliacao/lancamento"
-                          element={<AssessmentInput />}
-                        />
+                          {/* Schools Routes */}
+                          <Route path="/escolas" element={<SchoolsList />} />
+                          <Route
+                            path="/escolas/:id"
+                            element={<SchoolDetails />}
+                          />
 
-                        {/* Calendar */}
-                        <Route
-                          path="/calendario"
-                          element={<SchoolCalendar />}
-                        />
+                          {/* People Routes */}
+                          <Route
+                            path="/pessoas/alunos"
+                            element={<StudentsList />}
+                          />
+                          <Route
+                            path="/pessoas/alunos/:id"
+                            element={<StudentDetails />}
+                          />
+                          <Route
+                            path="/pessoas/professores"
+                            element={<TeachersList />}
+                          />
+                          <Route
+                            path="/pessoas/professores/:id"
+                            element={<TeacherDetails />}
+                          />
 
-                        {/* Reports */}
-                        <Route
-                          path="/relatorios"
-                          element={<ReportsDashboard />}
-                        />
-                        <Route
-                          path="/relatorios/matriculas"
-                          element={<EnrollmentReport />}
-                        />
-                        <Route
-                          path="/relatorios/desempenho"
-                          element={<PerformanceReport />}
-                        />
-                        <Route
-                          path="/relatorios/professores"
-                          element={<TeacherAllocationReport />}
-                        />
+                          {/* Academic Routes */}
+                          <Route
+                            path="/academico/cursos"
+                            element={<CoursesList />}
+                          />
+                          <Route
+                            path="/academico/cursos/:id"
+                            element={<CourseDetails />}
+                          />
+                          <Route
+                            path="/academico/turmas"
+                            element={<ClassesList />}
+                          />
+                          <Route
+                            path="/academico/regras-avaliacao"
+                            element={<EvaluationRulesList />}
+                          />
+                          <Route
+                            path="/avaliacao/lancamento"
+                            element={<AssessmentInput />}
+                          />
 
-                        <Route path="/configuracoes" element={<NotFound />} />
-                        <Route
-                          path="/configuracoes/usuarios"
-                          element={<UsersList />}
-                        />
-                      </Route>
+                          {/* Calendar */}
+                          <Route
+                            path="/calendario"
+                            element={<SchoolCalendar />}
+                          />
 
-                      <Route path="*" element={<NotFound />} />
-                    </Routes>
-                  </TooltipProvider>
-                </BrowserRouter>
-              </AssessmentProvider>
-            </TeacherProvider>
-          </StudentProvider>
-        </ProjectProvider>
-      </CourseProvider>
-    </SchoolProvider>
+                          {/* Reports */}
+                          <Route
+                            path="/relatorios"
+                            element={<ReportsDashboard />}
+                          />
+                          <Route
+                            path="/relatorios/matriculas"
+                            element={<EnrollmentReport />}
+                          />
+                          <Route
+                            path="/relatorios/desempenho"
+                            element={<PerformanceReport />}
+                          />
+                          <Route
+                            path="/relatorios/professores"
+                            element={<TeacherAllocationReport />}
+                          />
+
+                          {/* Settings */}
+                          <Route
+                            path="/configuracoes"
+                            element={<GeneralSettings />}
+                          />
+                          <Route
+                            path="/configuracoes/geral"
+                            element={<GeneralSettings />}
+                          />
+                          <Route
+                            path="/configuracoes/usuarios"
+                            element={<UsersList />}
+                          />
+                        </Route>
+
+                        <Route path="*" element={<NotFound />} />
+                      </Routes>
+                    </TooltipProvider>
+                  </BrowserRouter>
+                </AssessmentProvider>
+              </TeacherProvider>
+            </StudentProvider>
+          </ProjectProvider>
+        </CourseProvider>
+      </SchoolProvider>
+    </SettingsProvider>
   </UserProvider>
 )
 

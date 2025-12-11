@@ -16,6 +16,10 @@ import {
   Trophy,
   Filter,
   FileText,
+  Printer,
+  ArrowRightLeft,
+  Briefcase,
+  Book,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
@@ -37,6 +41,7 @@ import { useState } from 'react'
 import { StudentFormDialog } from './components/StudentFormDialog'
 import { EnrollmentFormDialog } from './components/EnrollmentFormDialog'
 import { ProjectEnrollmentDialog } from './components/ProjectEnrollmentDialog'
+import { StudentTransferDialog } from './components/StudentTransferDialog'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -90,6 +95,7 @@ export default function StudentDetails() {
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
   const [isEnrollmentDialogOpen, setIsEnrollmentDialogOpen] = useState(false)
   const [isProjectDialogOpen, setIsProjectDialogOpen] = useState(false)
+  const [isTransferDialogOpen, setIsTransferDialogOpen] = useState(false)
   const [deleteId, setDeleteId] = useState<string | null>(null)
 
   // Enrollment List State
@@ -156,6 +162,35 @@ export default function StudentDetails() {
       title: 'Projeto removido',
       description: 'Matrícula no projeto cancelada.',
     })
+  }
+
+  const handleTransfer = (
+    type: 'internal' | 'external',
+    destination: string,
+    notes?: string,
+  ) => {
+    // In a real app, this would create a transfer record/history
+    updateStudent(student.id, {
+      status: 'Transferido',
+    })
+    toast({
+      title: 'Processo Iniciado',
+      description: `Transferência para ${destination} registrada. Status alterado para Transferido.`,
+    })
+  }
+
+  const generateDocument = (docName: string) => {
+    toast({
+      title: 'Gerando Documento',
+      description: `O documento "${docName}" está sendo gerado e será baixado em breve.`,
+    })
+    // Mock download delay
+    setTimeout(() => {
+      toast({
+        title: 'Download Concluído',
+        description: `O arquivo ${docName}.pdf foi baixado com sucesso.`,
+      })
+    }, 2000)
   }
 
   const getSchoolName = (schoolId: string) => {
@@ -237,53 +272,103 @@ export default function StudentDetails() {
       </div>
 
       <div className="grid gap-6 md:grid-cols-3">
-        <Card className="col-span-1 h-fit">
-          <CardContent className="pt-6 flex flex-col items-center text-center">
-            <Avatar className="h-32 w-32 mb-4 border-4 border-primary/10">
-              <AvatarImage
-                src={`https://img.usecurling.com/ppl/medium?seed=${student.id}`}
-              />
-              <AvatarFallback className="text-2xl">
-                {student.name?.substring(0, 2).toUpperCase() || 'AL'}
-              </AvatarFallback>
-            </Avatar>
-            <h3 className="text-xl font-bold">{student.name}</h3>
-            <p className="text-sm text-muted-foreground mb-2">
-              Matrícula: {student.registration}
-            </p>
-            {student.status && (
-              <Badge
-                variant={
-                  student.status === 'Cursando' ? 'default' : 'secondary'
-                }
-                className="mt-2"
-              >
-                {student.status}
-              </Badge>
-            )}
+        <div className="col-span-1 space-y-6">
+          <Card>
+            <CardContent className="pt-6 flex flex-col items-center text-center">
+              <Avatar className="h-32 w-32 mb-4 border-4 border-primary/10">
+                <AvatarImage
+                  src={`https://img.usecurling.com/ppl/medium?seed=${student.id}`}
+                />
+                <AvatarFallback className="text-2xl">
+                  {student.name?.substring(0, 2).toUpperCase() || 'AL'}
+                </AvatarFallback>
+              </Avatar>
+              <h3 className="text-xl font-bold">{student.name}</h3>
+              <p className="text-sm text-muted-foreground mb-2">
+                Matrícula: {student.registration}
+              </p>
+              {student.status && (
+                <Badge
+                  variant={
+                    student.status === 'Cursando' ? 'default' : 'secondary'
+                  }
+                  className="mt-2"
+                >
+                  {student.status}
+                </Badge>
+              )}
 
-            <div className="w-full mt-6 text-left space-y-3">
-              <div className="flex items-center gap-2 text-sm">
-                <Calendar className="h-4 w-4 text-muted-foreground" />
-                <span>
-                  Nasc: {student.birthDate || 'N/A'} ({student.age} anos)
-                </span>
+              <div className="w-full mt-6 text-left space-y-3">
+                <div className="flex items-center gap-2 text-sm">
+                  <Calendar className="h-4 w-4 text-muted-foreground" />
+                  <span>
+                    Nasc: {student.birthDate || 'N/A'} ({student.age} anos)
+                  </span>
+                </div>
+                <div className="flex items-center gap-2 text-sm">
+                  <User className="h-4 w-4 text-muted-foreground" />
+                  <span>Resp: {student.guardian}</span>
+                </div>
+                <div className="flex items-center gap-2 text-sm">
+                  <Phone className="h-4 w-4 text-muted-foreground" />
+                  <span>{student.contacts?.phone || 'N/A'}</span>
+                </div>
+                <div className="flex items-center gap-2 text-sm">
+                  <Mail className="h-4 w-4 text-muted-foreground" />
+                  <span>{student.contacts?.email || 'N/A'}</span>
+                </div>
               </div>
-              <div className="flex items-center gap-2 text-sm">
-                <User className="h-4 w-4 text-muted-foreground" />
-                <span>Resp: {student.guardian}</span>
-              </div>
-              <div className="flex items-center gap-2 text-sm">
-                <Phone className="h-4 w-4 text-muted-foreground" />
-                <span>{student.contacts?.phone || 'N/A'}</span>
-              </div>
-              <div className="flex items-center gap-2 text-sm">
-                <Mail className="h-4 w-4 text-muted-foreground" />
-                <span>{student.contacts?.email || 'N/A'}</span>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-lg flex items-center gap-2">
+                <Printer className="h-5 w-5 text-primary" /> Ações Rápidas
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="flex flex-col gap-2">
+              <Button
+                variant="outline"
+                className="justify-start"
+                onClick={() => generateDocument('Ficha do Aluno')}
+              >
+                <FileText className="mr-2 h-4 w-4" /> Gerar Ficha do Aluno
+              </Button>
+              <Button
+                variant="outline"
+                className="justify-start"
+                onClick={() => generateDocument('Carteira de Estudante')}
+              >
+                <Briefcase className="mr-2 h-4 w-4" /> Gerar Carteira de
+                Estudante
+              </Button>
+              <Button
+                variant="outline"
+                className="justify-start"
+                onClick={() => generateDocument('Boletim')}
+              >
+                <GraduationCap className="mr-2 h-4 w-4" /> Gerar Boletim
+              </Button>
+              <Button
+                variant="outline"
+                className="justify-start"
+                onClick={() => generateDocument('Histórico Escolar')}
+              >
+                <Book className="mr-2 h-4 w-4" /> Gerar Histórico Escolar
+              </Button>
+              <Separator className="my-2" />
+              <Button
+                variant="default"
+                className="justify-start bg-orange-600 hover:bg-orange-700 text-white"
+                onClick={() => setIsTransferDialogOpen(true)}
+              >
+                <ArrowRightLeft className="mr-2 h-4 w-4" /> Transferência de
+                Aluno
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
 
         <div className="col-span-1 md:col-span-2 space-y-6">
           <Card>
@@ -589,6 +674,13 @@ export default function StudentDetails() {
         onOpenChange={setIsProjectDialogOpen}
         onSubmit={handleAddProject}
         excludeProjectIds={student.projectIds}
+      />
+
+      <StudentTransferDialog
+        open={isTransferDialogOpen}
+        onOpenChange={setIsTransferDialogOpen}
+        onTransfer={handleTransfer}
+        student={student}
       />
 
       <AlertDialog
