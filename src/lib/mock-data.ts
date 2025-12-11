@@ -78,3 +78,109 @@ export const initialUsers: User[] = [
     createdAt: new Date().toISOString(),
   },
 ]
+
+export interface Student {
+  id: string
+  name: string
+  age: number
+  grade: string
+  status: 'Cursando' | 'Transferido' | 'Reprovado'
+  registration: string
+  email?: string
+  phone?: string
+  guardian?: string
+}
+
+export const mockStudents: Student[] = [
+  {
+    id: '1',
+    name: 'Alice Souza',
+    age: 10,
+    grade: '5º Ano A',
+    status: 'Cursando',
+    registration: 'EDU-2024001',
+    email: 'alice.souza@aluno.edu.gov',
+    phone: '(11) 98765-4321',
+    guardian: 'Roberto Souza',
+  },
+  {
+    id: '2',
+    name: 'Bruno Lima',
+    age: 11,
+    grade: '5º Ano A',
+    status: 'Cursando',
+    registration: 'EDU-2024002',
+    email: 'bruno.lima@aluno.edu.gov',
+    phone: '(11) 98765-4322',
+    guardian: 'Carla Lima',
+  },
+  {
+    id: '3',
+    name: 'Carla Dias',
+    age: 9,
+    grade: '4º Ano B',
+    status: 'Transferido',
+    registration: 'EDU-2024003',
+    email: 'carla.dias@aluno.edu.gov',
+    phone: '(11) 98765-4323',
+    guardian: 'Marcos Dias',
+  },
+  {
+    id: '4',
+    name: 'Daniel Rocha',
+    age: 10,
+    grade: '5º Ano A',
+    status: 'Cursando',
+    registration: 'EDU-2024004',
+    email: 'daniel.rocha@aluno.edu.gov',
+    phone: '(11) 98765-4324',
+    guardian: 'Sandra Rocha',
+  },
+  {
+    id: '5',
+    name: 'Eduarda Martins',
+    age: 12,
+    grade: '6º Ano C',
+    status: 'Reprovado',
+    registration: 'EDU-2024005',
+    email: 'eduarda.martins@aluno.edu.gov',
+    phone: '(11) 98765-4325',
+    guardian: 'Pedro Martins',
+  },
+]
+
+export interface Teacher {
+  id: string
+  name: string
+  email: string
+  subject: string
+  phone: string
+  status: 'active' | 'inactive'
+}
+
+export const mockTeachers: Teacher[] = [
+  {
+    id: '1',
+    name: 'Prof. Alberto Campos',
+    email: 'alberto.campos@prof.edu.gov',
+    subject: 'Matemática',
+    phone: '(11) 91234-5678',
+    status: 'active',
+  },
+  {
+    id: '2',
+    name: 'Prof. Bianca Torres',
+    email: 'bianca.torres@prof.edu.gov',
+    subject: 'Português',
+    phone: '(11) 91234-5679',
+    status: 'active',
+  },
+  {
+    id: '3',
+    name: 'Prof. Carlos Mendes',
+    email: 'carlos.mendes@prof.edu.gov',
+    subject: 'História',
+    phone: '(11) 91234-5680',
+    status: 'active',
+  },
+]

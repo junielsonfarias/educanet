@@ -5,43 +5,75 @@ import { TooltipProvider } from '@/components/ui/tooltip'
 import Index from './pages/Index'
 import Dashboard from './pages/Dashboard'
 import SchoolsList from './pages/schools/SchoolsList'
+import SchoolDetails from './pages/schools/SchoolDetails'
 import StudentsList from './pages/people/StudentsList'
+import StudentDetails from './pages/people/StudentDetails'
+import TeachersList from './pages/people/TeachersList'
+import TeacherDetails from './pages/people/TeacherDetails'
 import ClassesList from './pages/academic/ClassesList'
 import ReportCard from './pages/public/ReportCard'
 import NotFound from './pages/NotFound'
 import Layout from './components/Layout'
 import UsersList from './pages/settings/UsersList'
 import { UserProvider } from './stores/useUserStore'
+import { SchoolProvider } from './stores/useSchoolStore'
+import { StudentProvider } from './stores/useStudentStore'
+import { TeacherProvider } from './stores/useTeacherStore'
 
 const App = () => (
   <UserProvider>
-    <BrowserRouter
-      future={{ v7_startTransition: false, v7_relativeSplatPath: false }}
-    >
-      <TooltipProvider>
-        <Toaster />
-        <Sonner />
-        <Routes>
-          <Route path="/" element={<Index />} />
-          <Route path="/publico/boletim" element={<ReportCard />} />
+    <SchoolProvider>
+      <StudentProvider>
+        <TeacherProvider>
+          <BrowserRouter
+            future={{ v7_startTransition: false, v7_relativeSplatPath: false }}
+          >
+            <TooltipProvider>
+              <Toaster />
+              <Sonner />
+              <Routes>
+                <Route path="/" element={<Index />} />
+                <Route path="/publico/boletim" element={<ReportCard />} />
 
-          <Route element={<Layout />}>
-            <Route path="/dashboard" element={<Dashboard />} />
-            <Route path="/escolas" element={<SchoolsList />} />
-            <Route path="/escolas/:id" element={<SchoolsList />} />
-            <Route path="/pessoas/alunos" element={<StudentsList />} />
-            <Route path="/pessoas/professores" element={<NotFound />} />
-            <Route path="/academico/turmas" element={<ClassesList />} />
-            <Route path="/avaliacao" element={<NotFound />} />
-            <Route path="/relatorios" element={<NotFound />} />
-            <Route path="/configuracoes" element={<NotFound />} />
-            <Route path="/configuracoes/usuarios" element={<UsersList />} />
-          </Route>
+                <Route element={<Layout />}>
+                  <Route path="/dashboard" element={<Dashboard />} />
 
-          <Route path="*" element={<NotFound />} />
-        </Routes>
-      </TooltipProvider>
-    </BrowserRouter>
+                  {/* Schools Routes */}
+                  <Route path="/escolas" element={<SchoolsList />} />
+                  <Route path="/escolas/:id" element={<SchoolDetails />} />
+
+                  {/* People Routes */}
+                  <Route path="/pessoas/alunos" element={<StudentsList />} />
+                  <Route
+                    path="/pessoas/alunos/:id"
+                    element={<StudentDetails />}
+                  />
+                  <Route
+                    path="/pessoas/professores"
+                    element={<TeachersList />}
+                  />
+                  <Route
+                    path="/pessoas/professores/:id"
+                    element={<TeacherDetails />}
+                  />
+
+                  <Route path="/academico/turmas" element={<ClassesList />} />
+                  <Route path="/avaliacao" element={<NotFound />} />
+                  <Route path="/relatorios" element={<NotFound />} />
+                  <Route path="/configuracoes" element={<NotFound />} />
+                  <Route
+                    path="/configuracoes/usuarios"
+                    element={<UsersList />}
+                  />
+                </Route>
+
+                <Route path="*" element={<NotFound />} />
+              </Routes>
+            </TooltipProvider>
+          </BrowserRouter>
+        </TeacherProvider>
+      </StudentProvider>
+    </SchoolProvider>
   </UserProvider>
 )
 

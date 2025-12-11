@@ -32,17 +32,77 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card'
-import { Link } from 'react-router-dom'
-import { mockSchools } from '@/lib/mock-data'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
+import { Link, useNavigate } from 'react-router-dom'
+import useSchoolStore from '@/stores/useSchoolStore'
+import { SchoolFormDialog } from './components/SchoolFormDialog'
+import { School } from '@/lib/mock-data'
+import { useToast } from '@/hooks/use-toast'
 
 export default function SchoolsList() {
+  const { schools, addSchool, updateSchool, deleteSchool } = useSchoolStore()
   const [searchTerm, setSearchTerm] = useState('')
+  const [isDialogOpen, setIsDialogOpen] = useState(false)
+  const [editingSchool, setEditingSchool] = useState<School | null>(null)
+  const [deleteId, setDeleteId] = useState<string | null>(null)
 
-  const filteredSchools = mockSchools.filter(
+  const navigate = useNavigate()
+  const { toast } = useToast()
+
+  const filteredSchools = schools.filter(
     (school) =>
       school.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       school.code.toLowerCase().includes(searchTerm.toLowerCase()),
   )
+
+  const handleCreate = (data: any) => {
+    addSchool(data)
+    toast({
+      title: 'Escola criada',
+      description: `${data.name} foi adicionada com sucesso.`,
+    })
+  }
+
+  const handleUpdate = (data: any) => {
+    if (editingSchool) {
+      updateSchool(editingSchool.id, data)
+      toast({
+        title: 'Escola atualizada',
+        description: 'Dados atualizados com sucesso.',
+      })
+      setEditingSchool(null)
+    }
+  }
+
+  const handleDelete = () => {
+    if (deleteId) {
+      deleteSchool(deleteId)
+      toast({
+        title: 'Escola removida',
+        description: 'A escola foi removida do sistema.',
+      })
+      setDeleteId(null)
+    }
+  }
+
+  const openCreateDialog = () => {
+    setEditingSchool(null)
+    setIsDialogOpen(true)
+  }
+
+  const openEditDialog = (school: School) => {
+    setEditingSchool(school)
+    setIsDialogOpen(true)
+  }
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -55,7 +115,7 @@ export default function SchoolsList() {
             Gerencie as unidades escolares da rede municipal.
           </p>
         </div>
-        <Button className="w-full sm:w-auto">
+        <Button onClick={openCreateDialog} className="w-full sm:w-auto">
           <Plus className="mr-2 h-4 w-4" />
           Nova Escola
         </Button>
@@ -101,67 +161,137 @@ export default function SchoolsList() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredSchools.map((school) => (
-                  <TableRow key={school.id}>
-                    <TableCell className="font-medium">{school.code}</TableCell>
-                    <TableCell>
-                      <div className="flex flex-col">
-                        <span className="font-medium">{school.name}</span>
-                        <span className="text-xs text-muted-foreground md:hidden flex items-center gap-1 mt-1">
-                          <MapPin className="h-3 w-3" /> {school.address}
-                        </span>
-                      </div>
-                    </TableCell>
-                    <TableCell className="hidden md:table-cell">
-                      {school.director}
-                    </TableCell>
-                    <TableCell className="hidden lg:table-cell">
-                      <div className="flex items-center gap-1 text-sm">
-                        <Phone className="h-3 w-3 text-muted-foreground" />
-                        {school.phone}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <Badge
-                        variant={
-                          school.status === 'active' ? 'default' : 'secondary'
-                        }
-                      >
-                        {school.status === 'active' ? 'Ativa' : 'Inativa'}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" className="h-8 w-8 p-0">
-                            <span className="sr-only">Abrir menu</span>
-                            <MoreHorizontal className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuLabel>Ações</DropdownMenuLabel>
-                          <DropdownMenuItem>
-                            <Link
-                              to={`/escolas/${school.id}`}
-                              className="w-full"
-                            >
-                              Ver Detalhes
-                            </Link>
-                          </DropdownMenuItem>
-                          <DropdownMenuItem>Editar Dados</DropdownMenuItem>
-                          <DropdownMenuItem className="text-destructive">
-                            Excluir
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
+                {filteredSchools.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={6} className="h-24 text-center">
+                      Nenhuma escola encontrada.
                     </TableCell>
                   </TableRow>
-                ))}
+                ) : (
+                  filteredSchools.map((school) => (
+                    <TableRow
+                      key={school.id}
+                      className="cursor-pointer hover:bg-muted/50"
+                      onClick={() => navigate(`/escolas/${school.id}`)}
+                    >
+                      <TableCell
+                        className="font-medium"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <Link
+                          to={`/escolas/${school.id}`}
+                          className="hover:underline"
+                        >
+                          {school.code}
+                        </Link>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex flex-col">
+                          <span className="font-medium">{school.name}</span>
+                          <span className="text-xs text-muted-foreground md:hidden flex items-center gap-1 mt-1">
+                            <MapPin className="h-3 w-3" /> {school.address}
+                          </span>
+                        </div>
+                      </TableCell>
+                      <TableCell className="hidden md:table-cell">
+                        {school.director}
+                      </TableCell>
+                      <TableCell className="hidden lg:table-cell">
+                        <div className="flex items-center gap-1 text-sm">
+                          <Phone className="h-3 w-3 text-muted-foreground" />
+                          {school.phone}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <Badge
+                          variant={
+                            school.status === 'active' ? 'default' : 'secondary'
+                          }
+                        >
+                          {school.status === 'active' ? 'Ativa' : 'Inativa'}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              className="h-8 w-8 p-0"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <span className="sr-only">Abrir menu</span>
+                              <MoreHorizontal className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuLabel>Ações</DropdownMenuLabel>
+                            <DropdownMenuItem
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                navigate(`/escolas/${school.id}`)
+                              }}
+                            >
+                              Ver Detalhes
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                openEditDialog(school)
+                              }}
+                            >
+                              Editar Dados
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              className="text-destructive focus:text-destructive"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                setDeleteId(school.id)
+                              }}
+                            >
+                              Excluir
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
               </TableBody>
             </Table>
           </div>
         </CardContent>
       </Card>
+
+      <SchoolFormDialog
+        open={isDialogOpen}
+        onOpenChange={setIsDialogOpen}
+        onSubmit={editingSchool ? handleUpdate : handleCreate}
+        initialData={editingSchool}
+      />
+
+      <AlertDialog
+        open={!!deleteId}
+        onOpenChange={(open) => !open && setDeleteId(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirmar exclusão</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tem certeza que deseja excluir esta escola? Esta ação não pode ser
+              desfeita.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDelete}
+              className="bg-destructive hover:bg-destructive/90"
+            >
+              Excluir
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

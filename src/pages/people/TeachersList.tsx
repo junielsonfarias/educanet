@@ -3,8 +3,9 @@ import {
   Plus,
   Search,
   MoreHorizontal,
-  User,
-  FileText,
+  Mail,
+  Phone,
+  BookOpen,
   Filter,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -22,7 +23,6 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuLabel,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
@@ -34,10 +34,10 @@ import {
   CardTitle,
 } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import useStudentStore from '@/stores/useStudentStore'
+import useTeacherStore from '@/stores/useTeacherStore'
 import { useNavigate } from 'react-router-dom'
-import { StudentFormDialog } from './components/StudentFormDialog'
-import { Student } from '@/lib/mock-data'
+import { TeacherFormDialog } from './components/TeacherFormDialog'
+import { Teacher } from '@/lib/mock-data'
 import { useToast } from '@/hooks/use-toast'
 import {
   AlertDialog,
@@ -50,60 +50,60 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 
-export default function StudentsList() {
-  const { students, addStudent, updateStudent, deleteStudent } =
-    useStudentStore()
+export default function TeachersList() {
+  const { teachers, addTeacher, updateTeacher, deleteTeacher } =
+    useTeacherStore()
   const [searchTerm, setSearchTerm] = useState('')
   const [isDialogOpen, setIsDialogOpen] = useState(false)
-  const [editingStudent, setEditingStudent] = useState<Student | null>(null)
+  const [editingTeacher, setEditingTeacher] = useState<Teacher | null>(null)
   const [deleteId, setDeleteId] = useState<string | null>(null)
 
   const navigate = useNavigate()
   const { toast } = useToast()
 
-  const filteredStudents = students.filter(
-    (student) =>
-      student.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      student.registration.toLowerCase().includes(searchTerm.toLowerCase()),
+  const filteredTeachers = teachers.filter(
+    (teacher) =>
+      teacher.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      teacher.subject.toLowerCase().includes(searchTerm.toLowerCase()),
   )
 
   const handleCreate = (data: any) => {
-    addStudent(data)
+    addTeacher(data)
     toast({
-      title: 'Aluno matriculado',
+      title: 'Professor cadastrado',
       description: `${data.name} adicionado com sucesso.`,
     })
   }
 
   const handleUpdate = (data: any) => {
-    if (editingStudent) {
-      updateStudent(editingStudent.id, data)
+    if (editingTeacher) {
+      updateTeacher(editingTeacher.id, data)
       toast({
         title: 'Dados atualizados',
-        description: 'Informações do aluno atualizadas com sucesso.',
+        description: 'Informações do professor atualizadas.',
       })
-      setEditingStudent(null)
+      setEditingTeacher(null)
     }
   }
 
   const handleDelete = () => {
     if (deleteId) {
-      deleteStudent(deleteId)
+      deleteTeacher(deleteId)
       toast({
-        title: 'Aluno removido',
-        description: 'Registro do aluno excluído.',
+        title: 'Professor removido',
+        description: 'Registro do professor excluído.',
       })
       setDeleteId(null)
     }
   }
 
   const openCreateDialog = () => {
-    setEditingStudent(null)
+    setEditingTeacher(null)
     setIsDialogOpen(true)
   }
 
-  const openEditDialog = (student: Student) => {
-    setEditingStudent(student)
+  const openEditDialog = (teacher: Teacher) => {
+    setEditingTeacher(teacher)
     setIsDialogOpen(true)
   }
 
@@ -112,28 +112,23 @@ export default function StudentsList() {
       <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
         <div>
           <h2 className="text-3xl font-bold tracking-tight text-primary">
-            Alunos
+            Professores
           </h2>
           <p className="text-muted-foreground">
-            Gestão completa de discentes da rede.
+            Gerenciamento do corpo docente da rede.
           </p>
         </div>
-        <div className="flex gap-2 w-full sm:w-auto">
-          <Button variant="outline" className="w-full sm:w-auto">
-            Exportar Lista
-          </Button>
-          <Button onClick={openCreateDialog} className="w-full sm:w-auto">
-            <Plus className="mr-2 h-4 w-4" />
-            Novo Aluno
-          </Button>
-        </div>
+        <Button onClick={openCreateDialog} className="w-full sm:w-auto">
+          <Plus className="mr-2 h-4 w-4" />
+          Novo Professor
+        </Button>
       </div>
 
       <Card>
         <CardHeader className="pb-3">
-          <CardTitle>Diretório de Alunos</CardTitle>
+          <CardTitle>Listagem de Professores</CardTitle>
           <CardDescription>
-            Visualize e gerencie todos os alunos matriculados.
+            Visualize e gerencie os professores cadastrados.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -141,7 +136,7 @@ export default function StudentsList() {
             <div className="relative flex-1 max-w-sm">
               <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
               <Input
-                placeholder="Buscar por nome ou matrícula..."
+                placeholder="Buscar por nome ou disciplina..."
                 className="pl-8"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
@@ -158,57 +153,74 @@ export default function StudentsList() {
                 <TableRow>
                   <TableHead className="w-[80px]">Avatar</TableHead>
                   <TableHead>Nome</TableHead>
-                  <TableHead>Matrícula</TableHead>
-                  <TableHead>Série/Turma</TableHead>
+                  <TableHead>Disciplina</TableHead>
+                  <TableHead className="hidden md:table-cell">
+                    Contato
+                  </TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead className="text-right">Ações</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredStudents.length === 0 ? (
+                {filteredTeachers.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={6} className="h-24 text-center">
-                      Nenhum aluno encontrado.
+                      Nenhum professor encontrado.
                     </TableCell>
                   </TableRow>
                 ) : (
-                  filteredStudents.map((student) => (
+                  filteredTeachers.map((teacher) => (
                     <TableRow
-                      key={student.id}
+                      key={teacher.id}
                       className="cursor-pointer hover:bg-muted/50"
-                      onClick={() => navigate(`/pessoas/alunos/${student.id}`)}
+                      onClick={() =>
+                        navigate(`/pessoas/professores/${teacher.id}`)
+                      }
                     >
                       <TableCell>
                         <Avatar className="h-9 w-9">
                           <AvatarImage
-                            src={`https://img.usecurling.com/ppl/thumbnail?seed=${student.id}`}
+                            src={`https://img.usecurling.com/ppl/thumbnail?gender=male&seed=${teacher.id}`}
                           />
                           <AvatarFallback>
-                            {student.name.substring(0, 2).toUpperCase()}
+                            {teacher.name.substring(0, 2).toUpperCase()}
                           </AvatarFallback>
                         </Avatar>
                       </TableCell>
                       <TableCell className="font-medium">
-                        {student.name}
+                        <div className="flex flex-col">
+                          <span>{teacher.name}</span>
+                          <span className="text-xs text-muted-foreground md:hidden">
+                            {teacher.email}
+                          </span>
+                        </div>
                       </TableCell>
-                      <TableCell className="text-muted-foreground font-mono text-sm">
-                        {student.registration}
+                      <TableCell>
+                        <Badge variant="outline" className="font-normal">
+                          {teacher.subject}
+                        </Badge>
                       </TableCell>
-                      <TableCell>{student.grade}</TableCell>
+                      <TableCell className="hidden md:table-cell">
+                        <div className="flex flex-col text-sm">
+                          <div className="flex items-center gap-1">
+                            <Mail className="h-3 w-3 text-muted-foreground" />
+                            {teacher.email}
+                          </div>
+                          <div className="flex items-center gap-1 mt-0.5">
+                            <Phone className="h-3 w-3 text-muted-foreground" />
+                            {teacher.phone}
+                          </div>
+                        </div>
+                      </TableCell>
                       <TableCell>
                         <Badge
                           variant={
-                            student.status === 'Cursando'
-                              ? 'outline'
+                            teacher.status === 'active'
+                              ? 'default'
                               : 'secondary'
                           }
-                          className={
-                            student.status === 'Cursando'
-                              ? 'bg-green-50 text-green-700 border-green-200'
-                              : ''
-                          }
                         >
-                          {student.status}
+                          {teacher.status === 'active' ? 'Ativo' : 'Inativo'}
                         </Badge>
                       </TableCell>
                       <TableCell className="text-right">
@@ -224,36 +236,28 @@ export default function StudentsList() {
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
-                            <DropdownMenuLabel>Aluno</DropdownMenuLabel>
-                            <DropdownMenuItem
-                              className="gap-2"
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                navigate(`/pessoas/alunos/${student.id}`)
-                              }}
-                            >
-                              <User className="h-4 w-4" /> Perfil Completo
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                              className="gap-2"
-                              onClick={(e) => e.stopPropagation()}
-                            >
-                              <FileText className="h-4 w-4" /> Histórico Escolar
-                            </DropdownMenuItem>
-                            <DropdownMenuSeparator />
+                            <DropdownMenuLabel>Ações</DropdownMenuLabel>
                             <DropdownMenuItem
                               onClick={(e) => {
                                 e.stopPropagation()
-                                openEditDialog(student)
+                                navigate(`/pessoas/professores/${teacher.id}`)
                               }}
                             >
-                              Editar Cadastro
+                              Ver Detalhes
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                openEditDialog(teacher)
+                              }}
+                            >
+                              Editar Dados
                             </DropdownMenuItem>
                             <DropdownMenuItem
                               className="text-destructive"
                               onClick={(e) => {
                                 e.stopPropagation()
-                                setDeleteId(student.id)
+                                setDeleteId(teacher.id)
                               }}
                             >
                               Excluir
@@ -270,11 +274,11 @@ export default function StudentsList() {
         </CardContent>
       </Card>
 
-      <StudentFormDialog
+      <TeacherFormDialog
         open={isDialogOpen}
         onOpenChange={setIsDialogOpen}
-        onSubmit={editingStudent ? handleUpdate : handleCreate}
-        initialData={editingStudent}
+        onSubmit={editingTeacher ? handleUpdate : handleCreate}
+        initialData={editingTeacher}
       />
 
       <AlertDialog
@@ -285,7 +289,7 @@ export default function StudentsList() {
           <AlertDialogHeader>
             <AlertDialogTitle>Confirmar exclusão</AlertDialogTitle>
             <AlertDialogDescription>
-              Esta ação removerá o aluno do sistema.
+              Tem certeza que deseja remover este professor?
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
