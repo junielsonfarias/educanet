@@ -1,17 +1,26 @@
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { Calendar, Users, Clock, School } from 'lucide-react'
+import { Calendar, Users, School } from 'lucide-react'
 import useSchoolStore from '@/stores/useSchoolStore'
 import { Link } from 'react-router-dom'
 
 export default function ClassesList() {
   const { schools } = useSchoolStore()
 
-  // Flatten all classes for display
-  const allClasses = schools.flatMap((school) => {
+  // Flatten all classes for display with robust error handling to prevent "flatMap of undefined" errors
+  const allClasses = (schools || []).flatMap((school) => {
+    // Ensure school exists and has academicYears array
+    if (!school || !Array.isArray(school.academicYears)) {
+      return []
+    }
+
     return school.academicYears.flatMap((year) => {
-      // Maybe filter only current/active year in a real app
+      // Ensure year exists and has classes array
+      if (!year || !Array.isArray(year.classes)) {
+        return []
+      }
+
       return year.classes.map((cls) => ({
         ...cls,
         schoolName: school.name,

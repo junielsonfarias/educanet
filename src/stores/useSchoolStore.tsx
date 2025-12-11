@@ -25,7 +25,16 @@ export const SchoolProvider = ({ children }: { children: React.ReactNode }) => {
 
   useEffect(() => {
     const stored = localStorage.getItem('edu_schools')
-    if (stored) setSchools(JSON.parse(stored))
+    if (stored) {
+      try {
+        const parsed = JSON.parse(stored)
+        if (Array.isArray(parsed)) {
+          setSchools(parsed)
+        }
+      } catch (error) {
+        console.error('Failed to parse schools from local storage:', error)
+      }
+    }
   }, [])
 
   useEffect(() => {
@@ -63,7 +72,11 @@ export const SchoolProvider = ({ children }: { children: React.ReactNode }) => {
             id: Math.random().toString(36).substr(2, 9),
             classes: [],
           }
-          return { ...s, academicYears: [...s.academicYears, newYear] }
+          // Ensure academicYears is an array to prevent crashes with corrupted data
+          const currentYears = Array.isArray(s.academicYears)
+            ? s.academicYears
+            : []
+          return { ...s, academicYears: [...currentYears, newYear] }
         }
         return s
       }),
@@ -78,14 +91,20 @@ export const SchoolProvider = ({ children }: { children: React.ReactNode }) => {
     setSchools((prev) =>
       prev.map((s) => {
         if (s.id === schoolId) {
+          // Ensure academicYears exists
+          const academicYears = Array.isArray(s.academicYears)
+            ? s.academicYears
+            : []
           return {
             ...s,
-            academicYears: s.academicYears.map((y) => {
+            academicYears: academicYears.map((y) => {
               if (y.id === yearId) {
+                // Ensure classes exists
+                const currentClasses = Array.isArray(y.classes) ? y.classes : []
                 return {
                   ...y,
                   classes: [
-                    ...y.classes,
+                    ...currentClasses,
                     { ...data, id: Math.random().toString(36).substr(2, 9) },
                   ],
                 }
