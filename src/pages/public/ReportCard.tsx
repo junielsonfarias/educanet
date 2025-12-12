@@ -22,15 +22,16 @@ import useAssessmentStore from '@/stores/useAssessmentStore'
 import useCourseStore from '@/stores/useCourseStore'
 import useSchoolStore from '@/stores/useSchoolStore'
 import { calculateGrades } from '@/lib/grade-calculator'
+import { ReportCardDisplay } from './components/ReportCardDisplay'
 import {
-  ReportCardDisplay,
   ReportCardData,
   GradeData,
   RecoveryGradeData,
   EvaluationTypeData,
   EvaluationEntry,
-} from './components/ReportCardDisplay'
-import { AssessmentType, Assessment } from '@/lib/mock-data'
+  HistoryEntry,
+} from './components/types'
+import { format } from 'date-fns'
 
 export default function ReportCard() {
   const [searchRegistration, setSearchRegistration] = useState('')
@@ -69,9 +70,11 @@ export default function ReportCard() {
     grades: GradeData[]
     recoveries: RecoveryGradeData[]
     evaluationTypes: EvaluationTypeData[]
+    history: HistoryEntry[]
   } => {
     const grades: GradeData[] = []
     const recoveries: RecoveryGradeData[] = []
+    const history: HistoryEntry[] = []
     const allAssessments: {
       typeId: string
       subject: string
@@ -88,9 +91,64 @@ export default function ReportCard() {
           a.classroomId === classId,
       )
 
-      // Collect raw assessments for other evaluations
+      // Collect Raw History
       subjectAssessments.forEach((a) => {
-        // Exclude recovery category from 'Other Evaluations' list
+        const type = assessmentTypes.find((t) => t.id === a.assessmentTypeId)
+        const period = periods.find((p: any) => p.id === a.periodId)
+
+        // Check if this is a recovery linked to another assessment
+        const isRecovered = assessments.some(
+          (rec) => rec.relatedAssessmentId === a.id,
+        )
+        const recoveryAssessment = assessments.find(
+          (rec) => rec.relatedAssessmentId === a.id,
+        )
+
+        // Add to history list (exclude if it's a recovery assessment itself, we can merge or show separate)
+        // Let's show all, but mark them
+
+        if (a.category === 'recuperation' && a.relatedAssessmentId) {
+          // It's a linked recovery, usually we show it inside the original in complex views,
+          // but here let's list it as a separate entry or handle it in the main entry?
+          // The PublicAssessmentHistory handles `isRecovered` prop.
+          // We should find the ORIGINAL assessment and mark it.
+          return // Skip adding recovery directly to list if we want to merge, OR add it.
+          // Strategy: Add ALL regular assessments. If recovered, enrich data.
+          // Independent recoveries (period recovery) are added as separate entries.
+        }
+
+        if ((a.category || 'regular') === 'regular') {
+          const rec = assessments.find((r) => r.relatedAssessmentId === a.id)
+          history.push({
+            id: a.id,
+            date: a.date,
+            subject: subject.name,
+            period: period?.name || 'N/A',
+            type: type?.name || 'Avaliação',
+            category: 'regular',
+            value: Number(a.value),
+            originalValue: Number(a.value),
+            isRecovered: !!rec,
+            recoveryValue: rec ? Number(rec.value) : undefined,
+          })
+        } else {
+          // Unlinked recovery (e.g. Period Recovery)
+          if (!a.relatedAssessmentId) {
+            history.push({
+              id: a.id,
+              date: a.date,
+              subject: subject.name,
+              period: period?.name || 'N/A',
+              type: type?.name || 'Recuperação',
+              category: 'recuperation',
+              value: Number(a.value),
+            })
+          }
+        }
+      })
+
+      // Collect raw assessments for other evaluations display
+      subjectAssessments.forEach((a) => {
         if (
           a.assessmentTypeId &&
           (a.category || 'regular') !== 'recuperation'
@@ -166,7 +224,7 @@ export default function ReportCard() {
       }
     })
 
-    return { grades, recoveries, evaluationTypes }
+    return { grades, recoveries, evaluationTypes, history }
   }
 
   const handleSearch = (e: React.FormEvent) => {
@@ -248,6 +306,7 @@ export default function ReportCard() {
       grades: reportCardGrades,
       recoveries: reportCardRecoveries,
       evaluationTypes: reportCardEvaluations,
+      history: reportCardHistory,
     } = calculateSubjectGrades(
       regularGradeStructure.subjects,
       student.id,
@@ -267,6 +326,7 @@ export default function ReportCard() {
     )
 
     const dependenciesData = []
+    let dependencyHistory: HistoryEntry[] = []
 
     for (const depEnrollment of dependencyEnrollments) {
       const depClass = activeYear.classes.find(
@@ -306,6 +366,7 @@ export default function ReportCard() {
           grades: depGrades,
           recoveries: depRecoveries,
           evaluationTypes: depEvaluations,
+          history: depHist,
         } = calculateSubjectGrades(
           activeSubjects,
           student.id,
@@ -323,12 +384,20 @@ export default function ReportCard() {
           evaluationTypes: depEvaluations,
           ruleName: depRule.name,
         })
+        dependencyHistory = [...dependencyHistory, ...depHist]
       }
     }
 
+    // Merge History
+    const fullHistory = [...reportCardHistory, ...dependencyHistory].sort(
+      (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime(),
+    )
+
     setResult({
       name: student.name,
+      registration: student.registration,
       school: school?.name || '',
+      schoolLogo: school?.logo,
       grade: validEnrollment.grade,
       year: validEnrollment.year,
       ruleName: regularRule.name,
@@ -337,13 +406,15 @@ export default function ReportCard() {
       evaluationTypes: reportCardEvaluations,
       periodNames: periods.map((p) => p.name),
       dependencies: dependenciesData,
+      history: fullHistory,
+      generatedAt: format(new Date(), 'dd/MM/yyyy HH:mm:ss'),
     })
   }
 
   return (
-    <div className="min-h-screen bg-secondary/30 p-4 md:p-8">
-      <div className="max-w-5xl mx-auto space-y-8">
-        <div className="text-center space-y-2">
+    <div className="min-h-screen bg-secondary/30 p-4 md:p-8 print:bg-white print:p-0">
+      <div className="max-w-5xl mx-auto space-y-8 print:max-w-none print:space-y-0">
+        <div className="text-center space-y-2 print:hidden">
           <h1 className="text-3xl font-bold text-primary">
             Boletim Escolar Online
           </h1>
@@ -352,7 +423,7 @@ export default function ReportCard() {
           </p>
         </div>
 
-        <Card>
+        <Card className="print:hidden">
           <CardHeader>
             <CardTitle>Consultar Boletim</CardTitle>
             <CardDescription>

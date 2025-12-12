@@ -1,4 +1,4 @@
-import { Printer, Info, AlertCircle, FileText } from 'lucide-react'
+import { Printer, Info, AlertCircle, FileText, Download } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
   Card,
@@ -21,60 +21,27 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from '@/components/ui/tooltip'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { cn } from '@/lib/utils'
-
-export type GradeData = {
-  subject: string
-  periodGrades: number[]
-  final: number
-  status: string
-  passing: boolean
-  formula?: string
-}
-
-export type RecoveryGradeData = {
-  subject: string
-  periodGrades: (number | null)[]
-}
-
-export type EvaluationEntry = {
-  subject: string
-  periodName: string
-  value: number
-}
-
-export type EvaluationTypeData = {
-  id: string
-  name: string
-  entries: EvaluationEntry[]
-}
-
-export type DependencyData = {
-  className: string
-  grades: GradeData[]
-  recoveries: RecoveryGradeData[]
-  evaluationTypes: EvaluationTypeData[]
-  ruleName: string
-}
-
-export type ReportCardData = {
-  name: string
-  school: string
-  grade: string
-  year: number
-  ruleName: string
-  periodNames: string[]
-  grades: GradeData[]
-  recoveries: RecoveryGradeData[]
-  evaluationTypes: EvaluationTypeData[]
-  dependencies: DependencyData[]
-}
+import {
+  ReportCardData,
+  GradeData,
+  RecoveryGradeData,
+  EvaluationTypeData,
+  EvaluationEntry,
+} from './types'
+import { PublicAssessmentHistory } from './PublicAssessmentHistory'
+import { PrintableReportCard } from './PrintableReportCard'
 
 interface ReportCardDisplayProps {
   data: ReportCardData
 }
 
 export function ReportCardDisplay({ data }: ReportCardDisplayProps) {
+  const handlePrint = () => {
+    window.print()
+  }
+
   const formatPeriodName = (name: string) => {
     return name.replace('Bimestre', 'Avaliação')
   }
@@ -263,9 +230,7 @@ export function ReportCardDisplay({ data }: ReportCardDisplayProps) {
                       <div className="font-bold mb-3 text-sm">{subject}</div>
                       <div className="flex flex-wrap gap-2">
                         {entries.map((entry, idx) => {
-                          // Try to derive a short stage name
                           let stageLabel = entry.periodName
-                          // Check if period name starts with a number (e.g. "1º Bimestre")
                           const match = entry.periodName.match(/^(\d+º)/)
                           if (match) {
                             stageLabel = `${match[1]} ${type.name}`
@@ -303,57 +268,92 @@ export function ReportCardDisplay({ data }: ReportCardDisplayProps) {
   }
 
   return (
-    <Card className="animate-slide-up">
-      <CardHeader className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-        <div>
-          <CardTitle className="text-xl">{data.name}</CardTitle>
-          <CardDescription className="text-base mt-1">
-            {data.school} • {data.grade} • {data.year}
-          </CardDescription>
-        </div>
-        <div className="flex gap-2">
-          <Button variant="outline" size="sm" onClick={() => window.print()}>
-            <Printer className="mr-2 h-4 w-4" /> Imprimir
-          </Button>
-        </div>
-      </CardHeader>
-      <CardContent className="space-y-8">
-        <div>
-          <h3 className="text-lg font-semibold mb-4">Grade Curricular</h3>
-          {renderGradesTable(data.grades, data.periodNames, data.ruleName)}
-          {renderRecoveriesTable(data.recoveries, data.periodNames)}
-          {renderOtherEvaluations(data.evaluationTypes)}
-        </div>
+    <>
+      {/* Screen View */}
+      <div className="print:hidden">
+        <Card className="animate-slide-up">
+          <CardHeader className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+            <div>
+              <CardTitle className="text-xl">{data.name}</CardTitle>
+              <CardDescription className="text-base mt-1">
+                {data.school} • {data.grade} • {data.year}
+              </CardDescription>
+            </div>
+            <div className="flex gap-2">
+              <Button onClick={handlePrint}>
+                <Printer className="mr-2 h-4 w-4" /> Exportar PDF / Imprimir
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <Tabs defaultValue="report" className="w-full">
+              <TabsList className="grid w-full grid-cols-2 mb-6">
+                <TabsTrigger value="report">Boletim</TabsTrigger>
+                <TabsTrigger value="history">
+                  Histórico de Avaliações
+                </TabsTrigger>
+              </TabsList>
 
-        {data.dependencies.length > 0 && (
-          <div className="space-y-6 pt-4 border-t">
-            <h3 className="text-lg font-semibold text-amber-700 flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-amber-500" />
-              Disciplinas em Dependência
-            </h3>
-            {data.dependencies.map((dep, idx) => (
-              <div key={idx} className="bg-amber-50/50 p-4 rounded-lg border">
-                <div className="mb-4 text-sm text-muted-foreground flex gap-4">
-                  <span>
-                    Turma: <strong>{dep.className}</strong>
-                  </span>
-                  <span>
-                    Tipo: <strong>Dependência</strong>
-                  </span>
+              <TabsContent value="report" className="space-y-8 animate-fade-in">
+                <div>
+                  <h3 className="text-lg font-semibold mb-4">
+                    Grade Curricular
+                  </h3>
+                  {renderGradesTable(
+                    data.grades,
+                    data.periodNames,
+                    data.ruleName,
+                  )}
+                  {renderRecoveriesTable(data.recoveries, data.periodNames)}
+                  {renderOtherEvaluations(data.evaluationTypes)}
                 </div>
-                {renderGradesTable(
-                  dep.grades,
-                  data.periodNames,
-                  dep.ruleName,
-                  true,
+
+                {data.dependencies.length > 0 && (
+                  <div className="space-y-6 pt-4 border-t">
+                    <h3 className="text-lg font-semibold text-amber-700 flex items-center gap-2">
+                      <span className="w-2 h-2 rounded-full bg-amber-500" />
+                      Disciplinas em Dependência
+                    </h3>
+                    {data.dependencies.map((dep, idx) => (
+                      <div
+                        key={idx}
+                        className="bg-amber-50/50 p-4 rounded-lg border"
+                      >
+                        <div className="mb-4 text-sm text-muted-foreground flex gap-4">
+                          <span>
+                            Turma: <strong>{dep.className}</strong>
+                          </span>
+                          <span>
+                            Tipo: <strong>Dependência</strong>
+                          </span>
+                        </div>
+                        {renderGradesTable(
+                          dep.grades,
+                          data.periodNames,
+                          dep.ruleName,
+                          true,
+                        )}
+                        {renderRecoveriesTable(
+                          dep.recoveries,
+                          data.periodNames,
+                        )}
+                        {renderOtherEvaluations(dep.evaluationTypes)}
+                      </div>
+                    ))}
+                  </div>
                 )}
-                {renderRecoveriesTable(dep.recoveries, data.periodNames)}
-                {renderOtherEvaluations(dep.evaluationTypes)}
-              </div>
-            ))}
-          </div>
-        )}
-      </CardContent>
-    </Card>
+              </TabsContent>
+
+              <TabsContent value="history">
+                <PublicAssessmentHistory history={data.history} />
+              </TabsContent>
+            </Tabs>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Print View */}
+      <PrintableReportCard data={data} />
+    </>
   )
 }
