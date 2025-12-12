@@ -153,6 +153,10 @@ export interface AttendanceRecord {
   justification?: string
 }
 
+export interface ReportCardViewSettings {
+  visibleColumns: string[]
+}
+
 export interface GeneralSettings {
   municipalityName: string
   educationSecretaryName: string
@@ -162,6 +166,7 @@ export interface GeneralSettings {
   facebookHandle?: string
   footerText?: string
   qeduMunicipalityId?: string
+  reportCardView?: ReportCardViewSettings
 }
 
 // --- New Interfaces for Institutional Website ---

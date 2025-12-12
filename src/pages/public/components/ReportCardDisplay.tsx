@@ -1,4 +1,13 @@
-import { Printer, Info, AlertCircle, FileText } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import {
+  Printer,
+  Info,
+  AlertCircle,
+  FileText,
+  Settings,
+  Eye,
+  EyeOff,
+} from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
   Card,
@@ -22,6 +31,14 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import { cn } from '@/lib/utils'
 import {
   ReportCardData,
@@ -32,14 +49,59 @@ import {
 } from './types'
 import { PublicAssessmentHistory } from './PublicAssessmentHistory'
 import { PrintableReportCard } from './PrintableReportCard'
+import useSettingsStore from '@/stores/useSettingsStore'
 
 interface ReportCardDisplayProps {
   data: ReportCardData
 }
 
 export function ReportCardDisplay({ data }: ReportCardDisplayProps) {
+  const { settings, updateSettings } = useSettingsStore()
+  const [visibleColumns, setVisibleColumns] = useState<string[]>([])
+
+  useEffect(() => {
+    // Initialize available columns if not set
+    const available = [
+      ...data.periodNames.map((_, i) => `period_${i}`),
+      'final',
+      'status',
+    ]
+
+    if (
+      !settings.reportCardView?.visibleColumns ||
+      settings.reportCardView.visibleColumns.length === 0
+    ) {
+      updateSettings({
+        reportCardView: {
+          visibleColumns: available,
+        },
+      })
+      setVisibleColumns(available)
+    } else {
+      setVisibleColumns(settings.reportCardView.visibleColumns)
+    }
+  }, [data.periodNames, settings.reportCardView, updateSettings])
+
   const handlePrint = () => {
     window.print()
+  }
+
+  const toggleColumn = (columnId: string) => {
+    const current = settings.reportCardView?.visibleColumns || []
+    let updated: string[] = []
+
+    if (current.includes(columnId)) {
+      updated = current.filter((c) => c !== columnId)
+    } else {
+      updated = [...current, columnId]
+    }
+
+    updateSettings({
+      reportCardView: {
+        visibleColumns: updated,
+      },
+    })
+    setVisibleColumns(updated)
   }
 
   const formatPeriodName = (name: string) => {
@@ -51,6 +113,8 @@ export function ReportCardDisplay({ data }: ReportCardDisplayProps) {
     if (grade >= 5) return 'text-blue-600 font-bold'
     return ''
   }
+
+  const isColumnVisible = (id: string) => visibleColumns.includes(id)
 
   const renderGradesTable = (
     grades: GradeData[],
@@ -66,65 +130,78 @@ export function ReportCardDisplay({ data }: ReportCardDisplayProps) {
               <TableHead className="font-bold min-w-[200px]">
                 Disciplina
               </TableHead>
-              {periodNames.map((p) => (
-                <TableHead key={p} className="text-center min-w-[80px]">
-                  {formatPeriodName(p)}
+              {periodNames.map((p, idx) =>
+                isColumnVisible(`period_${idx}`) ? (
+                  <TableHead key={p} className="text-center min-w-[80px]">
+                    {formatPeriodName(p)}
+                  </TableHead>
+                ) : null,
+              )}
+              {isColumnVisible('final') && (
+                <TableHead className="text-center font-bold min-w-[100px]">
+                  Média Final
                 </TableHead>
-              ))}
-              <TableHead className="text-center font-bold min-w-[100px]">
-                Média Final
-              </TableHead>
-              <TableHead className="text-center min-w-[120px]">
-                Situação
-              </TableHead>
+              )}
+              {isColumnVisible('status') && (
+                <TableHead className="text-center min-w-[120px]">
+                  Situação
+                </TableHead>
+              )}
             </TableRow>
           </TableHeader>
           <TableBody>
             {grades.map((grade) => (
               <TableRow key={grade.subject}>
                 <TableCell className="font-medium">{grade.subject}</TableCell>
-                {grade.periodGrades.map((p, idx) => (
-                  <TableCell
-                    key={idx}
-                    className={cn('text-center', getGradeColorClass(p))}
-                  >
-                    {p.toFixed(1)}
+                {grade.periodGrades.map((p, idx) =>
+                  isColumnVisible(`period_${idx}`) ? (
+                    <TableCell
+                      key={idx}
+                      className={cn('text-center', getGradeColorClass(p))}
+                    >
+                      {p.toFixed(1)}
+                    </TableCell>
+                  ) : null,
+                )}
+                {isColumnVisible('final') && (
+                  <TableCell className="text-center font-bold bg-muted/20">
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <div
+                          className={cn(
+                            'flex items-center justify-center gap-1 cursor-help',
+                            getGradeColorClass(grade.final),
+                          )}
+                        >
+                          {grade.final.toFixed(1)}
+                        </div>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p className="text-xs">Fórmula: {grade.formula}</p>
+                      </TooltipContent>
+                    </Tooltip>
                   </TableCell>
-                ))}
-                <TableCell className="text-center font-bold bg-muted/20">
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <div
-                        className={cn(
-                          'flex items-center justify-center gap-1 cursor-help',
-                          getGradeColorClass(grade.final),
-                        )}
-                      >
-                        {grade.final.toFixed(1)}
-                      </div>
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      <p className="text-xs">Fórmula: {grade.formula}</p>
-                    </TooltipContent>
-                  </Tooltip>
-                </TableCell>
-                <TableCell className="text-center">
-                  <Badge
-                    variant={
-                      grade.status === 'Aprovado' || grade.status === 'Cursando'
-                        ? 'default'
-                        : 'destructive'
-                    }
-                    className={cn({
-                      'bg-green-600 hover:bg-green-700':
-                        grade.status === 'Aprovado',
-                      'bg-yellow-600 hover:bg-yellow-700':
-                        grade.status === 'Cursando',
-                    })}
-                  >
-                    {grade.status}
-                  </Badge>
-                </TableCell>
+                )}
+                {isColumnVisible('status') && (
+                  <TableCell className="text-center">
+                    <Badge
+                      variant={
+                        grade.status === 'Aprovado' ||
+                        grade.status === 'Cursando'
+                          ? 'default'
+                          : 'destructive'
+                      }
+                      className={cn({
+                        'bg-green-600 hover:bg-green-700':
+                          grade.status === 'Aprovado',
+                        'bg-yellow-600 hover:bg-yellow-700':
+                          grade.status === 'Cursando',
+                      })}
+                    >
+                      {grade.status}
+                    </Badge>
+                  </TableCell>
+                )}
               </TableRow>
             ))}
           </TableBody>
@@ -155,6 +232,15 @@ export function ReportCardDisplay({ data }: ReportCardDisplayProps) {
 
     if (!hasRecoveries) return null
 
+    // Check if any visible period has recoveries
+    const hasVisibleRecoveries = recoveries.some((r) =>
+      r.periodGrades.some(
+        (g, idx) => g !== null && isColumnVisible(`period_${idx}`),
+      ),
+    )
+
+    if (!hasVisibleRecoveries) return null
+
     return (
       <div className="space-y-2 mt-6 animate-fade-in">
         <h4 className="text-sm font-semibold text-muted-foreground flex items-center gap-2">
@@ -167,28 +253,32 @@ export function ReportCardDisplay({ data }: ReportCardDisplayProps) {
                 <TableHead className="font-bold min-w-[200px]">
                   Disciplina
                 </TableHead>
-                {periodNames.map((_, idx) => (
-                  <TableHead key={idx} className="text-center min-w-[100px]">
-                    {idx + 1}º Recuperação
-                  </TableHead>
-                ))}
+                {periodNames.map((_, idx) =>
+                  isColumnVisible(`period_${idx}`) ? (
+                    <TableHead key={idx} className="text-center min-w-[100px]">
+                      {idx + 1}º Recuperação
+                    </TableHead>
+                  ) : null,
+                )}
               </TableRow>
             </TableHeader>
             <TableBody>
               {recoveries.map((rec) => (
                 <TableRow key={rec.subject}>
                   <TableCell className="font-medium">{rec.subject}</TableCell>
-                  {rec.periodGrades.map((grade, idx) => (
-                    <TableCell key={idx} className="text-center">
-                      {grade !== null ? (
-                        <span className={cn(getGradeColorClass(grade))}>
-                          {grade.toFixed(1)}
-                        </span>
-                      ) : (
-                        <span className="text-muted-foreground">-</span>
-                      )}
-                    </TableCell>
-                  ))}
+                  {rec.periodGrades.map((grade, idx) =>
+                    isColumnVisible(`period_${idx}`) ? (
+                      <TableCell key={idx} className="text-center">
+                        {grade !== null ? (
+                          <span className={cn(getGradeColorClass(grade))}>
+                            {grade.toFixed(1)}
+                          </span>
+                        ) : (
+                          <span className="text-muted-foreground">-</span>
+                        )}
+                      </TableCell>
+                    ) : null,
+                  )}
                 </TableRow>
               ))}
             </TableBody>
@@ -285,6 +375,40 @@ export function ReportCardDisplay({ data }: ReportCardDisplayProps) {
               </CardDescription>
             </div>
             <div className="flex gap-2">
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline">
+                    <Settings className="mr-2 h-4 w-4" /> Configurar Exibição
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-56">
+                  <DropdownMenuLabel>Colunas Visíveis</DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  {data.periodNames.map((p, idx) => (
+                    <DropdownMenuCheckboxItem
+                      key={idx}
+                      checked={isColumnVisible(`period_${idx}`)}
+                      onCheckedChange={() => toggleColumn(`period_${idx}`)}
+                    >
+                      {p}
+                    </DropdownMenuCheckboxItem>
+                  ))}
+                  <DropdownMenuSeparator />
+                  <DropdownMenuCheckboxItem
+                    checked={isColumnVisible('final')}
+                    onCheckedChange={() => toggleColumn('final')}
+                  >
+                    Média Final
+                  </DropdownMenuCheckboxItem>
+                  <DropdownMenuCheckboxItem
+                    checked={isColumnVisible('status')}
+                    onCheckedChange={() => toggleColumn('status')}
+                  >
+                    Situação
+                  </DropdownMenuCheckboxItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+
               <Button onClick={handlePrint}>
                 <Printer className="mr-2 h-4 w-4" /> Exportar PDF / Imprimir
               </Button>
@@ -358,7 +482,7 @@ export function ReportCardDisplay({ data }: ReportCardDisplayProps) {
       </div>
 
       {/* Print View */}
-      <PrintableReportCard data={data} />
+      <PrintableReportCard data={data} visibleColumns={visibleColumns} />
     </>
   )
 }
