@@ -38,6 +38,9 @@ import TeacherAllocationReport from './pages/reports/TeacherAllocationReport'
 import AgeGradeDistortionReport from './pages/reports/AgeGradeDistortionReport'
 import ApprovalFailureReport from './pages/reports/ApprovalFailureReport'
 import ComparativeReports from './pages/reports/ComparativeReports'
+import TransferReport from './pages/reports/TransferReport'
+import DropoutReport from './pages/reports/DropoutReport'
+import GradeEntryReport from './pages/reports/GradeEntryReport'
 import ReportCard from './pages/public/ReportCard'
 import EvaluationRulesList from './pages/academic/EvaluationRulesList'
 import AssessmentTypesList from './pages/academic/AssessmentTypesList'
@@ -268,6 +271,18 @@ const App = () => (
                                     <Route
                                       path="/relatorios/taxas-rendimento"
                                       element={<ApprovalFailureReport />}
+                                    />
+                                    <Route
+                                      path="/relatorios/transferencias"
+                                      element={<TransferReport />}
+                                    />
+                                    <Route
+                                      path="/relatorios/evasao"
+                                      element={<DropoutReport />}
+                                    />
+                                    <Route
+                                      path="/relatorios/status-lancamento"
+                                      element={<GradeEntryReport />}
                                     />
 
                                     {/* Settings */}

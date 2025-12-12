@@ -15,12 +15,33 @@ import {
   LineChart,
   PieChart,
   Scale,
+  ArrowRightLeft,
+  AlertTriangle,
+  FileCheck,
 } from 'lucide-react'
 
 export default function ReportsDashboard() {
   const navigate = useNavigate()
 
   const internalReports = [
+    {
+      title: 'Relatório de Transferências',
+      description: 'Listagem de alunos transferidos da rede ou entre unidades.',
+      icon: ArrowRightLeft,
+      path: '/relatorios/transferencias',
+    },
+    {
+      title: 'Relatório de Evasão (Abandono)',
+      description: 'Monitoramento de alunos em situação de abandono escolar.',
+      icon: AlertTriangle,
+      path: '/relatorios/evasao',
+    },
+    {
+      title: 'Status de Lançamento de Notas',
+      description: 'Acompanhamento do preenchimento de diários e notas.',
+      icon: FileCheck,
+      path: '/relatorios/status-lancamento',
+    },
     {
       title: 'Relatório Individual de Performance',
       description:
