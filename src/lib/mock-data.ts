@@ -45,6 +45,7 @@ export interface School {
   inepCode?: string
   administrativeDependency?: 'Federal' | 'Estadual' | 'Municipal' | 'Privada'
   locationType?: 'Urbana' | 'Rural'
+  polo?: string // Added Polo field
   infrastructure?: {
     classrooms: number
     accessible: boolean
@@ -74,9 +75,8 @@ export interface EvaluationRule {
   formula?: string
   isStandard?: boolean
   periodCount?: number
-  // New flexible configuration fields
-  typeWeights?: Record<string, number> // Map of AssessmentType ID to Weight percentage (0-100)
-  allowedExclusions?: boolean // Allow excluding lowest grade
+  typeWeights?: Record<string, number>
+  allowedExclusions?: boolean
   recoveryStrategy?: 'replace_if_higher' | 'always_replace' | 'average'
 }
 
@@ -138,7 +138,7 @@ export interface Assessment {
   value: number | string
   date: string
   assessmentTypeId?: string
-  relatedAssessmentId?: string // Link recovery to specific assessment
+  relatedAssessmentId?: string
 }
 
 export interface AttendanceRecord {
@@ -176,20 +176,20 @@ export interface NewsPost {
 
 export interface PublicDocument {
   id: string
-  organ: string // Órgão
-  documentNumber: string // Nº do documento
-  year: string // Ano
-  publishDate: string // Data de publicação
-  summary: string // Ementa
-  theme: string // Tema
-  driveLink: string // Google Drive Link
+  organ: string
+  documentNumber: string
+  year: string
+  publishDate: string
+  summary: string
+  theme: string
+  driveLink: string
   active: boolean
 }
 
 export interface InstitutionalContent {
   section: 'semed_info' | 'semed_structure'
   title: string
-  content: string // HTML or Rich Text
+  content: string
   updatedAt: string
 }
 
@@ -311,6 +311,7 @@ export const mockSchools: School[] = [
     inepCode: '12345678',
     administrativeDependency: 'Municipal',
     locationType: 'Urbana',
+    polo: 'Polo Centro',
     infrastructure: {
       classrooms: 12,
       accessible: true,

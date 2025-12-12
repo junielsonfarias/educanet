@@ -57,6 +57,7 @@ const schoolSchema = z.object({
     .enum(['Federal', 'Estadual', 'Municipal', 'Privada'])
     .optional(),
   locationType: z.enum(['Urbana', 'Rural']).optional(),
+  polo: z.string().optional(),
   educationTypes: z.array(z.string()).optional(),
   infrastructure: z.object({
     classrooms: z.coerce.number().min(0),
@@ -96,6 +97,7 @@ export function SchoolFormDialog({
       logo: '',
       administrativeDependency: 'Municipal',
       locationType: 'Urbana',
+      polo: '',
       educationTypes: [],
       infrastructure: {
         classrooms: 0,
@@ -122,6 +124,7 @@ export function SchoolFormDialog({
           administrativeDependency:
             initialData.administrativeDependency || 'Municipal',
           locationType: initialData.locationType || 'Urbana',
+          polo: initialData.polo || '',
           educationTypes: initialData.educationTypes || [],
           infrastructure: initialData.infrastructure || {
             classrooms: 0,
@@ -144,6 +147,7 @@ export function SchoolFormDialog({
           logo: '',
           administrativeDependency: 'Municipal',
           locationType: 'Urbana',
+          polo: '',
           educationTypes: [],
           infrastructure: {
             classrooms: 0,
@@ -421,6 +425,23 @@ export function SchoolFormDialog({
                     )}
                   />
                 </div>
+
+                <FormField
+                  control={form.control}
+                  name="polo"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Polo (Cluster)</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Ex: Polo Sede" {...field} />
+                      </FormControl>
+                      <FormDescription>
+                        Grupo ou região a qual a escola pertence.
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
 
                 <div className="space-y-3 border rounded-md p-4">
                   <h4 className="font-medium text-sm">

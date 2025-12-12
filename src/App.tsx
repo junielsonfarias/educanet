@@ -1,10 +1,15 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import { Toaster } from '@/components/ui/toaster'
 import { Toaster as Sonner } from '@/components/ui/sonner'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import InstitutionalHome from './pages/Index'
 import Login from './pages/Login'
 import PublicDocuments from './pages/public/PublicDocuments'
+import StudentPortal from './pages/public/StudentPortal'
+import EmployeePortal from './pages/public/EmployeePortal'
+import PublicCalendar from './pages/public/PublicCalendar'
+import PublicSchools from './pages/public/PublicSchools'
+import Structure from './pages/public/Structure'
 import Dashboard from './pages/Dashboard'
 import SchoolsList from './pages/schools/SchoolsList'
 import SchoolDetails from './pages/schools/SchoolDetails'
@@ -76,6 +81,26 @@ const App = () => (
                               <Route
                                 path="/publico/boletim"
                                 element={<ReportCard />}
+                              />
+                              <Route
+                                path="/publico/portal-aluno"
+                                element={<StudentPortal />}
+                              />
+                              <Route
+                                path="/publico/portal-servidor"
+                                element={<EmployeePortal />}
+                              />
+                              <Route
+                                path="/publico/calendario"
+                                element={<PublicCalendar />}
+                              />
+                              <Route
+                                path="/publico/escolas"
+                                element={<PublicSchools />}
+                              />
+                              <Route
+                                path="/publico/estrutura"
+                                element={<Structure />}
                               />
                             </Route>
 

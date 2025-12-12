@@ -9,6 +9,8 @@ import {
   UserCircle,
   School,
   Facebook,
+  Instagram,
+  Map,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -89,8 +91,8 @@ export default function InstitutionalHome() {
           <h2 className="text-2xl font-bold">Serviços</h2>
         </div>
         <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
-          <Link to="/login">
-            <Card className="hover:shadow-lg transition-shadow cursor-pointer h-full group">
+          <Link to="/publico/portal-aluno">
+            <Card className="hover:shadow-lg transition-shadow cursor-pointer h-full group hover:border-primary/50">
               <CardContent className="p-6 flex flex-col items-center text-center gap-4">
                 <div className="h-14 w-14 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 group-hover:scale-110 transition-transform">
                   <UserCircle className="h-8 w-8" />
@@ -104,8 +106,8 @@ export default function InstitutionalHome() {
               </CardContent>
             </Card>
           </Link>
-          <Link to="/login">
-            <Card className="hover:shadow-lg transition-shadow cursor-pointer h-full group">
+          <Link to="/publico/portal-servidor">
+            <Card className="hover:shadow-lg transition-shadow cursor-pointer h-full group hover:border-primary/50">
               <CardContent className="p-6 flex flex-col items-center text-center gap-4">
                 <div className="h-14 w-14 rounded-full bg-green-100 flex items-center justify-center text-green-600 group-hover:scale-110 transition-transform">
                   <School className="h-8 w-8" />
@@ -119,23 +121,8 @@ export default function InstitutionalHome() {
               </CardContent>
             </Card>
           </Link>
-          <Link to="/publico/boletim">
-            <Card className="hover:shadow-lg transition-shadow cursor-pointer h-full group">
-              <CardContent className="p-6 flex flex-col items-center text-center gap-4">
-                <div className="h-14 w-14 rounded-full bg-purple-100 flex items-center justify-center text-purple-600 group-hover:scale-110 transition-transform">
-                  <FileText className="h-8 w-8" />
-                </div>
-                <div>
-                  <h3 className="font-bold text-lg mb-1">Boletim Online</h3>
-                  <p className="text-sm text-muted-foreground">
-                    Consulte o desempenho escolar.
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
-          </Link>
-          <Link to="/login">
-            <Card className="hover:shadow-lg transition-shadow cursor-pointer h-full group">
+          <Link to="/publico/calendario">
+            <Card className="hover:shadow-lg transition-shadow cursor-pointer h-full group hover:border-primary/50">
               <CardContent className="p-6 flex flex-col items-center text-center gap-4">
                 <div className="h-14 w-14 rounded-full bg-orange-100 flex items-center justify-center text-orange-600 group-hover:scale-110 transition-transform">
                   <Calendar className="h-8 w-8" />
@@ -143,7 +130,22 @@ export default function InstitutionalHome() {
                 <div>
                   <h3 className="font-bold text-lg mb-1">Calendário</h3>
                   <p className="text-sm text-muted-foreground">
-                    Datas importantes e feriados.
+                    Datas importantes e feriados escolares.
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+          </Link>
+          <Link to="/publico/escolas">
+            <Card className="hover:shadow-lg transition-shadow cursor-pointer h-full group hover:border-primary/50">
+              <CardContent className="p-6 flex flex-col items-center text-center gap-4">
+                <div className="h-14 w-14 rounded-full bg-purple-100 flex items-center justify-center text-purple-600 group-hover:scale-110 transition-transform">
+                  <Map className="h-8 w-8" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-lg mb-1">Nossas Escolas</h3>
+                  <p className="text-sm text-muted-foreground">
+                    Localize as unidades da rede municipal.
                   </p>
                 </div>
               </CardContent>
@@ -152,7 +154,7 @@ export default function InstitutionalHome() {
         </div>
       </section>
 
-      {/* Main Content Grid - Adjusted to 5 columns to give sidebar more width (2/5 = 40%) */}
+      {/* Main Content Grid */}
       <div className="grid gap-12 lg:grid-cols-5 container mx-auto px-4">
         {/* News Section - Takes 3 columns (60%) */}
         <div className="lg:col-span-3 space-y-6">
@@ -227,27 +229,83 @@ export default function InstitutionalHome() {
               ) : (
                 <p>Informações institucionais não cadastradas.</p>
               )}
+              <div className="mt-4 pt-4 border-t">
+                <Link
+                  to="/publico/estrutura"
+                  className="text-primary hover:underline text-sm font-medium"
+                >
+                  Conheça nossa estrutura organizacional →
+                </Link>
+              </div>
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader>
+          <Card className="overflow-hidden">
+            <CardHeader className="bg-gradient-to-r from-blue-600 to-purple-600 text-white">
               <CardTitle className="flex items-center gap-2">
-                <Facebook className="h-5 w-5 text-primary" />
-                Nossas Redes Sociais
+                <Facebook className="h-5 w-5" />
+                Redes Sociais
               </CardTitle>
             </CardHeader>
-            <CardContent className="flex justify-center p-4 pt-0">
-              <iframe
-                src="https://www.facebook.com/plugins/page.php?href=https%3A%2F%2Fwww.facebook.com%2Fsemedssbvpa&tabs=timeline&width=500&height=500&small_header=false&adapt_container_width=true&hide_cover=false&show_facepile=true&appId"
-                width="500"
-                height="500"
-                style={{ border: 'none', overflow: 'hidden' }}
-                allowFullScreen={true}
-                allow="autoplay; clipboard-write; encrypted-media; picture-in-picture; web-share"
-                title="Facebook SEMED"
-                className="max-w-full rounded-md"
-              />
+            <CardContent className="p-0">
+              <div className="p-4 bg-muted/10">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="h-12 w-12 rounded-full bg-primary/20 overflow-hidden">
+                    <img
+                      src="https://img.usecurling.com/i?q=school&shape=outline"
+                      className="w-full h-full object-cover"
+                      alt="Logo"
+                    />
+                  </div>
+                  <div>
+                    <p className="font-bold">
+                      {settings.educationSecretaryName}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      @semed_oficial
+                    </p>
+                  </div>
+                  <Button
+                    size="sm"
+                    variant="default"
+                    className="ml-auto bg-blue-600 hover:bg-blue-700"
+                  >
+                    Seguir
+                  </Button>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2 mb-4">
+                  <img
+                    src="https://img.usecurling.com/p/300/300?q=school%20event"
+                    className="rounded-md w-full h-24 object-cover hover:opacity-90 cursor-pointer"
+                    alt="Post 1"
+                  />
+                  <img
+                    src="https://img.usecurling.com/p/300/300?q=students%20learning"
+                    className="rounded-md w-full h-24 object-cover hover:opacity-90 cursor-pointer"
+                    alt="Post 2"
+                  />
+                  <img
+                    src="https://img.usecurling.com/p/300/300?q=teacher"
+                    className="rounded-md w-full h-24 object-cover hover:opacity-90 cursor-pointer"
+                    alt="Post 3"
+                  />
+                  <img
+                    src="https://img.usecurling.com/p/300/300?q=classroom"
+                    className="rounded-md w-full h-24 object-cover hover:opacity-90 cursor-pointer"
+                    alt="Post 4"
+                  />
+                </div>
+
+                <div className="flex justify-center gap-4">
+                  <Button variant="outline" size="sm" className="w-full gap-2">
+                    <Facebook className="h-4 w-4 text-blue-600" /> Facebook
+                  </Button>
+                  <Button variant="outline" size="sm" className="w-full gap-2">
+                    <Instagram className="h-4 w-4 text-pink-600" /> Instagram
+                  </Button>
+                </div>
+              </div>
             </CardContent>
           </Card>
 
@@ -299,24 +357,6 @@ export default function InstitutionalHome() {
                 <p className="text-sm text-muted-foreground italic">
                   Nenhum documento recente.
                 </p>
-              )}
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Users className="h-5 w-5 text-primary" />
-                Estrutura
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="prose prose-sm text-muted-foreground">
-              {semedStructure ? (
-                <div
-                  dangerouslySetInnerHTML={{ __html: semedStructure.content }}
-                />
-              ) : (
-                <p>Estrutura não cadastrada.</p>
               )}
             </CardContent>
           </Card>

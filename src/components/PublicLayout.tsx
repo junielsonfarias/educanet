@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Link, Outlet, useLocation } from 'react-router-dom'
-import { Menu, X, School, LogIn } from 'lucide-react'
+import { Menu, X, School, LogIn, ChevronDown } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
   DropdownMenu,
@@ -19,8 +19,9 @@ export default function PublicLayout() {
 
   const navItems = [
     { label: 'Início', path: '/' },
+    { label: 'Escolas', path: '/publico/escolas' },
+    { label: 'Estrutura', path: '/publico/estrutura' },
     { label: 'Documentos', path: '/publico/documentos' },
-    { label: 'Boletim Escolar', path: '/publico/boletim' },
   ]
 
   return (
@@ -65,6 +66,32 @@ export default function PublicLayout() {
                 {item.label}
               </Link>
             ))}
+
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="ghost"
+                  className="gap-1 text-sm font-medium text-muted-foreground hover:text-primary"
+                >
+                  Serviços <ChevronDown className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem asChild>
+                  <Link to="/publico/portal-aluno">Portal do Aluno</Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <Link to="/publico/portal-servidor">Portal do Servidor</Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <Link to="/publico/boletim">Boletim Escolar</Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <Link to="/publico/calendario">Calendário Acadêmico</Link>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+
             <Link to="/login">
               <Button size="sm" className="gap-2">
                 <LogIn className="h-4 w-4" />
@@ -88,7 +115,7 @@ export default function PublicLayout() {
 
         {/* Mobile Nav */}
         {isMenuOpen && (
-          <div className="md:hidden border-b bg-background p-4">
+          <div className="md:hidden border-b bg-background p-4 animate-slide-down">
             <nav className="flex flex-col gap-4">
               {navItems.map((item) => (
                 <Link
@@ -104,6 +131,29 @@ export default function PublicLayout() {
                   {item.label}
                 </Link>
               ))}
+              <div className="h-px bg-border my-2" />
+              <Link
+                to="/publico/portal-aluno"
+                onClick={() => setIsMenuOpen(false)}
+                className="text-sm font-medium text-muted-foreground"
+              >
+                Portal do Aluno
+              </Link>
+              <Link
+                to="/publico/portal-servidor"
+                onClick={() => setIsMenuOpen(false)}
+                className="text-sm font-medium text-muted-foreground"
+              >
+                Portal do Servidor
+              </Link>
+              <Link
+                to="/publico/calendario"
+                onClick={() => setIsMenuOpen(false)}
+                className="text-sm font-medium text-muted-foreground"
+              >
+                Calendário
+              </Link>
+              <div className="h-px bg-border my-2" />
               <Link to="/login" onClick={() => setIsMenuOpen(false)}>
                 <Button className="w-full gap-2">
                   <LogIn className="h-4 w-4" />
@@ -141,6 +191,11 @@ export default function PublicLayout() {
                 <li>
                   <Link to="/" className="hover:underline">
                     Início
+                  </Link>
+                </li>
+                <li>
+                  <Link to="/publico/escolas" className="hover:underline">
+                    Nossas Escolas
                   </Link>
                 </li>
                 <li>

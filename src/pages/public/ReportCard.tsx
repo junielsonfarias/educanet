@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { Search, Printer, Info } from 'lucide-react'
+import { useState, useMemo } from 'react'
+import { Search, Printer, Info, AlertTriangle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
@@ -9,6 +9,13 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import {
   Table,
   TableBody,
@@ -28,38 +35,99 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from '@/components/ui/tooltip'
+import { Label } from '@/components/ui/label'
 
 export default function ReportCard() {
-  const [searchId, setSearchId] = useState('')
+  const [searchRegistration, setSearchRegistration] = useState('')
+  const [selectedSchool, setSelectedSchool] = useState('')
+  const [selectedYear, setSelectedYear] = useState('')
+  const [selectedGradeName, setSelectedGradeName] = useState('')
   const [result, setResult] = useState<any>(null)
+  const [error, setError] = useState<string | null>(null)
 
   const { students } = useStudentStore()
   const { assessments, assessmentTypes } = useAssessmentStore()
   const { courses, evaluationRules } = useCourseStore()
   const { schools } = useSchoolStore()
 
+  // Helper lists for dropdowns
+  const activeSchool = schools.find((s) => s.id === selectedSchool)
+  const academicYears = activeSchool?.academicYears || []
+  const activeYear = academicYears.find((y) => y.id === selectedYear)
+
+  // Extract unique grade names from the selected year classes
+  const availableGrades = useMemo(() => {
+    if (!activeYear) return []
+    const gradeNames = new Set(
+      activeYear.classes.map((c) => c.gradeName).filter(Boolean),
+    )
+    return Array.from(gradeNames) as string[]
+  }, [activeYear])
+
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault()
+    setError(null)
+    setResult(null)
+
+    // Validation
+    if (
+      !selectedSchool ||
+      !selectedYear ||
+      !selectedGradeName ||
+      !searchRegistration
+    ) {
+      setError('Por favor, preencha todos os campos.')
+      return
+    }
 
     // Find Student
-    const student = students.find((s) => s.registration === searchId)
+    const student = students.find((s) => s.registration === searchRegistration)
     if (!student) {
-      setResult(null)
+      setError('Aluno não encontrado com a matrícula informada.')
       return
     }
 
-    const enrollment = student.enrollments.find((e) => e.status === 'Cursando')
-    if (!enrollment) {
-      setResult(null)
+    // Verify Enrollment matches criteria
+    const enrollment = student.enrollments.find(
+      (e) =>
+        e.schoolId === selectedSchool &&
+        activeYear?.name === e.year.toString() &&
+        (e.grade === selectedGradeName || e.grade.includes(selectedGradeName)), // Loose match for simplicity or exact? User story asks for Grade
+    )
+
+    // Note: The dropdown selects "Grade Name" (e.g. 5º Ano), but enrollment might store "5º Ano A".
+    // Usually enrollment stores the Class Name or Grade Name. In this mock, enrollment.grade seems to be Class Name.
+    // Let's assume we match if the enrollment grade includes the selected grade name or matches class.
+    // Better logic: Enrollment stores "grade" string which is Class Name. Class has "gradeName".
+    // We should find if the student is enrolled in a class that belongs to the selected grade name.
+
+    const relevantClass = activeYear?.classes.find(
+      (c) =>
+        c.gradeName === selectedGradeName &&
+        (c.name === enrollment?.grade || enrollment?.grade.includes(c.name)),
+    )
+    // Or simpler: check if any enrollment matches
+    const validEnrollment = student.enrollments.find((e) => {
+      if (e.schoolId !== selectedSchool) return false
+      if (e.year.toString() !== activeYear?.name) return false
+
+      // Find class for this enrollment string
+      const cls = activeYear?.classes.find((c) => c.name === e.grade)
+      return cls && cls.gradeName === selectedGradeName
+    })
+
+    if (!validEnrollment) {
+      setError('Aluno não matriculado na escola/ano/série selecionados.')
       return
     }
 
-    const school = schools.find((s) => s.id === enrollment.schoolId)
+    const enrollmentData = validEnrollment
+    const school = schools.find((s) => s.id === enrollmentData.schoolId)
     const academicYear = school?.academicYears.find(
-      (y) => y.name === enrollment.year.toString(),
+      (y) => y.name === enrollmentData.year.toString(),
     )
     const classroom = academicYear?.classes.find(
-      (c) => c.name === enrollment.grade,
+      (c) => c.name === enrollmentData.grade,
     )
 
     // Find Course Structure
@@ -69,7 +137,7 @@ export default function ReportCard() {
     for (const course of courses) {
       const g = course.grades.find(
         (gr) =>
-          gr.name === enrollment.grade ||
+          gr.name === selectedGradeName || // Match selected grade name
           (classroom && gr.id === classroom.gradeId),
       )
       if (g) {
@@ -81,7 +149,10 @@ export default function ReportCard() {
       }
     }
 
-    if (!gradeStructure || !courseEvaluationRule) return
+    if (!gradeStructure || !courseEvaluationRule) {
+      setError('Erro na configuração curricular. Contate a escola.')
+      return
+    }
 
     const periods = academicYear?.periods || []
 
@@ -119,8 +190,9 @@ export default function ReportCard() {
     setResult({
       name: student.name,
       school: school?.name,
-      grade: enrollment.grade,
-      year: enrollment.year,
+      grade: enrollmentData.grade, // Display actual class name
+      gradeName: selectedGradeName,
+      year: enrollmentData.year,
       ruleName: courseEvaluationRule.name,
       grades: reportCardGrades,
       periodNames: periods.map((p) => p.name),
@@ -143,20 +215,109 @@ export default function ReportCard() {
           <CardHeader>
             <CardTitle>Consultar Boletim</CardTitle>
             <CardDescription>
-              Informe o número da matrícula para visualizar o boletim.
+              Preencha os dados abaixo para visualizar as notas.
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <form onSubmit={handleSearch} className="flex gap-4">
-              <Input
-                placeholder="Digite a matrícula (ex: EDU-2024001)"
-                value={searchId}
-                onChange={(e) => setSearchId(e.target.value)}
-                className="flex-1"
-              />
-              <Button type="submit">
-                <Search className="mr-2 h-4 w-4" /> Consultar
-              </Button>
+            <form onSubmit={handleSearch} className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Escola</Label>
+                  <Select
+                    onValueChange={(val) => {
+                      setSelectedSchool(val)
+                      setSelectedYear('')
+                      setSelectedGradeName('')
+                    }}
+                    value={selectedSchool}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione a escola" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {schools.map((school) => (
+                        <SelectItem key={school.id} value={school.id}>
+                          {school.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Ano Letivo</Label>
+                  <Select
+                    onValueChange={(val) => {
+                      setSelectedYear(val)
+                      setSelectedGradeName('')
+                    }}
+                    value={selectedYear}
+                    disabled={!selectedSchool}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione o ano" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {academicYears.map((year) => (
+                        <SelectItem key={year.id} value={year.id}>
+                          {year.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Série/Ano</Label>
+                  <Select
+                    onValueChange={setSelectedGradeName}
+                    value={selectedGradeName}
+                    disabled={!selectedYear}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione a série" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {availableGrades.map((grade) => (
+                        <SelectItem key={grade} value={grade}>
+                          {grade}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Matrícula do Aluno</Label>
+                  <Input
+                    placeholder="Ex: EDU-2024001"
+                    value={searchRegistration}
+                    onChange={(e) => setSearchRegistration(e.target.value)}
+                  />
+                </div>
+              </div>
+
+              {error && (
+                <div className="bg-destructive/10 p-3 rounded-md flex items-center gap-2 text-destructive text-sm">
+                  <AlertTriangle className="h-4 w-4" />
+                  {error}
+                </div>
+              )}
+
+              <div className="flex justify-end">
+                <Button
+                  type="submit"
+                  size="lg"
+                  disabled={
+                    !selectedSchool ||
+                    !selectedYear ||
+                    !selectedGradeName ||
+                    !searchRegistration
+                  }
+                >
+                  <Search className="mr-2 h-4 w-4" /> Consultar
+                </Button>
+              </div>
             </form>
           </CardContent>
         </Card>
