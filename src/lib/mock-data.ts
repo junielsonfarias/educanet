@@ -54,6 +54,10 @@ export interface School {
     lab: boolean
   }
   educationTypes?: string[]
+  coordinates?: {
+    lat: number
+    lng: number
+  }
 }
 
 export interface Subject {
@@ -213,6 +217,25 @@ export interface DashboardLayout {
   widgets: DashboardWidget[]
 }
 
+export interface ServiceCard {
+  id: string
+  title: string
+  description: string
+  icon: string // Lucide icon name
+  link: string
+  color: string // 'blue', 'green', 'orange', 'purple'
+  active: boolean
+  order: number
+}
+
+export interface QuickLink {
+  id: string
+  label: string
+  url: string
+  active: boolean
+  order: number
+}
+
 export interface GeneralSettings {
   municipalityName: string
   educationSecretaryName: string
@@ -225,6 +248,8 @@ export interface GeneralSettings {
   reportCardView?: ReportCardViewSettings
   dashboardLayout?: DashboardLayout
   savedLayouts?: DashboardLayout[]
+  serviceCards?: ServiceCard[]
+  quickLinks?: QuickLink[]
 }
 
 export type AlertType = 'dropout_risk' | 'low_performance' | 'system'
@@ -344,6 +369,87 @@ export const initialDashboardLayout: DashboardLayout = {
   ],
 }
 
+export const initialServiceCards: ServiceCard[] = [
+  {
+    id: 'sc1',
+    title: 'Portal do Aluno',
+    description: 'Acesso a notas, frequência e materiais.',
+    icon: 'UserCircle',
+    link: '/publico/portal-aluno',
+    color: 'blue',
+    active: true,
+    order: 1,
+  },
+  {
+    id: 'sc2',
+    title: 'Portal do Servidor',
+    description: 'Contracheque, diário eletrônico e mais.',
+    icon: 'School',
+    link: '/publico/portal-servidor',
+    color: 'green',
+    active: true,
+    order: 2,
+  },
+  {
+    id: 'sc3',
+    title: 'Calendário',
+    description: 'Datas importantes e feriados escolares.',
+    icon: 'Calendar',
+    link: '/publico/calendario',
+    color: 'orange',
+    active: true,
+    order: 3,
+  },
+  {
+    id: 'sc4',
+    title: 'Nossas Escolas',
+    description: 'Localize as unidades da rede municipal.',
+    icon: 'Map',
+    link: '/publico/escolas',
+    color: 'purple',
+    active: true,
+    order: 4,
+  },
+]
+
+export const initialQuickLinks: QuickLink[] = [
+  {
+    id: 'ql1',
+    label: 'Início',
+    url: '/',
+    active: true,
+    order: 1,
+  },
+  {
+    id: 'ql2',
+    label: 'Notícias',
+    url: '/publico/noticias',
+    active: true,
+    order: 2,
+  },
+  {
+    id: 'ql3',
+    label: 'Escolas',
+    url: '/publico/escolas',
+    active: true,
+    order: 3,
+  },
+  {
+    id: 'ql4',
+    label: 'Dados QEdu',
+    url: '/publico/dados-qedu',
+    active: true,
+    order: 4,
+  },
+  {
+    id: 'ql5',
+    label: 'Documentos',
+    url: '/publico/documentos',
+    active: true,
+    order: 5,
+  },
+]
+
 export const initialSettings: GeneralSettings = {
   municipalityName: 'Prefeitura Municipal',
   educationSecretaryName: 'Secretaria Municipal de Educação',
@@ -354,6 +460,8 @@ export const initialSettings: GeneralSettings = {
   qeduMunicipalityId: '1507300',
   dashboardLayout: initialDashboardLayout,
   savedLayouts: [initialDashboardLayout],
+  serviceCards: initialServiceCards,
+  quickLinks: initialQuickLinks,
 }
 
 export const mockEvaluationRules: EvaluationRule[] = [
@@ -467,6 +575,10 @@ export const mockSchools: School[] = [
     administrativeDependency: 'Municipal',
     locationType: 'Urbana',
     polo: 'Polo Centro',
+    coordinates: {
+      lat: 40, // Simulated relative percentage for the mock map
+      lng: 30, // Simulated relative percentage for the mock map
+    },
     infrastructure: {
       classrooms: 12,
       accessible: true,
@@ -540,6 +652,33 @@ export const mockSchools: School[] = [
         ],
       },
     ],
+  },
+  {
+    id: '2',
+    code: 'ESC-002',
+    name: 'Escola Municipal Cecília Meireles',
+    address: 'Av. Paulista, 456 - Bela Vista',
+    phone: '(11) 3456-1234',
+    director: 'João Santos',
+    status: 'active',
+    logo: 'https://img.usecurling.com/i?q=school&shape=outline&color=green',
+    inepCode: '87654321',
+    administrativeDependency: 'Municipal',
+    locationType: 'Urbana',
+    polo: 'Polo Sul',
+    coordinates: {
+      lat: 60,
+      lng: 70,
+    },
+    infrastructure: {
+      classrooms: 8,
+      accessible: true,
+      internet: true,
+      library: false,
+      lab: true,
+    },
+    educationTypes: ['Ensino Fundamental', 'Educação Infantil'],
+    academicYears: [],
   },
 ]
 
@@ -866,7 +1005,7 @@ export const mockNews: NewsPost[] = [
     summary:
       'Prefeitura anuncia calendário para o retorno das atividades escolares.',
     content:
-      'A Secretaria de Educação informa que o retorno às aulas está previsto para o dia 05 de fevereiro. Todas as escolas já estão preparadas para receber os alunos com segurança e novidades na infraestrutura.',
+      '<p>A Secretaria de Educação informa que o retorno às aulas está previsto para o dia 05 de fevereiro. Todas as escolas já estão preparadas para receber os alunos com segurança e novidades na infraestrutura.</p><p>Os pais devem ficar atentos aos comunicados específicos de cada unidade escolar sobre horários e materiais.</p>',
     publishDate: new Date().toISOString(),
     author: 'Ascom SEMED',
     imageUrl: 'https://img.usecurling.com/p/800/600?q=classroom',
@@ -877,7 +1016,7 @@ export const mockNews: NewsPost[] = [
     title: 'Reformas nas Escolas Municipais',
     summary: 'Três unidades escolares passam por ampliação e melhorias.',
     content:
-      'As escolas Monteiro Lobato, Cecília Meireles e Vinícius de Moraes estão recebendo obras de manutenção, pintura e climatização das salas de aula. O investimento visa proporcionar um ambiente mais adequado para o aprendizado.',
+      '<p>As escolas Monteiro Lobato, Cecília Meireles e Vinícius de Moraes estão recebendo obras de manutenção, pintura e climatização das salas de aula.</p><p>O investimento visa proporcionar um ambiente mais adequado para o aprendizado e bem-estar de todos os estudantes e servidores.</p>',
     publishDate: addDays(new Date(), -5).toISOString(),
     author: 'Ascom Prefeitura',
     imageUrl: 'https://img.usecurling.com/p/800/600?q=school%20renovation',

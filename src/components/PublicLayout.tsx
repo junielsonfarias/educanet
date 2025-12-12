@@ -26,6 +26,11 @@ export default function PublicLayout() {
     { label: 'Documentos', path: '/publico/documentos' },
   ]
 
+  // Filter active quick links
+  const activeQuickLinks = (settings.quickLinks || [])
+    .filter((l) => l.active)
+    .sort((a, b) => a.order - b.order)
+
   return (
     <div className="flex min-h-screen flex-col bg-background">
       {/* Header - Increased height */}
@@ -192,36 +197,54 @@ export default function PublicLayout() {
             <div>
               <h3 className="font-semibold mb-4">Links Rápidos</h3>
               <ul className="space-y-2 text-sm text-muted-foreground">
-                <li>
-                  <Link to="/" className="hover:underline">
-                    Início
-                  </Link>
-                </li>
-                <li>
-                  <Link to="/publico/noticias" className="hover:underline">
-                    Notícias
-                  </Link>
-                </li>
-                <li>
-                  <Link to="/publico/escolas" className="hover:underline">
-                    Nossas Escolas
-                  </Link>
-                </li>
-                <li>
-                  <Link to="/publico/dados-qedu" className="hover:underline">
-                    Dados QEdu
-                  </Link>
-                </li>
-                <li>
-                  <Link to="/publico/documentos" className="hover:underline">
-                    Documentos
-                  </Link>
-                </li>
-                <li>
-                  <Link to="/publico/boletim" className="hover:underline">
-                    Boletim
-                  </Link>
-                </li>
+                {activeQuickLinks.length > 0 ? (
+                  activeQuickLinks.map((link) => (
+                    <li key={link.id}>
+                      <Link to={link.url} className="hover:underline">
+                        {link.label}
+                      </Link>
+                    </li>
+                  ))
+                ) : (
+                  <>
+                    <li>
+                      <Link to="/" className="hover:underline">
+                        Início
+                      </Link>
+                    </li>
+                    <li>
+                      <Link to="/publico/noticias" className="hover:underline">
+                        Notícias
+                      </Link>
+                    </li>
+                    <li>
+                      <Link to="/publico/escolas" className="hover:underline">
+                        Nossas Escolas
+                      </Link>
+                    </li>
+                    <li>
+                      <Link
+                        to="/publico/dados-qedu"
+                        className="hover:underline"
+                      >
+                        Dados QEdu
+                      </Link>
+                    </li>
+                    <li>
+                      <Link
+                        to="/publico/documentos"
+                        className="hover:underline"
+                      >
+                        Documentos
+                      </Link>
+                    </li>
+                    <li>
+                      <Link to="/publico/boletim" className="hover:underline">
+                        Boletim
+                      </Link>
+                    </li>
+                  </>
+                )}
               </ul>
             </div>
             <div>

@@ -5,11 +5,13 @@ import { TooltipProvider } from '@/components/ui/tooltip'
 import InstitutionalHome from './pages/Index'
 import Login from './pages/Login'
 import PublicDocuments from './pages/public/PublicDocuments'
+import PublicDocumentDetail from './pages/public/PublicDocumentDetail'
 import StudentPortal from './pages/public/StudentPortal'
 import EmployeePortal from './pages/public/EmployeePortal'
 import PublicCalendar from './pages/public/PublicCalendar'
 import PublicSchools from './pages/public/PublicSchools'
 import PublicNews from './pages/public/PublicNews'
+import PublicNewsDetail from './pages/public/PublicNewsDetail'
 import Structure from './pages/public/Structure'
 import PublicQEduData from './pages/public/PublicQEduData'
 import Dashboard from './pages/Dashboard'
@@ -98,8 +100,16 @@ const App = () => (
                                       element={<PublicNews />}
                                     />
                                     <Route
+                                      path="/publico/noticias/:id"
+                                      element={<PublicNewsDetail />}
+                                    />
+                                    <Route
                                       path="/publico/documentos"
                                       element={<PublicDocuments />}
+                                    />
+                                    <Route
+                                      path="/publico/documentos/:id"
+                                      element={<PublicDocumentDetail />}
                                     />
                                     <Route
                                       path="/publico/boletim"

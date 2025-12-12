@@ -5,6 +5,7 @@ import {
   School as SchoolIcon,
   LayoutGrid,
   List,
+  Map as MapIcon,
 } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
@@ -25,6 +26,7 @@ import {
 import { Badge } from '@/components/ui/badge'
 import useSchoolStore from '@/stores/useSchoolStore'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { SchoolMap } from './components/SchoolMap'
 
 export default function PublicSchools() {
   const { schools } = useSchoolStore()
@@ -121,6 +123,9 @@ export default function PublicSchools() {
             <TabsTrigger value="grouped">
               <LayoutGrid className="h-4 w-4 mr-2" /> Por Polo
             </TabsTrigger>
+            <TabsTrigger value="map">
+              <MapIcon className="h-4 w-4 mr-2" /> Mapa
+            </TabsTrigger>
           </TabsList>
         </div>
 
@@ -147,6 +152,10 @@ export default function PublicSchools() {
               </div>
             ))}
           </div>
+        </TabsContent>
+
+        <TabsContent value="map">
+          <SchoolMap schools={filteredSchools} />
         </TabsContent>
       </Tabs>
     </div>

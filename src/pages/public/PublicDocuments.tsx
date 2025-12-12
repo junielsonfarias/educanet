@@ -6,6 +6,7 @@ import {
   Download,
   ExternalLink,
   Calendar,
+  Eye,
 } from 'lucide-react'
 import {
   Card,
@@ -34,6 +35,7 @@ import {
 } from '@/components/ui/table'
 import usePublicContentStore from '@/stores/usePublicContentStore'
 import { format, parseISO } from 'date-fns'
+import { Link } from 'react-router-dom'
 
 export default function PublicDocuments() {
   const { documents } = usePublicContentStore()
@@ -138,7 +140,7 @@ export default function PublicDocuments() {
                 <TableHead className="w-[120px]">Data</TableHead>
                 <TableHead>Ementa / Assunto</TableHead>
                 <TableHead className="w-[150px]">Órgão</TableHead>
-                <TableHead className="w-[100px] text-right">Acesso</TableHead>
+                <TableHead className="w-[180px] text-right">Acesso</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -177,21 +179,33 @@ export default function PublicDocuments() {
                       <Badge variant="outline">{doc.organ}</Badge>
                     </TableCell>
                     <TableCell className="text-right">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="text-primary hover:text-primary/80"
-                        asChild
-                      >
-                        <a
-                          href={doc.driveLink}
-                          target="_blank"
-                          rel="noreferrer"
+                      <div className="flex justify-end gap-2">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="text-primary hover:text-primary/80"
+                          asChild
                         >
-                          <ExternalLink className="h-4 w-4 md:mr-2" />
-                          <span className="hidden md:inline">Abrir</span>
-                        </a>
-                      </Button>
+                          <Link to={`/publico/documentos/${doc.id}`}>
+                            <Eye className="h-4 w-4 md:mr-2" />
+                            <span className="hidden md:inline">Detalhes</span>
+                          </Link>
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="text-muted-foreground hover:text-primary"
+                          asChild
+                        >
+                          <a
+                            href={doc.driveLink}
+                            target="_blank"
+                            rel="noreferrer"
+                          >
+                            <ExternalLink className="h-4 w-4" />
+                          </a>
+                        </Button>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))

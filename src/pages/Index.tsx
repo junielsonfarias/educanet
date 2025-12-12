@@ -10,6 +10,7 @@ import {
   Facebook,
   Instagram,
   Map,
+  Star,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -18,6 +19,7 @@ import { Link } from 'react-router-dom'
 import usePublicContentStore from '@/stores/usePublicContentStore'
 import useSettingsStore from '@/stores/useSettingsStore'
 import { format, parseISO } from 'date-fns'
+import { ServiceCard } from '@/lib/mock-data'
 
 export default function InstitutionalHome() {
   const { news, documents, getContent } = usePublicContentStore()
@@ -40,6 +42,38 @@ export default function InstitutionalHome() {
         new Date(b.publishDate).getTime() - new Date(a.publishDate).getTime(),
     )
     .slice(0, 5)
+
+  // Helper to get icon component
+  const getIcon = (iconName: string) => {
+    switch (iconName) {
+      case 'UserCircle':
+        return UserCircle
+      case 'School':
+        return School
+      case 'Calendar':
+        return Calendar
+      case 'Map':
+        return Map
+      default:
+        return Star
+    }
+  }
+
+  // Helper to get color classes
+  const getColorClasses = (color: string) => {
+    switch (color) {
+      case 'blue':
+        return { bg: 'bg-blue-100', text: 'text-blue-600' }
+      case 'green':
+        return { bg: 'bg-green-100', text: 'text-green-600' }
+      case 'orange':
+        return { bg: 'bg-orange-100', text: 'text-orange-600' }
+      case 'purple':
+        return { bg: 'bg-purple-100', text: 'text-purple-600' }
+      default:
+        return { bg: 'bg-gray-100', text: 'text-gray-600' }
+    }
+  }
 
   return (
     <div className="space-y-12 animate-fade-in">
@@ -82,73 +116,40 @@ export default function InstitutionalHome() {
         </div>
       </section>
 
-      {/* Services Grid */}
+      {/* Services Grid (Dynamic) */}
       <section className="container mx-auto px-4">
         <div className="flex items-center gap-2 mb-6">
           <School className="h-6 w-6 text-primary" />
           <h2 className="text-2xl font-bold">Serviços</h2>
         </div>
         <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
-          <Link to="/publico/portal-aluno">
-            <Card className="hover:shadow-lg transition-shadow cursor-pointer h-full group hover:border-primary/50">
-              <CardContent className="p-6 flex flex-col items-center text-center gap-4">
-                <div className="h-14 w-14 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 group-hover:scale-110 transition-transform">
-                  <UserCircle className="h-8 w-8" />
-                </div>
-                <div>
-                  <h3 className="font-bold text-lg mb-1">Portal do Aluno</h3>
-                  <p className="text-sm text-muted-foreground">
-                    Acesso a notas, frequência e materiais.
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
-          </Link>
-          <Link to="/publico/portal-servidor">
-            <Card className="hover:shadow-lg transition-shadow cursor-pointer h-full group hover:border-primary/50">
-              <CardContent className="p-6 flex flex-col items-center text-center gap-4">
-                <div className="h-14 w-14 rounded-full bg-green-100 flex items-center justify-center text-green-600 group-hover:scale-110 transition-transform">
-                  <School className="h-8 w-8" />
-                </div>
-                <div>
-                  <h3 className="font-bold text-lg mb-1">Portal do Servidor</h3>
-                  <p className="text-sm text-muted-foreground">
-                    Contracheque, diário eletrônico e mais.
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
-          </Link>
-          <Link to="/publico/calendario">
-            <Card className="hover:shadow-lg transition-shadow cursor-pointer h-full group hover:border-primary/50">
-              <CardContent className="p-6 flex flex-col items-center text-center gap-4">
-                <div className="h-14 w-14 rounded-full bg-orange-100 flex items-center justify-center text-orange-600 group-hover:scale-110 transition-transform">
-                  <Calendar className="h-8 w-8" />
-                </div>
-                <div>
-                  <h3 className="font-bold text-lg mb-1">Calendário</h3>
-                  <p className="text-sm text-muted-foreground">
-                    Datas importantes e feriados escolares.
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
-          </Link>
-          <Link to="/publico/escolas">
-            <Card className="hover:shadow-lg transition-shadow cursor-pointer h-full group hover:border-primary/50">
-              <CardContent className="p-6 flex flex-col items-center text-center gap-4">
-                <div className="h-14 w-14 rounded-full bg-purple-100 flex items-center justify-center text-purple-600 group-hover:scale-110 transition-transform">
-                  <Map className="h-8 w-8" />
-                </div>
-                <div>
-                  <h3 className="font-bold text-lg mb-1">Nossas Escolas</h3>
-                  <p className="text-sm text-muted-foreground">
-                    Localize as unidades da rede municipal.
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
-          </Link>
+          {(settings.serviceCards || [])
+            .filter((c) => c.active)
+            .sort((a, b) => a.order - b.order)
+            .map((card) => {
+              const IconComp = getIcon(card.icon)
+              const colors = getColorClasses(card.color)
+
+              return (
+                <Link to={card.link} key={card.id}>
+                  <Card className="hover:shadow-lg transition-shadow cursor-pointer h-full group hover:border-primary/50">
+                    <CardContent className="p-6 flex flex-col items-center text-center gap-4">
+                      <div
+                        className={`h-14 w-14 rounded-full ${colors.bg} flex items-center justify-center ${colors.text} group-hover:scale-110 transition-transform`}
+                      >
+                        <IconComp className="h-8 w-8" />
+                      </div>
+                      <div>
+                        <h3 className="font-bold text-lg mb-1">{card.title}</h3>
+                        <p className="text-sm text-muted-foreground">
+                          {card.description}
+                        </p>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </Link>
+              )
+            })}
         </div>
       </section>
 
@@ -176,43 +177,39 @@ export default function InstitutionalHome() {
             <div className="grid gap-6">
               {activeNews.length > 0 ? (
                 activeNews.map((post) => (
-                  <Card
-                    key={post.id}
-                    className="overflow-hidden hover:shadow-md transition-shadow"
-                  >
-                    <div className="flex flex-col md:flex-row">
-                      <div className="md:w-1/3 h-48 md:h-auto bg-muted">
-                        <img
-                          src={
-                            post.imageUrl ||
-                            'https://img.usecurling.com/p/400/300?q=education'
-                          }
-                          alt={post.title}
-                          className="w-full h-full object-cover"
-                        />
-                      </div>
-                      <div className="p-6 flex-1 flex flex-col justify-between">
-                        <div>
-                          <div className="text-xs text-muted-foreground mb-2 flex items-center gap-2">
-                            <Calendar className="h-3 w-3" />
-                            {format(parseISO(post.publishDate), 'dd/MM/yyyy')}
-                          </div>
-                          <h3 className="text-xl font-bold mb-2 hover:text-primary transition-colors">
-                            {post.title}
-                          </h3>
-                          <p className="text-muted-foreground line-clamp-2 mb-4">
-                            {post.summary}
-                          </p>
+                  <Link to={`/publico/noticias/${post.id}`} key={post.id}>
+                    <Card className="overflow-hidden hover:shadow-md transition-shadow cursor-pointer h-full">
+                      <div className="flex flex-col md:flex-row h-full">
+                        <div className="md:w-1/3 h-48 md:h-auto bg-muted">
+                          <img
+                            src={
+                              post.imageUrl ||
+                              'https://img.usecurling.com/p/400/300?q=education'
+                            }
+                            alt={post.title}
+                            className="w-full h-full object-cover"
+                          />
                         </div>
-                        <Button
-                          variant="link"
-                          className="p-0 h-auto w-fit text-primary"
-                        >
-                          Ler mais <ArrowRight className="ml-1 h-4 w-4" />
-                        </Button>
+                        <div className="p-6 flex-1 flex flex-col justify-between">
+                          <div>
+                            <div className="text-xs text-muted-foreground mb-2 flex items-center gap-2">
+                              <Calendar className="h-3 w-3" />
+                              {format(parseISO(post.publishDate), 'dd/MM/yyyy')}
+                            </div>
+                            <h3 className="text-xl font-bold mb-2 hover:text-primary transition-colors">
+                              {post.title}
+                            </h3>
+                            <p className="text-muted-foreground line-clamp-2 mb-4">
+                              {post.summary}
+                            </p>
+                          </div>
+                          <span className="text-primary text-sm font-medium flex items-center hover:underline">
+                            Ler mais <ArrowRight className="ml-1 h-4 w-4" />
+                          </span>
+                        </div>
                       </div>
-                    </div>
-                  </Card>
+                    </Card>
+                  </Link>
                 ))
               ) : (
                 <p className="text-muted-foreground italic">
@@ -248,10 +245,8 @@ export default function InstitutionalHome() {
                         key={doc.id}
                         className="group p-4 hover:bg-muted/30 transition-colors"
                       >
-                        <a
-                          href={doc.driveLink}
-                          target="_blank"
-                          rel="noreferrer"
+                        <Link
+                          to={`/publico/documentos/${doc.id}`}
                           className="block"
                         >
                           <div className="flex items-start gap-4">
@@ -279,7 +274,7 @@ export default function InstitutionalHome() {
                               </Badge>
                             </div>
                           </div>
-                        </a>
+                        </Link>
                       </li>
                     ))}
                   </ul>

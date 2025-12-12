@@ -11,6 +11,7 @@ import { Input } from '@/components/ui/input'
 import { Newspaper, Calendar, Search, ArrowRight } from 'lucide-react'
 import usePublicContentStore from '@/stores/usePublicContentStore'
 import { format, parseISO } from 'date-fns'
+import { Link } from 'react-router-dom'
 
 export default function PublicNews() {
   const { news } = usePublicContentStore()
@@ -58,39 +59,42 @@ export default function PublicNews() {
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
         {filteredNews.length > 0 ? (
           filteredNews.map((post) => (
-            <Card
+            <Link
+              to={`/publico/noticias/${post.id}`}
               key={post.id}
-              className="overflow-hidden hover:shadow-lg transition-shadow flex flex-col h-full"
+              className="block h-full"
             >
-              <div className="h-48 bg-muted relative overflow-hidden group">
-                <img
-                  src={
-                    post.imageUrl ||
-                    'https://img.usecurling.com/p/400/300?q=education'
-                  }
-                  alt={post.title}
-                  className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-                />
-                <div className="absolute top-2 right-2 bg-background/80 backdrop-blur-sm px-2 py-1 rounded text-xs font-medium flex items-center gap-1">
-                  <Calendar className="h-3 w-3" />
-                  {format(parseISO(post.publishDate), 'dd/MM/yyyy')}
+              <Card className="overflow-hidden hover:shadow-lg transition-shadow flex flex-col h-full group">
+                <div className="h-48 bg-muted relative overflow-hidden">
+                  <img
+                    src={
+                      post.imageUrl ||
+                      'https://img.usecurling.com/p/400/300?q=education'
+                    }
+                    alt={post.title}
+                    className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                  />
+                  <div className="absolute top-2 right-2 bg-background/80 backdrop-blur-sm px-2 py-1 rounded text-xs font-medium flex items-center gap-1">
+                    <Calendar className="h-3 w-3" />
+                    {format(parseISO(post.publishDate), 'dd/MM/yyyy')}
+                  </div>
                 </div>
-              </div>
-              <CardHeader className="pb-2">
-                <CardTitle className="line-clamp-2 hover:text-primary transition-colors cursor-pointer">
-                  {post.title}
-                </CardTitle>
-                <CardDescription className="line-clamp-3">
-                  {post.summary}
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="mt-auto pt-4">
-                <Button variant="outline" className="w-full gap-2 group/btn">
-                  Ler Notícia
-                  <ArrowRight className="h-4 w-4 transition-transform group-hover/btn:translate-x-1" />
-                </Button>
-              </CardContent>
-            </Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="line-clamp-2 group-hover:text-primary transition-colors">
+                    {post.title}
+                  </CardTitle>
+                  <CardDescription className="line-clamp-3">
+                    {post.summary}
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="mt-auto pt-4">
+                  <Button variant="outline" className="w-full gap-2 group/btn">
+                    Ler Notícia
+                    <ArrowRight className="h-4 w-4 transition-transform group-hover/btn:translate-x-1" />
+                  </Button>
+                </CardContent>
+              </Card>
+            </Link>
           ))
         ) : (
           <div className="col-span-full text-center py-12 text-muted-foreground">
