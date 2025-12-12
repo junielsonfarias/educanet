@@ -1,13 +1,6 @@
 import { useParams, useNavigate } from 'react-router-dom'
 import {
   ArrowLeft,
-  Mail,
-  Phone,
-  User,
-  GraduationCap,
-  Calendar,
-  Edit,
-  Trash2,
   Printer,
   FileText,
   Briefcase,
@@ -15,6 +8,7 @@ import {
   ArrowRightLeft,
   Plus,
   Trophy,
+  CalendarDays,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
@@ -31,6 +25,9 @@ import useStudentStore from '@/stores/useStudentStore'
 import useProjectStore from '@/stores/useProjectStore'
 import useUserStore from '@/stores/useUserStore'
 import useSchoolStore from '@/stores/useSchoolStore'
+import useAssessmentStore from '@/stores/useAssessmentStore'
+import useCourseStore from '@/stores/useCourseStore'
+import useAttendanceStore from '@/stores/useAttendanceStore'
 import { useState } from 'react'
 import { StudentFormDialog } from './components/StudentFormDialog'
 import { EnrollmentFormDialog } from './components/EnrollmentFormDialog'
@@ -55,15 +52,9 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
 import { StudentInfoCard } from './components/StudentInfoCard'
 import { StudentPerformanceCard } from './components/StudentPerformanceCard'
+import { StudentAssessmentHistory } from './components/StudentAssessmentHistory'
 
 export default function StudentDetails() {
   const { id } = useParams<{ id: string }>()
@@ -80,6 +71,9 @@ export default function StudentDetails() {
   const { projects } = useProjectStore()
   const { currentUser } = useUserStore()
   const { schools } = useSchoolStore()
+  const { assessments, assessmentTypes } = useAssessmentStore()
+  const { courses } = useCourseStore()
+  const { getStudentAttendance } = useAttendanceStore()
   const { toast } = useToast()
 
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
@@ -87,10 +81,6 @@ export default function StudentDetails() {
   const [isProjectDialogOpen, setIsProjectDialogOpen] = useState(false)
   const [isTransferDialogOpen, setIsTransferDialogOpen] = useState(false)
   const [deleteId, setDeleteId] = useState<string | null>(null)
-
-  const [enrollmentSort, setEnrollmentSort] = useState<'year' | 'status'>(
-    'year',
-  )
 
   const student = getStudent(id || '')
   const isAdminOrSupervisor =
@@ -106,6 +96,49 @@ export default function StudentDetails() {
       </div>
     )
   }
+
+  // --- Prepare Data for Enhanced Views ---
+
+  // 1. Current Enrollment & School Info
+  const activeEnrollment = student.enrollments.find(
+    (e) => e.status === 'Cursando',
+  )
+  const currentSchool = schools.find((s) => s.id === activeEnrollment?.schoolId)
+  const currentYear = currentSchool?.academicYears.find(
+    (y) => y.name === activeEnrollment?.year.toString(),
+  )
+
+  // 2. Attendance Stats
+  const attendanceRecords = getStudentAttendance(student.id)
+  const totalAttendance = attendanceRecords.length
+  const presentCount = attendanceRecords.filter((r) => r.present).length
+  const attendancePercentage =
+    totalAttendance > 0 ? (presentCount / totalAttendance) * 100 : 100
+
+  // 3. Subjects & Periods (for Assessment History)
+  // Need to find the correct Course/Grade structure
+  let gradeStructure: any = null
+  let periods: any[] = currentYear?.periods || []
+
+  if (activeEnrollment && currentYear) {
+    const classroom = currentYear.classes.find(
+      (c) => c.name === activeEnrollment.grade,
+    )
+    for (const course of courses) {
+      const g = course.grades.find(
+        (gr) =>
+          gr.name === activeEnrollment.grade ||
+          (classroom && gr.id === classroom.gradeId),
+      )
+      if (g) {
+        gradeStructure = g
+        break
+      }
+    }
+  }
+  const subjects = gradeStructure?.subjects || []
+
+  // --- Handlers ---
 
   const handleUpdate = (data: any) => {
     updateStudent(student.id, data)
@@ -182,311 +215,259 @@ export default function StudentDetails() {
     return proj ? `${proj.name} (${proj.schedule})` : 'Projeto desconhecido'
   }
 
-  const enrollments = student.enrollments || []
-  const sortedEnrollments = [...enrollments].sort((a, b) => {
-    if (enrollmentSort === 'year') return b.year - a.year
-    return a.status.localeCompare(b.status)
-  })
-
   return (
     <div className="space-y-6 animate-fade-in pb-10">
-      <div className="flex items-center gap-4">
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={() => navigate('/pessoas/alunos')}
-        >
-          <ArrowLeft className="h-5 w-5" />
-        </Button>
-        <div className="flex-1">
-          <h2 className="text-3xl font-bold tracking-tight text-primary flex items-center gap-2">
-            Detalhes do Aluno
-          </h2>
-        </div>
-        {isAdminOrSupervisor && (
-          <div className="flex gap-2">
-            <Button variant="outline" onClick={() => setIsEditDialogOpen(true)}>
-              <Edit className="mr-2 h-4 w-4" /> Editar
-            </Button>
-            <Button
-              variant="destructive"
-              onClick={() => setDeleteId(student.id)}
-            >
-              <Trash2 className="mr-2 h-4 w-4" /> Excluir
-            </Button>
+      {/* Header */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="flex items-center gap-4">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => navigate('/pessoas/alunos')}
+          >
+            <ArrowLeft className="h-5 w-5" />
+          </Button>
+          <div className="flex items-center gap-4">
+            <Avatar className="h-16 w-16 border-2 border-primary/20">
+              <AvatarImage
+                src={`https://img.usecurling.com/ppl/medium?seed=${student.id}`}
+              />
+              <AvatarFallback className="text-lg">
+                {student.name.substring(0, 2).toUpperCase()}
+              </AvatarFallback>
+            </Avatar>
+            <div>
+              <h2 className="text-2xl font-bold text-primary tracking-tight">
+                {student.name}
+              </h2>
+              <div className="flex items-center gap-2 text-muted-foreground text-sm">
+                <span className="font-mono bg-muted px-1.5 py-0.5 rounded">
+                  {student.registration}
+                </span>
+                <span>•</span>
+                <span>
+                  {activeEnrollment
+                    ? `${activeEnrollment.grade} - ${currentSchool?.name}`
+                    : 'Sem matrícula ativa'}
+                </span>
+              </div>
+            </div>
           </div>
-        )}
+        </div>
+
+        <div className="flex gap-2 self-end md:self-auto">
+          <Button variant="outline" onClick={() => generateDocument('Boletim')}>
+            <Printer className="mr-2 h-4 w-4" /> Boletim
+          </Button>
+          {isAdminOrSupervisor && (
+            <Button variant="default" onClick={() => setIsEditDialogOpen(true)}>
+              Editar Cadastro
+            </Button>
+          )}
+        </div>
       </div>
 
       <div className="grid gap-6 md:grid-cols-3">
-        {/* Left Column */}
+        {/* Left Column: Info & Stats */}
         <div className="col-span-1 space-y-6">
+          {/* Quick Stats Card */}
           <Card>
-            <CardContent className="pt-6 flex flex-col items-center text-center">
-              <Avatar className="h-32 w-32 mb-4 border-4 border-primary/10">
-                <AvatarImage
-                  src={`https://img.usecurling.com/ppl/medium?seed=${student.id}`}
-                />
-                <AvatarFallback className="text-2xl">
-                  {student.name?.substring(0, 2).toUpperCase() || 'AL'}
-                </AvatarFallback>
-              </Avatar>
-              <h3 className="text-xl font-bold">{student.name}</h3>
-              <p className="text-sm text-muted-foreground mb-2">
-                Matrícula: {student.registration}
-              </p>
-              {student.status && (
-                <Badge
-                  variant={
-                    student.status === 'Cursando' ? 'default' : 'secondary'
-                  }
-                  className="mt-2"
-                >
-                  {student.status}
-                </Badge>
-              )}
-
-              <div className="w-full mt-6 text-left space-y-3">
-                <div className="flex items-center gap-2 text-sm">
-                  <Calendar className="h-4 w-4 text-muted-foreground" />
-                  <span>
-                    Nasc: {student.birthDate || 'N/A'} ({student.age} anos)
-                  </span>
-                </div>
-                <div className="flex items-center gap-2 text-sm">
-                  <User className="h-4 w-4 text-muted-foreground" />
-                  <span>Resp: {student.guardian}</span>
-                </div>
-                <div className="flex items-center gap-2 text-sm">
-                  <Phone className="h-4 w-4 text-muted-foreground" />
-                  <span>{student.contacts?.phone || 'N/A'}</span>
-                </div>
-                <div className="flex items-center gap-2 text-sm">
-                  <Mail className="h-4 w-4 text-muted-foreground" />
-                  <span>{student.contacts?.email || 'N/A'}</span>
-                </div>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base font-medium text-muted-foreground">
+                Resumo Acadêmico
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="grid grid-cols-2 gap-4">
+              <div className="flex flex-col">
+                <span className="text-2xl font-bold">
+                  {attendancePercentage.toFixed(0)}%
+                </span>
+                <span className="text-xs text-muted-foreground flex items-center gap-1">
+                  <CalendarDays className="h-3 w-3" /> Frequência
+                </span>
+              </div>
+              <div className="flex flex-col">
+                <span className="text-2xl font-bold">
+                  {activeEnrollment ? activeEnrollment.status : student.status}
+                </span>
+                <span className="text-xs text-muted-foreground flex items-center gap-1">
+                  <Briefcase className="h-3 w-3" /> Situação
+                </span>
               </div>
             </CardContent>
           </Card>
 
+          <StudentInfoCard student={student} />
+
+          {/* Quick Actions */}
           <Card>
             <CardHeader className="pb-3">
-              <CardTitle className="text-lg flex items-center gap-2">
-                <Printer className="h-5 w-5 text-primary" /> Ações Rápidas
+              <CardTitle className="text-sm font-medium uppercase tracking-wider text-muted-foreground">
+                Documentos & Ações
               </CardTitle>
             </CardHeader>
             <CardContent className="flex flex-col gap-2">
               <Button
                 variant="outline"
-                className="justify-start"
+                className="justify-start h-9"
                 onClick={() => generateDocument('Ficha do Aluno')}
               >
-                <FileText className="mr-2 h-4 w-4" /> Gerar Ficha
+                <FileText className="mr-2 h-4 w-4" /> Ficha Cadastral
               </Button>
               <Button
                 variant="outline"
-                className="justify-start"
-                onClick={() => generateDocument('Carteira de Estudante')}
-              >
-                <Briefcase className="mr-2 h-4 w-4" /> Carteira de Estudante
-              </Button>
-              <Button
-                variant="outline"
-                className="justify-start"
-                onClick={() => generateDocument('Boletim')}
-              >
-                <GraduationCap className="mr-2 h-4 w-4" /> Gerar Boletim
-              </Button>
-              <Button
-                variant="outline"
-                className="justify-start"
+                className="justify-start h-9"
                 onClick={() => generateDocument('Histórico Escolar')}
               >
                 <Book className="mr-2 h-4 w-4" /> Histórico Escolar
               </Button>
-              <Separator className="my-2" />
-              <Button
-                variant="default"
-                className="justify-start bg-orange-600 hover:bg-orange-700 text-white"
-                onClick={() => setIsTransferDialogOpen(true)}
-              >
-                <ArrowRightLeft className="mr-2 h-4 w-4" /> Transferência
-              </Button>
+              {isAdminOrSupervisor && (
+                <>
+                  <Separator className="my-1" />
+                  <Button
+                    variant="default"
+                    className="justify-start h-9 bg-orange-600 hover:bg-orange-700 text-white"
+                    onClick={() => setIsTransferDialogOpen(true)}
+                  >
+                    <ArrowRightLeft className="mr-2 h-4 w-4" /> Transferência
+                  </Button>
+                </>
+              )}
             </CardContent>
           </Card>
         </div>
 
-        {/* Right Column (2 spans) */}
+        {/* Right Column: Academic Performance */}
         <div className="col-span-1 md:col-span-2 space-y-6">
-          <StudentInfoCard student={student} />
-
           <StudentPerformanceCard student={student} />
 
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <div className="flex flex-col gap-1">
-                <CardTitle>Histórico de Matrículas</CardTitle>
-                <CardDescription>Registro acadêmico completo</CardDescription>
-              </div>
-              <div className="flex items-center gap-2">
-                <Select
-                  value={enrollmentSort}
-                  onValueChange={(v: any) => setEnrollmentSort(v)}
-                >
-                  <SelectTrigger className="w-[140px] h-8 text-xs">
-                    <SelectValue placeholder="Ordenar" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="year">Por Ano</SelectItem>
-                    <SelectItem value="status">Por Status</SelectItem>
-                  </SelectContent>
-                </Select>
+          {/* New Assessment History Component */}
+          <StudentAssessmentHistory
+            assessments={assessments.filter((a) => a.studentId === student.id)}
+            assessmentTypes={assessmentTypes}
+            subjects={subjects}
+            periods={periods}
+          />
+
+          <div className="grid gap-6 md:grid-cols-2">
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-lg">Matrículas</CardTitle>
                 {isAdminOrSupervisor && (
                   <Button
                     size="sm"
+                    variant="outline"
                     onClick={() => setIsEnrollmentDialogOpen(true)}
                   >
-                    <Plus className="h-4 w-4 mr-1" /> Nova
+                    <Plus className="h-4 w-4" />
                   </Button>
                 )}
-              </div>
-            </CardHeader>
-            <CardContent>
-              {sortedEnrollments.length === 0 ? (
-                <p className="text-sm text-muted-foreground py-4 text-center">
-                  Nenhuma matrícula registrada.
-                </p>
-              ) : (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Ano Letivo</TableHead>
-                      <TableHead>Série / Turma</TableHead>
-                      <TableHead>Escola</TableHead>
-                      <TableHead>Status</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {sortedEnrollments.map((enrollment) => {
-                      const schoolName =
-                        schools.find((s) => s.id === enrollment.schoolId)
-                          ?.name || 'Escola Externa'
-                      return (
-                        <TableRow
-                          key={enrollment.id}
-                          className="hover:bg-muted/50"
-                        >
+              </CardHeader>
+              <CardContent>
+                {student.enrollments.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">None</p>
+                ) : (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Ano</TableHead>
+                        <TableHead>Série</TableHead>
+                        <TableHead>Status</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {student.enrollments.map((e) => (
+                        <TableRow key={e.id}>
+                          <TableCell>{e.year}</TableCell>
                           <TableCell className="font-medium">
-                            {enrollment.year}
-                          </TableCell>
-                          <TableCell>{enrollment.grade}</TableCell>
-                          <TableCell className="text-muted-foreground text-xs">
-                            {schoolName}
+                            {e.grade}
                           </TableCell>
                           <TableCell>
-                            <Badge
-                              variant={
-                                enrollment.status === 'Cursando'
-                                  ? 'default'
-                                  : enrollment.status === 'Aprovado'
-                                    ? 'default'
-                                    : 'secondary'
-                              }
-                            >
-                              {enrollment.status}
-                            </Badge>
+                            <Badge variant="outline">{e.status}</Badge>
                           </TableCell>
                         </TableRow>
-                      )
-                    })}
-                  </TableBody>
-                </Table>
-              )}
-            </CardContent>
-          </Card>
+                      ))}
+                    </TableBody>
+                  </Table>
+                )}
+              </CardContent>
+            </Card>
 
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <div>
-                <CardTitle>Projetos Extracurriculares</CardTitle>
-                <CardDescription>Atividades complementares</CardDescription>
-              </div>
-              {isAdminOrSupervisor && (
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => setIsProjectDialogOpen(true)}
-                >
-                  <Trophy className="h-4 w-4 mr-1" /> Adicionar Projeto
-                </Button>
-              )}
-            </CardHeader>
-            <CardContent>
-              {student.projectIds.length === 0 ? (
-                <p className="text-sm text-muted-foreground py-4 text-center">
-                  Nenhum projeto matriculado.
-                </p>
-              ) : (
-                <div className="space-y-2">
-                  {student.projectIds.map((projectId) => (
-                    <div
-                      key={projectId}
-                      className="flex items-center justify-between p-3 border rounded-md bg-secondary/10"
-                    >
-                      <div className="flex items-center gap-3">
-                        <div className="h-8 w-8 rounded-full bg-primary/20 flex items-center justify-center">
-                          <Trophy className="h-4 w-4 text-primary" />
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-lg">Projetos</CardTitle>
+                {isAdminOrSupervisor && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setIsProjectDialogOpen(true)}
+                  >
+                    <Plus className="h-4 w-4" />
+                  </Button>
+                )}
+              </CardHeader>
+              <CardContent>
+                {student.projectIds.length === 0 ? (
+                  <p className="text-sm text-muted-foreground py-2 italic">
+                    Não participa de projetos.
+                  </p>
+                ) : (
+                  <div className="space-y-2">
+                    {student.projectIds.map((pid) => (
+                      <div
+                        key={pid}
+                        className="flex items-center justify-between p-2 bg-secondary/10 rounded border"
+                      >
+                        <div className="flex items-center gap-2">
+                          <Trophy className="h-4 w-4 text-amber-500" />
+                          <span className="text-sm font-medium">
+                            {getProjectName(pid)}
+                          </span>
                         </div>
-                        <span className="font-medium">
-                          {getProjectName(projectId)}
-                        </span>
+                        {isAdminOrSupervisor && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-6 w-6 text-destructive"
+                            onClick={() => handleRemoveProject(pid)}
+                          >
+                            <Plus className="h-3 w-3 rotate-45" />
+                          </Button>
+                        )}
                       </div>
-                      {isAdminOrSupervisor && (
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8 text-destructive hover:text-destructive"
-                          onClick={() => handleRemoveProject(projectId)}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
         </div>
       </div>
 
+      {/* Dialogs */}
       <StudentFormDialog
         open={isEditDialogOpen}
         onOpenChange={setIsEditDialogOpen}
         onSubmit={handleUpdate}
         initialData={student}
       />
-
       <EnrollmentFormDialog
         open={isEnrollmentDialogOpen}
         onOpenChange={setIsEnrollmentDialogOpen}
         onSubmit={handleAddEnrollment}
       />
-
       <ProjectEnrollmentDialog
         open={isProjectDialogOpen}
         onOpenChange={setIsProjectDialogOpen}
         onSubmit={handleAddProject}
         excludeProjectIds={student.projectIds}
       />
-
       <StudentTransferDialog
         open={isTransferDialogOpen}
         onOpenChange={setIsTransferDialogOpen}
         onTransfer={handleTransfer}
         student={student}
       />
-
       <AlertDialog
         open={!!deleteId}
         onOpenChange={(open) => !open && setDeleteId(null)}
@@ -495,8 +476,7 @@ export default function StudentDetails() {
           <AlertDialogHeader>
             <AlertDialogTitle>Excluir Aluno</AlertDialogTitle>
             <AlertDialogDescription>
-              Esta ação é irreversível. O histórico e dados do aluno serão
-              perdidos.
+              Esta ação é irreversível. Todos os dados serão perdidos.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -505,7 +485,7 @@ export default function StudentDetails() {
               onClick={handleDelete}
               className="bg-destructive hover:bg-destructive/90"
             >
-              Excluir Definitivamente
+              Excluir
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

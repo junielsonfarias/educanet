@@ -141,6 +141,18 @@ export interface Assessment {
   relatedAssessmentId?: string // Link recovery to specific assessment
 }
 
+export interface AttendanceRecord {
+  id: string
+  studentId: string
+  schoolId: string
+  yearId: string
+  classroomId: string
+  subjectId: string
+  date: string
+  present: boolean
+  justification?: string
+}
+
 export interface GeneralSettings {
   municipalityName: string
   educationSecretaryName: string
@@ -556,7 +568,6 @@ export const mockAssessments: Assessment[] = [
     date: '2024-06-20',
     assessmentTypeId: 'at1',
   },
-  // Add History assessment for testing
   {
     id: 'as3',
     studentId: '1',
@@ -572,3 +583,5 @@ export const mockAssessments: Assessment[] = [
     assessmentTypeId: 'at1',
   },
 ]
+
+export const mockAttendance: AttendanceRecord[] = []

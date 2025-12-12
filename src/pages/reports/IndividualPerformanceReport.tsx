@@ -6,16 +6,11 @@ import {
   GraduationCap,
   Calendar,
   Filter,
+  Download,
+  FileSpreadsheet,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import {
   Select,
   SelectContent,
@@ -37,7 +32,7 @@ import useAssessmentStore from '@/stores/useAssessmentStore'
 import useCourseStore from '@/stores/useCourseStore'
 import useSchoolStore from '@/stores/useSchoolStore'
 import useSettingsStore from '@/stores/useSettingsStore'
-import { calculateGrades, CalculatedAssessment } from '@/lib/grade-calculator'
+import { calculateGrades } from '@/lib/grade-calculator'
 import {
   Command,
   CommandEmpty,
@@ -51,6 +46,12 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '@/components/ui/popover'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import { Check, ChevronsUpDown } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -101,7 +102,6 @@ export default function IndividualPerformanceReport() {
     const academicYear = school?.academicYears.find(
       (y) => y.name === selectedEnrollment.year.toString(),
     )
-    // Try to find classroom by name as enrollment grade is name-based
     const classroom = academicYear?.classes.find(
       (c) => c.name === selectedEnrollment.grade,
     )
@@ -129,7 +129,6 @@ export default function IndividualPerformanceReport() {
     const periods = academicYear?.periods || []
 
     const subjects = gradeStructure.subjects.map((subject: any) => {
-      // Filter logic
       if (disciplineFilter !== 'all' && subject.id !== disciplineFilter)
         return null
 
@@ -148,7 +147,6 @@ export default function IndividualPerformanceReport() {
         settings.defaultRecoveryStrategy,
       )
 
-      // Flatten assessments for chronological view
       const flatAssessments = calculation.periodResults
         .filter((p) => periodFilter === 'all' || p.periodId === periodFilter)
         .flatMap((p) =>
@@ -181,6 +179,40 @@ export default function IndividualPerformanceReport() {
     disciplineFilter,
     periodFilter,
   ])
+
+  const handleExportCSV = () => {
+    if (!reportData || !student) return
+
+    let csvContent =
+      'data:text/csv;charset=utf-8,Aluno,Disciplina,Periodo,Data,Avaliacao,Nota Original,Recuperacao,Nota Final\n'
+
+    reportData.subjects.forEach((subject: any) => {
+      subject.flatAssessments.forEach((assessment: any) => {
+        const type = assessmentTypes.find(
+          (t) => t.id === assessment.assessmentTypeId,
+        )
+        const row = [
+          student.name,
+          subject.subjectName,
+          assessment.periodName,
+          assessment.date ? new Date(assessment.date).toLocaleDateString() : '',
+          type?.name || 'Avaliacao',
+          assessment.isRecovered ? assessment.originalValue : assessment.value, // Logic check: value is effective, originalValue is stored if recovered
+          assessment.isRecovered ? assessment.recoveryValue : '-',
+          assessment.value,
+        ].join(',')
+        csvContent += row + '\n'
+      })
+    })
+
+    const encodedUri = encodeURI(csvContent)
+    const link = document.createElement('a')
+    link.setAttribute('href', encodedUri)
+    link.setAttribute('download', `relatorio_${student.name}.csv`)
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+  }
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -303,9 +335,22 @@ export default function IndividualPerformanceReport() {
                 </SelectContent>
               </Select>
             </div>
-            <Button variant="outline" onClick={() => window.print()}>
-              <FileText className="mr-2 h-4 w-4" /> Exportar PDF
-            </Button>
+
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline">
+                  <Download className="mr-2 h-4 w-4" /> Exportar Relatório
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => window.print()}>
+                  <FileText className="mr-2 h-4 w-4" /> Exportar PDF (Imprimir)
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={handleExportCSV}>
+                  <FileSpreadsheet className="mr-2 h-4 w-4" /> Exportar CSV
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
 
           <div className="space-y-6">
