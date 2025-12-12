@@ -197,7 +197,8 @@ export default function ReportCard() {
 
     groupedByType.forEach((entries, typeId) => {
       const type = assessmentTypes.find((t) => t.id === typeId)
-      if (type) {
+      // Only include types that are explicitly excluded from average
+      if (type && type.excludeFromAverage) {
         evaluationTypes.push({
           id: type.id,
           name: type.name,
