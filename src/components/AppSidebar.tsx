@@ -12,6 +12,8 @@ import {
   Newspaper,
   PieChart,
   BarChart,
+  ClipboardList,
+  PenTool,
 } from 'lucide-react'
 import {
   Sidebar,
@@ -36,6 +38,11 @@ const menuItems = [
     title: 'Dashboard',
     url: '/dashboard',
     icon: LayoutDashboard,
+  },
+  {
+    title: 'Painel Estratégico',
+    url: '/dashboard/estrategico',
+    icon: BarChart,
   },
   {
     title: 'Escolas',
@@ -74,14 +81,14 @@ const academicItems = [
     icon: Users,
   },
   {
-    title: 'Regras de Avaliação',
-    url: '/academico/regras-avaliacao',
-    icon: FileText,
+    title: 'Diário de Classe',
+    url: '/academico/diario',
+    icon: ClipboardList,
   },
   {
-    title: 'Tipos de Avaliação',
-    url: '/academico/tipos-avaliacao',
-    icon: FileText,
+    title: 'Planejamento de Aulas',
+    url: '/academico/planejamento',
+    icon: PenTool,
   },
   {
     title: 'Lançamento de Notas',
@@ -92,6 +99,16 @@ const academicItems = [
     title: 'Análise e Comparação',
     url: '/academico/analise-avaliacoes',
     icon: BarChart,
+  },
+  {
+    title: 'Regras de Avaliação',
+    url: '/academico/regras-avaliacao',
+    icon: FileText,
+  },
+  {
+    title: 'Tipos de Avaliação',
+    url: '/academico/tipos-avaliacao',
+    icon: FileText,
   },
 ]
 

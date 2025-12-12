@@ -14,6 +14,7 @@ import {
   BarChart,
   LineChart,
   PieChart,
+  Scale,
 } from 'lucide-react'
 
 export default function ReportsDashboard() {
@@ -45,6 +46,12 @@ export default function ReportsDashboard() {
       description: 'Quadro de distribuição de carga horária docente.',
       icon: School,
       path: '/relatorios/professores',
+    },
+    {
+      title: 'Comparativo entre Escolas',
+      description: 'Compare indicadores de desempenho de múltiplas unidades.',
+      icon: Scale,
+      path: '/relatorios/comparativo',
     },
   ]
 

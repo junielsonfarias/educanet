@@ -153,6 +153,39 @@ export interface AttendanceRecord {
   justification?: string
 }
 
+export interface Occurrence {
+  id: string
+  studentId: string
+  schoolId: string
+  yearId: string
+  classroomId: string
+  date: string
+  type: 'behavior' | 'pedagogical' | 'health' | 'other'
+  description: string
+  recordedBy: string
+  createdAt: string
+}
+
+export interface LessonPlan {
+  id: string
+  teacherId: string
+  schoolId: string
+  yearId: string
+  classroomId: string
+  subjectId: string
+  date: string
+  topic: string
+  objectives: string
+  methodology: string
+  resources: string
+  evaluation: string
+  status: 'draft' | 'submitted' | 'approved' | 'rejected'
+  feedback?: string
+  attachments?: { name: string; url: string }[]
+  createdAt: string
+  updatedAt: string
+}
+
 export interface ReportCardViewSettings {
   visibleColumns: string[]
 }
@@ -669,6 +702,42 @@ export const mockAssessments: Assessment[] = [
 ]
 
 export const mockAttendance: AttendanceRecord[] = []
+
+export const mockOccurrences: Occurrence[] = [
+  {
+    id: 'occ1',
+    studentId: '1',
+    schoolId: '1',
+    yearId: 'y2024',
+    classroomId: 'cl1',
+    date: new Date().toISOString(),
+    type: 'behavior',
+    description:
+      'Aluno apresentou comportamento exemplar na atividade em grupo.',
+    recordedBy: 'Prof. Alberto Campos',
+    createdAt: new Date().toISOString(),
+  },
+]
+
+export const mockLessonPlans: LessonPlan[] = [
+  {
+    id: 'lp1',
+    teacherId: '1',
+    schoolId: '1',
+    yearId: 'y2024',
+    classroomId: 'cl1',
+    subjectId: 's10',
+    date: new Date().toISOString(),
+    topic: 'Frações e Números Decimais',
+    objectives: 'Compreender a relação entre frações e decimais.',
+    methodology: 'Aula expositiva e exercícios práticos.',
+    resources: 'Lousa, livro didático, projetor.',
+    evaluation: 'Participação e resolução de lista de exercícios.',
+    status: 'approved',
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  },
+]
 
 // --- Mock Data for Website ---
 
