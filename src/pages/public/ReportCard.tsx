@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react'
-import { Search, AlertTriangle } from 'lucide-react'
+import { Search, AlertTriangle, AlertCircle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
@@ -17,6 +17,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Label } from '@/components/ui/label'
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import useStudentStore from '@/stores/useStudentStore'
 import useAssessmentStore from '@/stores/useAssessmentStore'
 import useCourseStore from '@/stores/useCourseStore'
@@ -40,6 +41,7 @@ export default function ReportCard() {
   const [selectedGradeName, setSelectedGradeName] = useState('')
   const [result, setResult] = useState<ReportCardData | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [errorType, setErrorType] = useState<'error' | 'warning'>('error')
 
   const { students } = useStudentStore()
   const { assessments, assessmentTypes } = useAssessmentStore()
@@ -51,12 +53,37 @@ export default function ReportCard() {
   const activeYear = academicYears.find((y) => y.id === selectedYear)
 
   const availableGrades = useMemo(() => {
-    if (!activeYear) return []
-    const gradeNames = new Set(
-      activeYear.classes.map((c) => c.gradeName).filter(Boolean),
-    )
-    return Array.from(gradeNames) as string[]
-  }, [activeYear])
+    if (!activeYear || !selectedSchool) return []
+
+    const validGradeNames = new Set<string>()
+    const classMap = new Map<string, string>()
+
+    // Map classes to grade names
+    activeYear.classes.forEach((c) => {
+      if (c.gradeName) {
+        classMap.set(c.name, c.gradeName)
+      }
+    })
+
+    // Filter students with active regular enrollments in this school/year
+    students.forEach((student) => {
+      student.enrollments.forEach((e) => {
+        if (
+          e.schoolId === selectedSchool &&
+          e.year.toString() === activeYear.name &&
+          e.type === 'regular' &&
+          ['Cursando', 'Aprovado', 'Reprovado'].includes(e.status)
+        ) {
+          const gradeName = classMap.get(e.grade)
+          if (gradeName) {
+            validGradeNames.add(gradeName)
+          }
+        }
+      })
+    })
+
+    return Array.from(validGradeNames).sort()
+  }, [activeYear, selectedSchool, students])
 
   const calculateSubjectGrades = (
     subjects: any[],
@@ -197,7 +224,6 @@ export default function ReportCard() {
 
     groupedByType.forEach((entries, typeId) => {
       const type = assessmentTypes.find((t) => t.id === typeId)
-      // Only include types that are explicitly excluded from average
       if (type && type.excludeFromAverage) {
         evaluationTypes.push({
           id: type.id,
@@ -214,6 +240,7 @@ export default function ReportCard() {
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault()
     setError(null)
+    setErrorType('error')
     setResult(null)
 
     if (
@@ -228,12 +255,12 @@ export default function ReportCard() {
 
     const student = students.find((s) => s.registration === searchRegistration)
     if (!student) {
-      setError('Aluno não encontrado com a matrícula informada.')
+      setError('Número de matrícula inválido ou não encontrado.')
       return
     }
 
-    // Find Regular Enrollment
-    const validEnrollment = student.enrollments.find((e) => {
+    // Check for Regular Enrollment in Selected Criteria
+    const regularEnrollment = student.enrollments.find((e) => {
       if (e.schoolId !== selectedSchool) return false
       if (e.year.toString() !== activeYear?.name) return false
       if (e.type !== 'regular') return false
@@ -242,157 +269,196 @@ export default function ReportCard() {
       return cls && cls.gradeName === selectedGradeName
     })
 
-    if (!validEnrollment) {
-      setError('Aluno não matriculado na escola/ano/série selecionados.')
-      return
-    }
-
-    const school = schools.find((s) => s.id === validEnrollment.schoolId)
-    const academicYear = school?.academicYears.find(
-      (y) => y.name === validEnrollment.year.toString(),
-    )
-    const classroom = academicYear?.classes.find(
-      (c) => c.name === validEnrollment.grade,
-    )
-
-    if (!academicYear || !classroom) {
-      setError('Dados acadêmicos incompletos.')
-      return
-    }
-
-    // Determine Regular Structure
-    let regularGradeStructure: any = null
-    let regularRule: any = null
-
-    for (const course of courses) {
-      const g = course.grades.find(
-        (gr) =>
-          gr.name === selectedGradeName ||
-          (classroom && gr.id === classroom.gradeId),
+    if (regularEnrollment) {
+      const school = schools.find((s) => s.id === regularEnrollment.schoolId)
+      const academicYear = school?.academicYears.find(
+        (y) => y.name === regularEnrollment.year.toString(),
       )
-      if (g) {
-        regularGradeStructure = g
-        regularRule = evaluationRules.find((r) => r.id === g.evaluationRuleId)
-        break
+      const classroom = academicYear?.classes.find(
+        (c) => c.name === regularEnrollment.grade,
+      )
+
+      if (!academicYear || !classroom) {
+        setError('Dados acadêmicos incompletos.')
+        return
       }
-    }
 
-    if (!regularGradeStructure || !regularRule) {
-      setError('Erro na configuração curricular.')
-      return
-    }
-
-    const periods = academicYear.periods || []
-    const isYearActive = academicYear.status === 'active'
-
-    // Calculate Regular Grades
-    const {
-      grades: reportCardGrades,
-      recoveries: reportCardRecoveries,
-      evaluationTypes: reportCardEvaluations,
-      history: reportCardHistory,
-    } = calculateSubjectGrades(
-      regularGradeStructure.subjects,
-      student.id,
-      academicYear.id,
-      classroom.id,
-      regularRule,
-      periods,
-      isYearActive,
-    )
-
-    // Calculate Dependency Grades
-    const dependencyEnrollments = student.enrollments.filter(
-      (e) =>
-        e.schoolId === selectedSchool &&
-        e.year.toString() === activeYear?.name &&
-        e.type === 'dependency',
-    )
-
-    const dependenciesData = []
-    let dependencyHistory: HistoryEntry[] = []
-
-    for (const depEnrollment of dependencyEnrollments) {
-      const depClass = activeYear.classes.find(
-        (c) => c.name === depEnrollment.grade,
-      )
-      if (!depClass) continue
-
-      let depGradeStructure: any = null
-      let depRule: any = null
+      // Determine Regular Structure
+      let regularGradeStructure: any = null
+      let regularRule: any = null
 
       for (const course of courses) {
-        const g = course.grades.find((gr) => gr.id === depClass.gradeId)
+        const g = course.grades.find(
+          (gr) =>
+            gr.name === selectedGradeName ||
+            (classroom && gr.id === classroom.gradeId),
+        )
         if (g) {
-          depGradeStructure = g
-          depRule = evaluationRules.find((r) => r.id === g.evaluationRuleId)
+          regularGradeStructure = g
+          regularRule = evaluationRules.find((r) => r.id === g.evaluationRuleId)
           break
         }
       }
 
-      if (!depGradeStructure || !depRule) continue
+      if (!regularGradeStructure || !regularRule) {
+        setError('Erro na configuração curricular.')
+        return
+      }
 
-      // Filter subjects with assessments
-      const activeSubjects = depGradeStructure.subjects.filter(
-        (subject: any) => {
-          return assessments.some(
-            (a) =>
-              a.studentId === student.id &&
-              a.subjectId === subject.id &&
-              a.classroomId === depClass.id &&
-              a.yearId === academicYear.id,
-          )
-        },
+      const periods = academicYear.periods || []
+      const isYearActive = academicYear.status === 'active'
+
+      // Calculate Regular Grades
+      const {
+        grades: reportCardGrades,
+        recoveries: reportCardRecoveries,
+        evaluationTypes: reportCardEvaluations,
+        history: reportCardHistory,
+      } = calculateSubjectGrades(
+        regularGradeStructure.subjects,
+        student.id,
+        academicYear.id,
+        classroom.id,
+        regularRule,
+        periods,
+        isYearActive,
       )
 
-      if (activeSubjects.length > 0) {
-        const {
-          grades: depGrades,
-          recoveries: depRecoveries,
-          evaluationTypes: depEvaluations,
-          history: depHist,
-        } = calculateSubjectGrades(
-          activeSubjects,
-          student.id,
-          academicYear.id,
-          depClass.id,
-          depRule,
-          periods,
-          isYearActive,
+      // Calculate Dependency Grades
+      const dependencyEnrollments = student.enrollments.filter(
+        (e) =>
+          e.schoolId === selectedSchool &&
+          e.year.toString() === activeYear?.name &&
+          e.type === 'dependency',
+      )
+
+      const dependenciesData = []
+      let dependencyHistory: HistoryEntry[] = []
+
+      for (const depEnrollment of dependencyEnrollments) {
+        const depClass = activeYear.classes.find(
+          (c) => c.name === depEnrollment.grade,
+        )
+        if (!depClass) continue
+
+        let depGradeStructure: any = null
+        let depRule: any = null
+
+        for (const course of courses) {
+          const g = course.grades.find((gr) => gr.id === depClass.gradeId)
+          if (g) {
+            depGradeStructure = g
+            depRule = evaluationRules.find((r) => r.id === g.evaluationRuleId)
+            break
+          }
+        }
+
+        if (!depGradeStructure || !depRule) continue
+
+        // Filter subjects with assessments
+        const activeSubjects = depGradeStructure.subjects.filter(
+          (subject: any) => {
+            return assessments.some(
+              (a) =>
+                a.studentId === student.id &&
+                a.subjectId === subject.id &&
+                a.classroomId === depClass.id &&
+                a.yearId === academicYear.id,
+            )
+          },
         )
 
-        dependenciesData.push({
-          className: depClass.name,
-          grades: depGrades,
-          recoveries: depRecoveries,
-          evaluationTypes: depEvaluations,
-          ruleName: depRule.name,
-        })
-        dependencyHistory = [...dependencyHistory, ...depHist]
+        if (activeSubjects.length > 0) {
+          const {
+            grades: depGrades,
+            recoveries: depRecoveries,
+            evaluationTypes: depEvaluations,
+            history: depHist,
+          } = calculateSubjectGrades(
+            activeSubjects,
+            student.id,
+            academicYear.id,
+            depClass.id,
+            depRule,
+            periods,
+            isYearActive,
+          )
+
+          dependenciesData.push({
+            className: depClass.name,
+            grades: depGrades,
+            recoveries: depRecoveries,
+            evaluationTypes: depEvaluations,
+            ruleName: depRule.name,
+          })
+          dependencyHistory = [...dependencyHistory, ...depHist]
+        }
       }
+
+      const fullHistory = [...reportCardHistory, ...dependencyHistory].sort(
+        (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime(),
+      )
+
+      setResult({
+        name: student.name,
+        registration: student.registration,
+        school: school?.name || '',
+        schoolLogo: school?.logo,
+        grade: regularEnrollment.grade,
+        year: regularEnrollment.year,
+        ruleName: regularRule.name,
+        grades: reportCardGrades,
+        recoveries: reportCardRecoveries,
+        evaluationTypes: reportCardEvaluations,
+        periodNames: periods.map((p) => p.name),
+        dependencies: dependenciesData,
+        history: fullHistory,
+        generatedAt: format(new Date(), 'dd/MM/yyyy HH:mm:ss'),
+      })
+      return
     }
 
-    // Merge History
-    const fullHistory = [...reportCardHistory, ...dependencyHistory].sort(
-      (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime(),
-    )
+    // Check for Dependency in Selected Series (for better error message)
+    const dependencyEnrollment = student.enrollments.find((e) => {
+      if (e.schoolId !== selectedSchool) return false
+      if (e.year.toString() !== activeYear?.name) return false
+      if (e.type !== 'dependency') return false
 
-    setResult({
-      name: student.name,
-      registration: student.registration,
-      school: school?.name || '',
-      schoolLogo: school?.logo,
-      grade: validEnrollment.grade,
-      year: validEnrollment.year,
-      ruleName: regularRule.name,
-      grades: reportCardGrades,
-      recoveries: reportCardRecoveries,
-      evaluationTypes: reportCardEvaluations,
-      periodNames: periods.map((p) => p.name),
-      dependencies: dependenciesData,
-      history: fullHistory,
-      generatedAt: format(new Date(), 'dd/MM/yyyy HH:mm:ss'),
+      const cls = activeYear?.classes.find((c) => c.name === e.grade)
+      return cls && cls.gradeName === selectedGradeName
     })
+
+    if (dependencyEnrollment) {
+      const actualRegular = student.enrollments.find(
+        (e) =>
+          e.schoolId === selectedSchool &&
+          e.year.toString() === activeYear?.name &&
+          e.type === 'regular',
+      )
+
+      let suggestion = ''
+      if (actualRegular) {
+        const cls = activeYear?.classes.find(
+          (c) => c.name === actualRegular.grade,
+        )
+        const regName = cls?.gradeName || actualRegular.grade
+        suggestion = ` Por favor, verifique a série de matrícula regular do aluno (${regName}).`
+      } else {
+        suggestion =
+          ' Por favor, verifique a série de matrícula regular do aluno.'
+      }
+
+      setError(
+        `O aluno possui matrícula em regime de dependência nesta série, mas não uma matrícula regular.${suggestion}`,
+      )
+      setErrorType('warning')
+      return
+    }
+
+    // Generic Error
+    setError(
+      'Nenhuma matrícula ativa encontrada para o aluno nesta escola, ano letivo e série.',
+    )
   }
 
   return (
@@ -468,10 +534,16 @@ export default function ReportCard() {
                   <Select
                     onValueChange={setSelectedGradeName}
                     value={selectedGradeName}
-                    disabled={!selectedYear}
+                    disabled={!selectedYear || availableGrades.length === 0}
                   >
                     <SelectTrigger>
-                      <SelectValue placeholder="Selecione a série" />
+                      <SelectValue
+                        placeholder={
+                          availableGrades.length === 0 && selectedYear
+                            ? 'Nenhuma série disponível'
+                            : 'Selecione a série'
+                        }
+                      />
                     </SelectTrigger>
                     <SelectContent>
                       {availableGrades.map((grade) => (
@@ -481,6 +553,12 @@ export default function ReportCard() {
                       ))}
                     </SelectContent>
                   </Select>
+                  {selectedYear && availableGrades.length === 0 && (
+                    <p className="text-xs text-muted-foreground text-amber-600">
+                      Nenhuma série com matrículas regulares encontrada para
+                      este ano letivo.
+                    </p>
+                  )}
                 </div>
 
                 <div className="space-y-2">
@@ -494,10 +572,24 @@ export default function ReportCard() {
               </div>
 
               {error && (
-                <div className="bg-destructive/10 p-3 rounded-md flex items-center gap-2 text-destructive text-sm">
-                  <AlertTriangle className="h-4 w-4" />
-                  {error}
-                </div>
+                <Alert
+                  variant={errorType === 'error' ? 'destructive' : 'default'}
+                  className={
+                    errorType === 'warning'
+                      ? 'border-amber-500 text-amber-600 bg-amber-50'
+                      : ''
+                  }
+                >
+                  {errorType === 'error' ? (
+                    <AlertTriangle className="h-4 w-4" />
+                  ) : (
+                    <AlertCircle className="h-4 w-4" />
+                  )}
+                  <AlertTitle>
+                    {errorType === 'error' ? 'Erro' : 'Atenção'}
+                  </AlertTitle>
+                  <AlertDescription>{error}</AlertDescription>
+                </Alert>
               )}
 
               <div className="flex justify-end">
