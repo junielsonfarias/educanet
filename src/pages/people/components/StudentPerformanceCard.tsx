@@ -30,17 +30,31 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import { GraduationCap, Calculator, Info, FileText } from 'lucide-react'
+import {
+  GraduationCap,
+  Calculator,
+  Info,
+  FileText,
+  ArrowRight,
+  TrendingUp,
+} from 'lucide-react'
 import { Student, EvaluationRule } from '@/lib/mock-data'
 import useAssessmentStore from '@/stores/useAssessmentStore'
 import useSchoolStore from '@/stores/useSchoolStore'
 import useCourseStore from '@/stores/useCourseStore'
+import useSettingsStore from '@/stores/useSettingsStore'
 import {
   calculateGrades,
   SubjectCalculationResult,
 } from '@/lib/grade-calculator'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Separator } from '@/components/ui/separator'
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip'
 
 interface StudentPerformanceCardProps {
   student: Student
@@ -52,6 +66,7 @@ export function StudentPerformanceCard({
   const { assessments, assessmentTypes } = useAssessmentStore()
   const { schools } = useSchoolStore()
   const { courses, evaluationRules } = useCourseStore()
+  const { settings } = useSettingsStore()
   const [selectedYear, setSelectedYear] = useState<string>('')
   const [detailsDialog, setDetailsDialog] =
     useState<SubjectCalculationResult | null>(null)
@@ -134,6 +149,7 @@ export function StudentPerformanceCard({
         courseEvaluationRule!,
         periods,
         assessmentTypes,
+        settings.defaultRecoveryStrategy, // Pass global setting
       )
 
       return {
@@ -254,6 +270,14 @@ export function StudentPerformanceCard({
               <span className="font-semibold text-primary">
                 {detailsDialog?.ruleName}
               </span>
+              <span className="block mt-1 text-xs">
+                Estratégia de Recuperação:{' '}
+                {detailsDialog?.recoveryStrategyApplied === 'replace_if_higher'
+                  ? 'Substituir se Maior'
+                  : detailsDialog?.recoveryStrategyApplied === 'always_replace'
+                    ? 'Sempre Substituir'
+                    : 'Média'}
+              </span>
             </DialogDescription>
           </DialogHeader>
 
@@ -274,7 +298,7 @@ export function StudentPerformanceCard({
                           variant="outline"
                           className="text-orange-600 border-orange-200 bg-orange-50"
                         >
-                          Recuperação Aplicada
+                          Recuperação Periódica Aplicada
                         </Badge>
                       )}
                       <span className="font-bold text-lg">
@@ -290,7 +314,7 @@ export function StudentPerformanceCard({
                       <p className="text-xs font-semibold text-muted-foreground uppercase">
                         Avaliações
                       </p>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      <div className="grid grid-cols-1 gap-2">
                         {period.assessments.map((assessment) => {
                           const type = assessmentTypes.find(
                             (t) => t.id === assessment.assessmentTypeId,
@@ -298,12 +322,12 @@ export function StudentPerformanceCard({
                           return (
                             <div
                               key={assessment.id}
-                              className="flex justify-between items-center bg-secondary/20 p-2 rounded text-sm"
+                              className="flex justify-between items-center bg-secondary/20 p-2 rounded text-sm group relative"
                             >
                               <div className="flex items-center gap-2">
                                 <FileText className="h-3 w-3 text-primary" />
                                 <span
-                                  className="truncate max-w-[120px]"
+                                  className="truncate max-w-[150px] font-medium"
                                   title={type?.name || 'Avaliação'}
                                 >
                                   {type?.name || 'Avaliação'}
@@ -313,13 +337,55 @@ export function StudentPerformanceCard({
                                     variant="outline"
                                     className="text-[10px] h-4 px-1"
                                   >
-                                    Rec
+                                    Recuperação Avulsa
                                   </Badge>
                                 )}
                               </div>
-                              <span className="font-semibold">
-                                {Number(assessment.value).toFixed(1)}
-                              </span>
+
+                              <div className="flex items-center gap-3">
+                                {assessment.isRecovered && (
+                                  <div className="flex items-center gap-2 text-xs">
+                                    <span className="line-through text-muted-foreground">
+                                      {Number(assessment.originalValue).toFixed(
+                                        1,
+                                      )}
+                                    </span>
+                                    <ArrowRight className="h-3 w-3 text-muted-foreground" />
+                                    <TooltipProvider>
+                                      <Tooltip>
+                                        <TooltipTrigger asChild>
+                                          <span className="flex items-center gap-1 font-bold text-green-600 cursor-help border-b border-dashed border-green-300">
+                                            {Number(assessment.value).toFixed(
+                                              1,
+                                            )}
+                                            <TrendingUp className="h-3 w-3" />
+                                          </span>
+                                        </TooltipTrigger>
+                                        <TooltipContent>
+                                          <p className="font-semibold">
+                                            Recuperado!
+                                          </p>
+                                          <p>
+                                            Nota Recuperação:{' '}
+                                            {assessment.recoveryValue}
+                                          </p>
+                                          {assessment.recoveryDate && (
+                                            <p className="text-xs opacity-75">
+                                              Data: {assessment.recoveryDate}
+                                            </p>
+                                          )}
+                                        </TooltipContent>
+                                      </Tooltip>
+                                    </TooltipProvider>
+                                  </div>
+                                )}
+
+                                {!assessment.isRecovered && (
+                                  <span className="font-semibold">
+                                    {Number(assessment.value).toFixed(1)}
+                                  </span>
+                                )}
+                              </div>
                             </div>
                           )
                         })}
@@ -349,7 +415,7 @@ export function StudentPerformanceCard({
                     {period.recoveryGrade !== null && (
                       <div>
                         <span className="text-muted-foreground">
-                          Nota Recuperação:
+                          Nota Recuperação Final:
                         </span>{' '}
                         {period.recoveryGrade}
                       </div>

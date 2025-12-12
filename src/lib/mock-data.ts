@@ -146,11 +146,13 @@ export interface GeneralSettings {
   educationSecretaryName: string
   municipalityLogo?: string
   secretaryLogo?: string
+  defaultRecoveryStrategy?: 'replace_if_higher' | 'always_replace' | 'average'
 }
 
 export const initialSettings: GeneralSettings = {
   municipalityName: 'Prefeitura Municipal',
   educationSecretaryName: 'Secretaria Municipal de Educação',
+  defaultRecoveryStrategy: 'replace_if_higher',
 }
 
 export const mockEvaluationRules: EvaluationRule[] = [

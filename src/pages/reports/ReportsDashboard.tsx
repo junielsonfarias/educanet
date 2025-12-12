@@ -6,12 +6,19 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card'
-import { FileText, Users, School, GraduationCap } from 'lucide-react'
+import { FileText, Users, School, GraduationCap, BarChart } from 'lucide-react'
 
 export default function ReportsDashboard() {
   const navigate = useNavigate()
 
   const reports = [
+    {
+      title: 'Relatório Individual de Performance',
+      description:
+        'Análise detalhada de notas, recuperações e progresso por aluno.',
+      icon: BarChart,
+      path: '/relatorios/individual',
+    },
     {
       title: 'Relatório de Matrículas',
       description:
@@ -20,8 +27,8 @@ export default function ReportsDashboard() {
       path: '/relatorios/matriculas',
     },
     {
-      title: 'Desempenho Escolar',
-      description: 'Análise de notas e desempenho por série e disciplina.',
+      title: 'Desempenho Escolar (Turma)',
+      description: 'Análise de notas e desempenho consolidado por turma.',
       icon: GraduationCap,
       path: '/relatorios/desempenho',
     },

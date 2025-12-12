@@ -1,5 +1,12 @@
 import { Assessment, EvaluationRule, Period, AssessmentType } from './mock-data'
 
+export interface CalculatedAssessment extends Assessment {
+  originalValue?: number
+  isRecovered?: boolean
+  recoveryValue?: number
+  recoveryDate?: string
+}
+
 export interface PeriodCalculationResult {
   periodId: string
   periodName: string
@@ -8,7 +15,7 @@ export interface PeriodCalculationResult {
   finalPeriodGrade: number
   isRecoveryUsed: boolean
   logs: string[]
-  assessments: Assessment[] // Detailed breakdown of assessments for this period
+  assessments: CalculatedAssessment[] // Detailed breakdown of assessments for this period
 }
 
 export interface SubjectCalculationResult {
@@ -19,6 +26,7 @@ export interface SubjectCalculationResult {
   ruleName: string
   formulaUsed: string
   rawFinalGrade: number
+  recoveryStrategyApplied: string
 }
 
 /**
@@ -30,8 +38,13 @@ export function calculateGrades(
   rule: EvaluationRule,
   periods: Period[],
   assessmentTypes: AssessmentType[],
+  defaultStrategy:
+    | 'replace_if_higher'
+    | 'always_replace'
+    | 'average' = 'replace_if_higher',
 ): SubjectCalculationResult {
   const periodResults: PeriodCalculationResult[] = []
+  const activeStrategy = rule.recoveryStrategy || defaultStrategy
 
   // 1. Calculate Grade per Period
   for (const period of periods) {
@@ -51,48 +64,57 @@ export function calculateGrades(
     )
 
     // Process Individual Linked Recoveries
-    const effectiveAssessments = regularAssessments.map((reg) => {
-      const linkedRecovery = recoveryAssessments.find(
-        (rec) => rec.relatedAssessmentId === reg.id,
-      )
-      let effectiveValue = Number(reg.value)
-      const originalValue = Number(reg.value)
-      let isRecovered = false
+    const effectiveAssessments: CalculatedAssessment[] = regularAssessments.map(
+      (reg) => {
+        const linkedRecovery = recoveryAssessments.find(
+          (rec) => rec.relatedAssessmentId === reg.id,
+        )
+        let effectiveValue = Number(reg.value)
+        const originalValue = Number(reg.value)
+        let isRecovered = false
+        let recoveryValue: number | undefined
+        let recoveryDate: string | undefined
 
-      if (linkedRecovery) {
-        const recVal = Number(linkedRecovery.value)
-        isRecovered = true
-        if (rule.recoveryStrategy === 'always_replace') {
-          effectiveValue = recVal
-          periodLog.push(
-            `Recuperação Individual: Avaliação (${originalValue}) substituída por (${recVal}) [Sempre Substituir].`,
-          )
-        } else if (rule.recoveryStrategy === 'average') {
-          effectiveValue = (originalValue + recVal) / 2
-          periodLog.push(
-            `Recuperação Individual: Média entre (${originalValue}) e (${recVal}) = ${effectiveValue.toFixed(2)}.`,
-          )
-        } else {
-          // Default: replace_if_higher
-          if (recVal > originalValue) {
+        if (linkedRecovery) {
+          const recVal = Number(linkedRecovery.value)
+          recoveryValue = recVal
+          recoveryDate = linkedRecovery.date
+          isRecovered = true
+
+          if (activeStrategy === 'always_replace') {
             effectiveValue = recVal
             periodLog.push(
-              `Recuperação Individual: Avaliação (${originalValue}) substituída por (${recVal}) [Maior Nota].`,
+              `Recuperação Individual: Avaliação (${originalValue}) substituída por (${recVal}) [Sempre Substituir].`,
+            )
+          } else if (activeStrategy === 'average') {
+            effectiveValue = (originalValue + recVal) / 2
+            periodLog.push(
+              `Recuperação Individual: Média entre (${originalValue}) e (${recVal}) = ${effectiveValue.toFixed(2)}.`,
             )
           } else {
-            periodLog.push(
-              `Recuperação Individual: Recuperação (${recVal}) não superou original (${originalValue}). Mantida original.`,
-            )
+            // Default: replace_if_higher
+            if (recVal > originalValue) {
+              effectiveValue = recVal
+              periodLog.push(
+                `Recuperação Individual: Avaliação (${originalValue}) substituída por (${recVal}) [Maior Nota].`,
+              )
+            } else {
+              periodLog.push(
+                `Recuperação Individual: Recuperação (${recVal}) não superou original (${originalValue}). Mantida original.`,
+              )
+            }
           }
         }
-      }
-      return {
-        ...reg,
-        value: effectiveValue, // Override value for calculation
-        originalValue,
-        isRecovered,
-      }
-    })
+        return {
+          ...reg,
+          value: effectiveValue, // Override value for calculation
+          originalValue,
+          isRecovered,
+          recoveryValue,
+          recoveryDate,
+        }
+      },
+    )
 
     let regularAverage = 0
 
@@ -186,13 +208,13 @@ export function calculateGrades(
       )
       recoveryGrade = maxRecovery
 
-      if (rule.recoveryStrategy === 'always_replace') {
+      if (activeStrategy === 'always_replace') {
         finalPeriodGrade = maxRecovery
         isRecoveryUsed = true
         periodLog.push(
           `Recuperação Periódica (Sempre Substituir): Nota de recuperação (${maxRecovery}) substitui a média (${regularAverage.toFixed(2)}).`,
         )
-      } else if (rule.recoveryStrategy === 'average') {
+      } else if (activeStrategy === 'average') {
         finalPeriodGrade = (regularAverage + maxRecovery) / 2
         isRecoveryUsed = true
         periodLog.push(
@@ -303,5 +325,6 @@ export function calculateGrades(
     periodResults,
     ruleName: rule.name,
     formulaUsed,
+    recoveryStrategyApplied: activeStrategy,
   }
 }

@@ -18,6 +18,7 @@ import SchoolCalendar from './pages/calendar/SchoolCalendar'
 import ReportsDashboard from './pages/reports/ReportsDashboard'
 import EnrollmentReport from './pages/reports/EnrollmentReport'
 import PerformanceReport from './pages/reports/PerformanceReport'
+import IndividualPerformanceReport from './pages/reports/IndividualPerformanceReport'
 import TeacherAllocationReport from './pages/reports/TeacherAllocationReport'
 import ReportCard from './pages/public/ReportCard'
 import EvaluationRulesList from './pages/academic/EvaluationRulesList'
@@ -125,6 +126,10 @@ const App = () => (
                           <Route
                             path="/relatorios"
                             element={<ReportsDashboard />}
+                          />
+                          <Route
+                            path="/relatorios/individual"
+                            element={<IndividualPerformanceReport />}
                           />
                           <Route
                             path="/relatorios/matriculas"
