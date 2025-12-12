@@ -19,6 +19,7 @@ export default function PublicLayout() {
 
   const navItems = [
     { label: 'Início', path: '/' },
+    { label: 'Notícias', path: '/publico/noticias' },
     { label: 'Escolas', path: '/publico/escolas' },
     { label: 'Estrutura', path: '/publico/estrutura' },
     { label: 'Documentos', path: '/publico/documentos' },
@@ -26,27 +27,27 @@ export default function PublicLayout() {
 
   return (
     <div className="flex min-h-screen flex-col bg-background">
-      {/* Header */}
+      {/* Header - Increased height */}
       <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-        <div className="container flex h-16 items-center justify-between px-4 md:px-8">
-          <div className="flex items-center gap-2">
-            <Link to="/" className="flex items-center gap-2">
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
+        <div className="container flex h-24 items-center justify-between px-4 md:px-8">
+          <div className="flex items-center gap-4">
+            <Link to="/" className="flex items-center gap-3">
+              <div className="flex h-16 w-16 items-center justify-center rounded-xl bg-primary/5 p-1">
                 {settings.municipalityLogo ? (
                   <img
                     src={settings.municipalityLogo}
                     alt="Logo"
-                    className="h-8 w-8 object-contain"
+                    className="h-full w-full object-contain"
                   />
                 ) : (
-                  <School className="h-6 w-6 text-primary" />
+                  <School className="h-10 w-10 text-primary" />
                 )}
               </div>
               <div className="hidden flex-col md:flex">
-                <span className="text-sm font-bold leading-tight text-primary">
+                <span className="text-base font-bold leading-tight text-primary uppercase tracking-wide">
                   {settings.educationSecretaryName}
                 </span>
-                <span className="text-xs text-muted-foreground">
+                <span className="text-sm text-muted-foreground">
                   {settings.municipalityName}
                 </span>
               </div>
@@ -54,13 +55,15 @@ export default function PublicLayout() {
           </div>
 
           {/* Desktop Nav */}
-          <nav className="hidden md:flex items-center gap-6">
+          <nav className="hidden md:flex items-center gap-8">
             {navItems.map((item) => (
               <Link
                 key={item.path}
                 to={item.path}
                 className={`text-sm font-medium transition-colors hover:text-primary ${
-                  isActive(item.path) ? 'text-primary' : 'text-muted-foreground'
+                  isActive(item.path)
+                    ? 'text-primary font-bold'
+                    : 'text-muted-foreground'
                 }`}
               >
                 {item.label}
@@ -194,6 +197,11 @@ export default function PublicLayout() {
                   </Link>
                 </li>
                 <li>
+                  <Link to="/publico/noticias" className="hover:underline">
+                    Notícias
+                  </Link>
+                </li>
+                <li>
                   <Link to="/publico/escolas" className="hover:underline">
                     Nossas Escolas
                   </Link>
@@ -220,8 +228,8 @@ export default function PublicLayout() {
             </div>
           </div>
           <div className="mt-8 border-t pt-8 text-center text-xs text-muted-foreground">
-            © {new Date().getFullYear()} {settings.municipalityName}. Todos os
-            direitos reservados.
+            {settings.footerText ||
+              `© ${new Date().getFullYear()} ${settings.municipalityName}. Todos os direitos reservados.`}
           </div>
         </div>
       </footer>

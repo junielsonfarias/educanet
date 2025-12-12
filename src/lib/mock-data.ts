@@ -159,6 +159,8 @@ export interface GeneralSettings {
   municipalityLogo?: string
   secretaryLogo?: string
   defaultRecoveryStrategy?: 'replace_if_higher' | 'always_replace' | 'average'
+  facebookHandle?: string
+  footerText?: string
 }
 
 // --- New Interfaces for Institutional Website ---
@@ -199,6 +201,9 @@ export const initialSettings: GeneralSettings = {
   municipalityName: 'Prefeitura Municipal',
   educationSecretaryName: 'Secretaria Municipal de Educação',
   defaultRecoveryStrategy: 'replace_if_higher',
+  facebookHandle: '@semed_oficial',
+  footerText:
+    '© 2025 Prefeitura Municipal de São Sebastião da Boa Vista. Todos os direitos reservados.',
 }
 
 export const mockEvaluationRules: EvaluationRule[] = [

@@ -5,6 +5,8 @@ import {
   Building,
   FileText,
   Settings as SettingsIcon,
+  Facebook,
+  Type,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -27,6 +29,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import useSettingsStore from '@/stores/useSettingsStore'
 import { useToast } from '@/hooks/use-toast'
 import { fileToBase64 } from '@/lib/file-utils'
+import { Textarea } from '@/components/ui/textarea'
 
 export default function GeneralSettings() {
   const { settings, updateSettings } = useSettingsStore()
@@ -36,7 +39,9 @@ export default function GeneralSettings() {
   const municipalityLogoInputRef = useRef<HTMLInputElement>(null)
   const secretaryLogoInputRef = useRef<HTMLInputElement>(null)
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
+  ) => {
     setFormData((prev) => ({ ...prev, [e.target.id]: e.target.value }))
   }
 
@@ -136,10 +141,10 @@ export default function GeneralSettings() {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <FileText className="h-5 w-5 text-primary" />
-                  Identidade Visual
+                  Identidade Visual e Rodapé
                 </CardTitle>
                 <CardDescription>
-                  Logotipos para cabeçalhos de documentos e relatórios.
+                  Logotipos e textos de rodapé do site e relatórios.
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
@@ -184,7 +189,7 @@ export default function GeneralSettings() {
                             ou arraste
                           </div>
                           <p className="text-xs text-muted-foreground">
-                            PNG, JPG (Max. 2MB)
+                            PNG, JPG (Max. 5MB)
                           </p>
                         </div>
                       )}
@@ -240,7 +245,7 @@ export default function GeneralSettings() {
                             ou arraste
                           </div>
                           <p className="text-xs text-muted-foreground">
-                            PNG, JPG (Max. 2MB)
+                            PNG, JPG (Max. 5MB)
                           </p>
                         </div>
                       )}
@@ -252,6 +257,59 @@ export default function GeneralSettings() {
                         onChange={(e) => handleFileChange(e, 'secretaryLogo')}
                       />
                     </div>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label
+                    htmlFor="footerText"
+                    className="flex items-center gap-2"
+                  >
+                    <Type className="h-4 w-4" /> Texto do Rodapé
+                  </Label>
+                  <Textarea
+                    id="footerText"
+                    value={formData.footerText}
+                    onChange={handleChange}
+                    placeholder="© 2025 Prefeitura Municipal... Todos os direitos reservados."
+                    className="min-h-[80px]"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Este texto será exibido no rodapé de todas as páginas do
+                    site público.
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Facebook className="h-5 w-5 text-primary" />
+                  Redes Sociais
+                </CardTitle>
+                <CardDescription>
+                  Configuração de integração com redes sociais.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="grid gap-6 md:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label htmlFor="facebookHandle">Facebook Page Handle</Label>
+                    <div className="relative">
+                      <Facebook className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                      <Input
+                        id="facebookHandle"
+                        value={formData.facebookHandle}
+                        onChange={handleChange}
+                        placeholder="@semed_oficial"
+                        className="pl-9"
+                      />
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      O identificador da página do Facebook (ex: @semedssbvpa)
+                      para exibir o feed.
+                    </p>
                   </div>
                 </div>
               </CardContent>

@@ -1,7 +1,6 @@
 import {
   FileText,
   Newspaper,
-  Users,
   Building,
   ArrowRight,
   GraduationCap,
@@ -25,7 +24,6 @@ export default function InstitutionalHome() {
   const { settings } = useSettingsStore()
 
   const semedInfo = getContent('semed_info')
-  const semedStructure = getContent('semed_structure')
 
   const activeNews = news
     .filter((n) => n.active)
@@ -87,7 +85,7 @@ export default function InstitutionalHome() {
       {/* Services Grid */}
       <section className="container mx-auto px-4">
         <div className="flex items-center gap-2 mb-6">
-          <Users className="h-6 w-6 text-primary" />
+          <School className="h-6 w-6 text-primary" />
           <h2 className="text-2xl font-bold">Serviços</h2>
         </div>
         <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
@@ -156,61 +154,142 @@ export default function InstitutionalHome() {
 
       {/* Main Content Grid */}
       <div className="grid gap-12 lg:grid-cols-5 container mx-auto px-4">
-        {/* News Section - Takes 3 columns (60%) */}
-        <div className="lg:col-span-3 space-y-6">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Newspaper className="h-6 w-6 text-primary" />
-              <h2 className="text-2xl font-bold">Últimas Notícias</h2>
+        {/* Main Content Area (News + Documents) - Takes 3 columns (60%) */}
+        <div className="lg:col-span-3 space-y-12">
+          {/* News Section */}
+          <div className="space-y-6">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Newspaper className="h-6 w-6 text-primary" />
+                <h2 className="text-2xl font-bold">Últimas Notícias</h2>
+              </div>
+              <Link to="/publico/noticias">
+                <Button
+                  variant="ghost"
+                  className="text-primary hover:underline"
+                >
+                  Ver todas
+                </Button>
+              </Link>
+            </div>
+
+            <div className="grid gap-6">
+              {activeNews.length > 0 ? (
+                activeNews.map((post) => (
+                  <Card
+                    key={post.id}
+                    className="overflow-hidden hover:shadow-md transition-shadow"
+                  >
+                    <div className="flex flex-col md:flex-row">
+                      <div className="md:w-1/3 h-48 md:h-auto bg-muted">
+                        <img
+                          src={
+                            post.imageUrl ||
+                            'https://img.usecurling.com/p/400/300?q=education'
+                          }
+                          alt={post.title}
+                          className="w-full h-full object-cover"
+                        />
+                      </div>
+                      <div className="p-6 flex-1 flex flex-col justify-between">
+                        <div>
+                          <div className="text-xs text-muted-foreground mb-2 flex items-center gap-2">
+                            <Calendar className="h-3 w-3" />
+                            {format(parseISO(post.publishDate), 'dd/MM/yyyy')}
+                          </div>
+                          <h3 className="text-xl font-bold mb-2 hover:text-primary transition-colors">
+                            {post.title}
+                          </h3>
+                          <p className="text-muted-foreground line-clamp-2 mb-4">
+                            {post.summary}
+                          </p>
+                        </div>
+                        <Button
+                          variant="link"
+                          className="p-0 h-auto w-fit text-primary"
+                        >
+                          Ler mais <ArrowRight className="ml-1 h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  </Card>
+                ))
+              ) : (
+                <p className="text-muted-foreground italic">
+                  Nenhuma notícia publicada.
+                </p>
+              )}
             </div>
           </div>
 
-          <div className="grid gap-6">
-            {activeNews.length > 0 ? (
-              activeNews.map((post) => (
-                <Card
-                  key={post.id}
-                  className="overflow-hidden hover:shadow-md transition-shadow"
+          {/* Documents Section (Moved here) */}
+          <div className="space-y-6">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <FileText className="h-6 w-6 text-primary" />
+                <h2 className="text-2xl font-bold">Documentos Recentes</h2>
+              </div>
+              <Link to="/publico/documentos">
+                <Button
+                  variant="ghost"
+                  className="text-primary hover:underline"
                 >
-                  <div className="flex flex-col md:flex-row">
-                    <div className="md:w-1/3 h-48 md:h-auto bg-muted">
-                      <img
-                        src={
-                          post.imageUrl ||
-                          'https://img.usecurling.com/p/400/300?q=education'
-                        }
-                        alt={post.title}
-                        className="w-full h-full object-cover"
-                      />
-                    </div>
-                    <div className="p-6 flex-1 flex flex-col justify-between">
-                      <div>
-                        <div className="text-xs text-muted-foreground mb-2 flex items-center gap-2">
-                          <Calendar className="h-3 w-3" />
-                          {format(parseISO(post.publishDate), 'dd/MM/yyyy')}
-                        </div>
-                        <h3 className="text-xl font-bold mb-2 hover:text-primary transition-colors">
-                          {post.title}
-                        </h3>
-                        <p className="text-muted-foreground line-clamp-2 mb-4">
-                          {post.summary}
-                        </p>
-                      </div>
-                      <Button
-                        variant="link"
-                        className="p-0 h-auto w-fit text-primary"
+                  Ver todos
+                </Button>
+              </Link>
+            </div>
+
+            <Card>
+              <CardContent className="p-0">
+                {activeDocuments.length > 0 ? (
+                  <ul className="divide-y">
+                    {activeDocuments.map((doc) => (
+                      <li
+                        key={doc.id}
+                        className="group p-4 hover:bg-muted/30 transition-colors"
                       >
-                        Ler mais <ArrowRight className="ml-1 h-4 w-4" />
-                      </Button>
-                    </div>
+                        <a
+                          href={doc.driveLink}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="block"
+                        >
+                          <div className="flex items-start gap-4">
+                            <div className="mt-1 min-w-[4px] h-full self-stretch rounded-full bg-primary/20 group-hover:bg-primary transition-colors" />
+                            <div className="flex-1">
+                              <div className="flex justify-between items-start mb-1">
+                                <p className="text-sm font-bold group-hover:text-primary transition-colors">
+                                  {doc.documentNumber}
+                                </p>
+                                <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded">
+                                  {format(
+                                    parseISO(doc.publishDate),
+                                    'dd/MM/yyyy',
+                                  )}
+                                </span>
+                              </div>
+                              <p className="text-sm text-muted-foreground line-clamp-2">
+                                {doc.summary}
+                              </p>
+                              <Badge
+                                variant="outline"
+                                className="mt-2 text-[10px] font-normal"
+                              >
+                                {doc.organ}
+                              </Badge>
+                            </div>
+                          </div>
+                        </a>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <div className="p-8 text-center text-muted-foreground italic">
+                    Nenhum documento recente.
                   </div>
-                </Card>
-              ))
-            ) : (
-              <p className="text-muted-foreground italic">
-                Nenhuma notícia publicada.
-              </p>
-            )}
+                )}
+              </CardContent>
+            </Card>
           </div>
         </div>
 
@@ -240,124 +319,74 @@ export default function InstitutionalHome() {
             </CardContent>
           </Card>
 
-          <Card className="overflow-hidden">
-            <CardHeader className="bg-gradient-to-r from-blue-600 to-purple-600 text-white">
+          {/* Enhanced Facebook Feed */}
+          <Card className="overflow-hidden border-2 border-blue-100 shadow-md">
+            <CardHeader className="bg-[#1877F2] text-white">
               <CardTitle className="flex items-center gap-2">
-                <Facebook className="h-5 w-5" />
-                Redes Sociais
+                <Facebook className="h-6 w-6" />
+                Fique Conectado
               </CardTitle>
             </CardHeader>
             <CardContent className="p-0">
-              <div className="p-4 bg-muted/10">
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="h-12 w-12 rounded-full bg-primary/20 overflow-hidden">
+              <div className="bg-gradient-to-b from-[#1877F2]/10 to-background p-6">
+                <div className="flex items-center gap-4 mb-6 bg-white p-4 rounded-xl shadow-sm">
+                  <div className="h-16 w-16 rounded-full border-4 border-[#1877F2]/20 overflow-hidden shrink-0">
                     <img
-                      src="https://img.usecurling.com/i?q=school&shape=outline"
+                      src={`https://img.usecurling.com/i?q=school&shape=outline&color=blue`}
                       className="w-full h-full object-cover"
                       alt="Logo"
                     />
                   </div>
-                  <div>
-                    <p className="font-bold">
+                  <div className="flex-1 min-w-0">
+                    <p className="font-bold text-lg truncate">
                       {settings.educationSecretaryName}
                     </p>
-                    <p className="text-xs text-muted-foreground">
-                      @semed_oficial
+                    <p className="text-sm text-muted-foreground font-medium flex items-center gap-1">
+                      <Facebook className="h-3 w-3" />
+                      {settings.facebookHandle || '@semed_oficial'}
                     </p>
                   </div>
                   <Button
                     size="sm"
-                    variant="default"
-                    className="ml-auto bg-blue-600 hover:bg-blue-700"
+                    className="bg-[#1877F2] hover:bg-[#166fe5] text-white shrink-0"
                   >
                     Seguir
                   </Button>
                 </div>
 
-                <div className="grid grid-cols-2 gap-2 mb-4">
-                  <img
-                    src="https://img.usecurling.com/p/300/300?q=school%20event"
-                    className="rounded-md w-full h-24 object-cover hover:opacity-90 cursor-pointer"
-                    alt="Post 1"
-                  />
-                  <img
-                    src="https://img.usecurling.com/p/300/300?q=students%20learning"
-                    className="rounded-md w-full h-24 object-cover hover:opacity-90 cursor-pointer"
-                    alt="Post 2"
-                  />
-                  <img
-                    src="https://img.usecurling.com/p/300/300?q=teacher"
-                    className="rounded-md w-full h-24 object-cover hover:opacity-90 cursor-pointer"
-                    alt="Post 3"
-                  />
-                  <img
-                    src="https://img.usecurling.com/p/300/300?q=classroom"
-                    className="rounded-md w-full h-24 object-cover hover:opacity-90 cursor-pointer"
-                    alt="Post 4"
-                  />
+                <div className="grid grid-cols-2 gap-3 mb-6">
+                  {[1, 2, 3, 4].map((i) => (
+                    <div
+                      key={i}
+                      className="aspect-square rounded-lg overflow-hidden relative group cursor-pointer"
+                    >
+                      <img
+                        src={`https://img.usecurling.com/p/400/400?q=school%20activity%20${i}`}
+                        className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
+                        alt={`Post ${i}`}
+                      />
+                      <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                        <Facebook className="text-white h-8 w-8 drop-shadow-lg" />
+                      </div>
+                    </div>
+                  ))}
                 </div>
 
                 <div className="flex justify-center gap-4">
-                  <Button variant="outline" size="sm" className="w-full gap-2">
-                    <Facebook className="h-4 w-4 text-blue-600" /> Facebook
+                  <Button
+                    variant="outline"
+                    className="w-full gap-2 border-[#1877F2] text-[#1877F2] hover:bg-[#1877F2] hover:text-white"
+                  >
+                    <Facebook className="h-4 w-4" /> Ver Página no Facebook
                   </Button>
-                  <Button variant="outline" size="sm" className="w-full gap-2">
-                    <Instagram className="h-4 w-4 text-pink-600" /> Instagram
+                  <Button
+                    variant="outline"
+                    className="w-full gap-2 border-pink-500 text-pink-600 hover:bg-pink-500 hover:text-white"
+                  >
+                    <Instagram className="h-4 w-4" /> Instagram
                   </Button>
                 </div>
               </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <FileText className="h-5 w-5 text-primary" />
-                Documentos Recentes
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              {activeDocuments.length > 0 ? (
-                <ul className="space-y-4">
-                  {activeDocuments.map((doc) => (
-                    <li key={doc.id} className="group">
-                      <a
-                        href={doc.driveLink}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="block"
-                      >
-                        <div className="flex items-start gap-3">
-                          <div className="mt-1 min-w-[4px] h-4 rounded-full bg-primary/20 group-hover:bg-primary transition-colors" />
-                          <div>
-                            <p className="text-sm font-medium group-hover:text-primary transition-colors">
-                              {doc.documentNumber}
-                            </p>
-                            <p className="text-xs text-muted-foreground line-clamp-2">
-                              {doc.summary}
-                            </p>
-                            <span className="text-[10px] text-muted-foreground/60 mt-1 block">
-                              {format(parseISO(doc.publishDate), 'dd/MM/yyyy')}
-                            </span>
-                          </div>
-                        </div>
-                      </a>
-                    </li>
-                  ))}
-                  <li>
-                    <Link
-                      to="/publico/documentos"
-                      className="text-xs text-primary hover:underline flex items-center justify-center mt-4"
-                    >
-                      Ver todos os documentos
-                    </Link>
-                  </li>
-                </ul>
-              ) : (
-                <p className="text-sm text-muted-foreground italic">
-                  Nenhum documento recente.
-                </p>
-              )}
             </CardContent>
           </Card>
         </div>

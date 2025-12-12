@@ -9,6 +9,7 @@ import StudentPortal from './pages/public/StudentPortal'
 import EmployeePortal from './pages/public/EmployeePortal'
 import PublicCalendar from './pages/public/PublicCalendar'
 import PublicSchools from './pages/public/PublicSchools'
+import PublicNews from './pages/public/PublicNews'
 import Structure from './pages/public/Structure'
 import Dashboard from './pages/Dashboard'
 import SchoolsList from './pages/schools/SchoolsList'
@@ -74,6 +75,10 @@ const App = () => (
                             {/* Public Institutional Website Routes */}
                             <Route element={<PublicLayout />}>
                               <Route path="/" element={<InstitutionalHome />} />
+                              <Route
+                                path="/publico/noticias"
+                                element={<PublicNews />}
+                              />
                               <Route
                                 path="/publico/documentos"
                                 element={<PublicDocuments />}
