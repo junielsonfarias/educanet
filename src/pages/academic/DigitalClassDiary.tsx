@@ -9,6 +9,7 @@ import {
   AlertTriangle,
   MessageSquare,
   Clock,
+  History,
 } from 'lucide-react'
 import { format } from 'date-fns'
 import { cn } from '@/lib/utils'
@@ -20,7 +21,6 @@ import {
   FormField,
   FormItem,
   FormLabel,
-  FormMessage,
 } from '@/components/ui/form'
 import {
   Popover,
@@ -95,6 +95,7 @@ export default function DigitalClassDiary() {
   const schoolId = form.watch('schoolId')
   const classId = form.watch('classId')
   const date = form.watch('date')
+  const subjectId = form.watch('subjectId')
 
   // Derived Data
   const selectedSchool = schools.find((s) => s.id === schoolId)
@@ -125,12 +126,55 @@ export default function DigitalClassDiary() {
       .sort((a, b) => a.name.localeCompare(b.name))
   }, [students, selectedClass, selectedSchool])
 
-  // Initialize all students as present by default when class loads
-  useEffect(() => {
-    if (classStudents.length > 0) {
-      setSelectedStudents(classStudents.map((s) => s.id))
+  const classOccurrences = useMemo(() => {
+    if (!classId) return []
+    const all = getClassOccurrences(classId)
+    // Filter by student if selected
+    if (occurrenceStudentId) {
+      return all.filter((o) => o.studentId === occurrenceStudentId)
     }
-  }, [classStudents])
+    return all.sort(
+      (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime(),
+    )
+  }, [classId, occurrenceStudentId, getClassOccurrences])
+
+  // Load attendance data when context changes
+  useEffect(() => {
+    if (!classId || !date) return
+
+    const dateStr = format(date, 'yyyy-MM-dd')
+    const existingRecords = getClassAttendance(
+      classId,
+      subjectId || 'general',
+      dateStr,
+    )
+
+    if (existingRecords && existingRecords.length > 0) {
+      // Load existing state
+      const presentIds = existingRecords
+        .filter((r) => r.present)
+        .map((r) => r.studentId)
+      const justificationMap: Record<string, string> = {}
+      existingRecords.forEach((r) => {
+        if (!r.present && r.justification) {
+          justificationMap[r.studentId] = r.justification
+        }
+      })
+
+      setSelectedStudents(presentIds)
+      setJustifications(justificationMap)
+      toast({
+        title: 'Dados Carregados',
+        description: `Frequência de ${dateStr} carregada.`,
+      })
+    } else {
+      // Default: All present if loaded fresh
+      if (classStudents.length > 0) {
+        setSelectedStudents(classStudents.map((s) => s.id))
+        setJustifications({})
+      }
+    }
+  }, [classId, date, subjectId, getClassAttendance, classStudents])
 
   const togglePresence = (studentId: string) => {
     if (selectedStudents.includes(studentId)) {
@@ -151,6 +195,13 @@ export default function DigitalClassDiary() {
   const handleSaveAttendance = (data: z.infer<typeof formSchema>) => {
     if (!activeYear) return
 
+    const dateStr = format(data.date, 'yyyy-MM-dd')
+
+    // In a real app, we should probably update existing records instead of just adding
+    // but the store `addAttendance` currently just appends.
+    // For this mock implementation, we'll append, but the `useEffect` above reads the matching records.
+    // Ideally the store should handle upsert.
+
     classStudents.forEach((student) => {
       const isPresent = selectedStudents.includes(student.id)
       addAttendance({
@@ -159,7 +210,7 @@ export default function DigitalClassDiary() {
         yearId: activeYear.id,
         classroomId: data.classId,
         subjectId: data.subjectId || 'general',
-        date: data.date.toISOString(),
+        date: dateStr, // Use date string YYYY-MM-DD
         present: isPresent,
         justification: !isPresent ? justifications[student.id] : undefined,
       })
@@ -167,7 +218,7 @@ export default function DigitalClassDiary() {
 
     toast({
       title: 'Frequência Registrada',
-      description: `Presença salva para ${format(data.date, 'dd/MM/yyyy')}`,
+      description: `Presença salva para ${dateStr}`,
     })
   }
 
@@ -198,7 +249,7 @@ export default function DigitalClassDiary() {
       description: 'Registro adicionado ao histórico do aluno.',
     })
     setOccurrenceDesc('')
-    setOccurrenceStudentId('')
+    // Keep student selected to allow multiple entries or viewing history
   }
 
   return (
@@ -424,72 +475,140 @@ export default function DigitalClassDiary() {
           </TabsContent>
 
           <TabsContent value="occurrences">
-            <Card>
-              <CardHeader>
-                <CardTitle>Registro de Ocorrências</CardTitle>
-                <CardDescription>
-                  Comportamento, saúde ou observações pedagógicas.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid gap-4 md:grid-cols-2">
-                  <div className="space-y-2">
-                    <FormLabel>Aluno</FormLabel>
-                    <Select
-                      value={occurrenceStudentId}
-                      onValueChange={setOccurrenceStudentId}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Selecione o aluno" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {classStudents.map((s) => (
-                          <SelectItem key={s.id} value={s.id}>
-                            {s.name}
+            <div className="grid gap-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Nova Ocorrência</CardTitle>
+                  <CardDescription>
+                    Registre comportamento, saúde ou observações pedagógicas.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <div className="space-y-2">
+                      <FormLabel>Aluno</FormLabel>
+                      <Select
+                        value={occurrenceStudentId}
+                        onValueChange={setOccurrenceStudentId}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Selecione o aluno" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {classStudents.map((s) => (
+                            <SelectItem key={s.id} value={s.id}>
+                              {s.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <FormLabel>Tipo de Ocorrência</FormLabel>
+                      <Select
+                        value={occurrenceType}
+                        onValueChange={setOccurrenceType}
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="behavior">
+                            Comportamental
                           </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                          <SelectItem value="pedagogical">
+                            Pedagógica
+                          </SelectItem>
+                          <SelectItem value="health">Saúde</SelectItem>
+                          <SelectItem value="other">Outros</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
                   </div>
                   <div className="space-y-2">
-                    <FormLabel>Tipo de Ocorrência</FormLabel>
-                    <Select
-                      value={occurrenceType}
-                      onValueChange={setOccurrenceType}
-                    >
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="behavior">Comportamental</SelectItem>
-                        <SelectItem value="pedagogical">Pedagógica</SelectItem>
-                        <SelectItem value="health">Saúde</SelectItem>
-                        <SelectItem value="other">Outros</SelectItem>
-                      </SelectContent>
-                    </Select>
+                    <FormLabel>Descrição Detalhada</FormLabel>
+                    <Textarea
+                      value={occurrenceDesc}
+                      onChange={(e) => setOccurrenceDesc(e.target.value)}
+                      placeholder="Descreva o ocorrido..."
+                      className="min-h-[100px]"
+                    />
                   </div>
-                </div>
-                <div className="space-y-2">
-                  <FormLabel>Descrição Detalhada</FormLabel>
-                  <Textarea
-                    value={occurrenceDesc}
-                    onChange={(e) => setOccurrenceDesc(e.target.value)}
-                    placeholder="Descreva o ocorrido..."
-                    className="min-h-[100px]"
-                  />
-                </div>
-                <div className="flex justify-end">
-                  <Button
-                    variant="secondary"
-                    onClick={handleSaveOccurrence}
-                    disabled={!occurrenceStudentId}
-                  >
-                    <AlertTriangle className="mr-2 h-4 w-4" /> Registrar
-                    Ocorrência
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
+                  <div className="flex justify-end">
+                    <Button
+                      variant="secondary"
+                      onClick={handleSaveOccurrence}
+                      disabled={!occurrenceStudentId}
+                    >
+                      <AlertTriangle className="mr-2 h-4 w-4" /> Registrar
+                      Ocorrência
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <History className="h-5 w-5" /> Histórico de Ocorrências
+                  </CardTitle>
+                  <CardDescription>
+                    Visualizando registros{' '}
+                    {occurrenceStudentId
+                      ? 'do aluno selecionado'
+                      : 'de toda a turma'}
+                    .
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {classOccurrences.length > 0 ? (
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Data</TableHead>
+                          <TableHead>Aluno</TableHead>
+                          <TableHead>Tipo</TableHead>
+                          <TableHead>Descrição</TableHead>
+                          <TableHead>Registrado Por</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {classOccurrences.map((occ) => {
+                          const studentName =
+                            classStudents.find((s) => s.id === occ.studentId)
+                              ?.name || 'Desconhecido'
+                          return (
+                            <TableRow key={occ.id}>
+                              <TableCell className="whitespace-nowrap">
+                                {format(new Date(occ.date), 'dd/MM/yyyy HH:mm')}
+                              </TableCell>
+                              <TableCell>{studentName}</TableCell>
+                              <TableCell className="capitalize">
+                                {occ.type === 'behavior'
+                                  ? 'Comportamental'
+                                  : occ.type === 'pedagogical'
+                                    ? 'Pedagógica'
+                                    : occ.type === 'health'
+                                      ? 'Saúde'
+                                      : 'Outros'}
+                              </TableCell>
+                              <TableCell>{occ.description}</TableCell>
+                              <TableCell className="text-muted-foreground text-xs">
+                                {occ.recordedBy}
+                              </TableCell>
+                            </TableRow>
+                          )
+                        })}
+                      </TableBody>
+                    </Table>
+                  ) : (
+                    <div className="text-center py-8 text-muted-foreground">
+                      Nenhuma ocorrência encontrada.
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
           </TabsContent>
         </Tabs>
       )}

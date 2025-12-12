@@ -23,10 +23,10 @@ import {
   TrendingUp,
   AlertCircle,
   Users,
-  GraduationCap,
   School,
   CheckCircle2,
   XCircle,
+  BookOpen,
 } from 'lucide-react'
 import useSchoolStore from '@/stores/useSchoolStore'
 import useStudentStore from '@/stores/useStudentStore'
@@ -51,7 +51,6 @@ export default function StrategicDashboard() {
     let failed = 0
     let ongoing = 0
 
-    // Simplified logic: Check status of active enrollments
     students.forEach((s) => {
       const activeEnrollment = s.enrollments.find(
         (e) => e.status !== 'Transferido' && e.status !== 'Abandono',
@@ -85,14 +84,6 @@ export default function StrategicDashboard() {
   const subjectPerformance = useMemo(() => {
     const subjectStats: Record<string, { sum: number; count: number }> = {}
 
-    // Iterate over assessments to calculate average raw value
-    // A more precise way would be to calculate Final Grade per student per subject, then average that.
-    // For strategic dashboard speed, we'll approximate using assessment values for now,
-    // or calculate full grades if feasible. Let's try calculating final grades for accuracy.
-
-    // Group students by class to minimize rule lookups
-    const processedStudents = new Set<string>()
-
     students.forEach((student) => {
       const enrollment = student.enrollments.find(
         (e) =>
@@ -110,7 +101,6 @@ export default function StrategicDashboard() {
 
       if (!year || !classroom) return
 
-      // Find structure
       const course = courses.find((c) =>
         c.grades.some((g) => g.id === classroom.gradeId),
       )
@@ -150,7 +140,7 @@ export default function StrategicDashboard() {
         average: parseFloat((stats.sum / stats.count).toFixed(1)),
       }))
       .sort((a, b) => b.average - a.average)
-      .slice(0, 10) // Top 10 subjects
+      .slice(0, 10)
   }, [
     students,
     schools,
@@ -162,7 +152,6 @@ export default function StrategicDashboard() {
 
   // 3. High Absenteeism
   const absenteeismData = useMemo(() => {
-    // Threshold: > 20% absence
     const studentsWithAbsence = students.map((s) => {
       const records = attendanceRecords.filter((r) => r.studentId === s.id)
       const total = records.length
@@ -185,13 +174,85 @@ export default function StrategicDashboard() {
 
   // 4. Low Performance Students (Risk)
   const lowPerformanceStudents = useMemo(() => {
-    // Students with average < 6 in more than 2 subjects
-    // Simplified check based on assessments for speed
-    // In a real app, this would be pre-calculated or queried from DB
-    // Here we mock a bit of logic or reuse aggregation
-    return [] // Placeholder for complexity reasons in this single file response, user story asked to "identify", usually a list.
-    // Implementing a simple list based on logic similar to subjectPerformance but per student
-  }, [])
+    const atRisk: Array<{
+      id: string
+      name: string
+      registration: string
+      failedCount: number
+      subjects: Array<{ name: string; grade: number }>
+    }> = []
+
+    students.forEach((student) => {
+      // Find active enrollment
+      const enrollment = student.enrollments.find(
+        (e) => e.status === 'Cursando',
+      )
+      if (!enrollment) return
+
+      const school = schools.find((s) => s.id === enrollment.schoolId)
+      const year = school?.academicYears.find(
+        (y) => y.name === enrollment.year.toString(),
+      )
+      const classroom = year?.classes.find((c) => c.name === enrollment.grade)
+
+      if (!year || !classroom) return
+
+      // Find structure
+      const course = courses.find((c) =>
+        c.grades.some((g) => g.id === classroom.gradeId),
+      )
+      const grade = course?.grades.find((g) => g.id === classroom.gradeId)
+      const rule = evaluationRules.find((r) => r.id === grade?.evaluationRuleId)
+
+      if (!grade || !rule) return
+
+      const periods = year.periods
+      let failedSubjectsCount = 0
+      const subjectDetails: Array<{ name: string; grade: number }> = []
+
+      grade.subjects.forEach((subj) => {
+        const subAssessments = assessments.filter(
+          (a) =>
+            a.studentId === student.id &&
+            a.subjectId === subj.id &&
+            a.yearId === year.id,
+        )
+
+        const calc = calculateGrades(
+          subAssessments,
+          rule,
+          periods,
+          assessmentTypes,
+        )
+
+        // Check passing grade using the rule
+        if (!calc.isPassing) {
+          failedSubjectsCount++
+          subjectDetails.push({ name: subj.name, grade: calc.finalGrade })
+        }
+      })
+
+      // Threshold: 2 or more subjects below passing grade
+      if (failedSubjectsCount >= 2) {
+        atRisk.push({
+          id: student.id,
+          name: student.name,
+          registration: student.registration,
+          failedCount: failedSubjectsCount,
+          subjects: subjectDetails,
+        })
+      }
+    })
+
+    return atRisk.sort((a, b) => b.failedCount - a.failedCount).slice(0, 5)
+  }, [
+    students,
+    schools,
+    courses,
+    evaluationRules,
+    assessments,
+    assessmentTypes,
+  ])
 
   return (
     <div className="space-y-6 animate-fade-in p-6">
@@ -251,13 +312,17 @@ export default function StrategicDashboard() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">
-              Alunos em Risco (Frequência)
+              Alunos em Risco (Notas)
             </CardTitle>
-            <AlertCircle className="h-4 w-4 text-red-600" />
+            <XCircle className="h-4 w-4 text-red-600" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{absenteeismData.length}</div>
-            <p className="text-xs text-muted-foreground">{'>'} 20% de faltas</p>
+            <div className="text-2xl font-bold">
+              {lowPerformanceStudents.length}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Com notas baixas em 2+ disciplinas
+            </p>
           </CardContent>
         </Card>
       </div>
@@ -349,7 +414,7 @@ export default function StrategicDashboard() {
               Alerta de Infrequência
             </CardTitle>
             <CardDescription>
-              Alunos com maior índice de faltas registrado.
+              Alunos com maior índice de faltas registrado ({'>'} 20%).
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -379,44 +444,53 @@ export default function StrategicDashboard() {
               </div>
             ) : (
               <div className="text-center py-8 text-muted-foreground">
-                Nenhum aluno em situação crítica.
+                Nenhum aluno em situação crítica de frequência.
               </div>
             )}
           </CardContent>
         </Card>
 
-        {/* Historical Trend Placeholder */}
+        {/* Low Performance List */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <TrendingUp className="h-5 w-5 text-blue-600" />
-              Tendência Histórica
+              <BookOpen className="h-5 w-5 text-orange-600" />
+              Alunos com Baixo Desempenho
             </CardTitle>
             <CardDescription>
-              Evolução da taxa de aprovação nos últimos 5 anos (Simulado).
+              Alunos com média insuficiente em 2 ou mais disciplinas.
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="h-[200px] w-full flex items-end justify-between px-4 gap-2">
-              {[78, 82, 80, 85, 88].map((val, idx) => (
-                <div
-                  key={idx}
-                  className="flex flex-col items-center gap-2 w-full"
-                >
+            {lowPerformanceStudents.length > 0 ? (
+              <div className="space-y-4">
+                {lowPerformanceStudents.map((student) => (
                   <div
-                    className="w-full bg-blue-100 rounded-t-md relative group hover:bg-blue-200 transition-colors"
-                    style={{ height: `${val}%` }}
+                    key={student.id}
+                    className="flex flex-col border-b pb-2 last:border-0 last:pb-0 gap-1"
                   >
-                    <div className="absolute -top-8 left-1/2 -translate-x-1/2 bg-popover text-popover-foreground text-xs px-2 py-1 rounded shadow opacity-0 group-hover:opacity-100 transition-opacity">
-                      {val}%
+                    <div className="flex items-center justify-between">
+                      <span className="font-medium">{student.name}</span>
+                      <span className="text-xs font-semibold text-red-600 bg-red-50 px-2 py-0.5 rounded-full">
+                        {student.failedCount} disciplinas
+                      </span>
+                    </div>
+                    <div className="text-xs text-muted-foreground flex flex-wrap gap-1">
+                      {student.subjects.map((s, idx) => (
+                        <span key={idx}>
+                          {s.name} ({s.grade.toFixed(1)})
+                          {idx < student.subjects.length - 1 ? ', ' : ''}
+                        </span>
+                      ))}
                     </div>
                   </div>
-                  <span className="text-xs text-muted-foreground">
-                    {2020 + idx}
-                  </span>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-8 text-muted-foreground">
+                Nenhum aluno identificado com baixo desempenho crítico.
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>
