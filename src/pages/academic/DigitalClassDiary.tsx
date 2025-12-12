@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import * as z from 'zod'
@@ -126,11 +126,11 @@ export default function DigitalClassDiary() {
   }, [students, selectedClass, selectedSchool])
 
   // Initialize all students as present by default when class loads
-  useMemo(() => {
+  useEffect(() => {
     if (classStudents.length > 0) {
       setSelectedStudents(classStudents.map((s) => s.id))
     }
-  }, [classStudents.length]) // Only run when student list changes, not on toggle
+  }, [classStudents])
 
   const togglePresence = (studentId: string) => {
     if (selectedStudents.includes(studentId)) {
