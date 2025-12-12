@@ -35,7 +35,6 @@ import ApprovalFailureReport from './pages/reports/ApprovalFailureReport'
 import ReportCard from './pages/public/ReportCard'
 import EvaluationRulesList from './pages/academic/EvaluationRulesList'
 import AssessmentTypesList from './pages/academic/AssessmentTypesList'
-import DataSimulator from './pages/settings/DataSimulator'
 import NotFound from './pages/NotFound'
 import Layout from './components/Layout'
 import PublicLayout from './components/PublicLayout'
@@ -233,10 +232,6 @@ const App = () => (
                               <Route
                                 path="/configuracoes/usuarios"
                                 element={<UsersList />}
-                              />
-                              <Route
-                                path="/configuracoes/simulador"
-                                element={<DataSimulator />}
                               />
                               {/* Website Management */}
                               <Route

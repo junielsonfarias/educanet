@@ -8,7 +8,6 @@ import {
   FileText,
   LogOut,
   GraduationCap,
-  Database,
   Globe,
   Newspaper,
   PieChart,
@@ -267,21 +266,6 @@ export function AppSidebar() {
                   </Link>
                 </SidebarMenuButton>
               </SidebarMenuItem>
-              {(currentUser?.role === 'admin' ||
-                currentUser?.role === 'supervisor') && (
-                <SidebarMenuItem>
-                  <SidebarMenuButton
-                    asChild
-                    isActive={isActive('/configuracoes/simulador')}
-                    tooltip="Simulador de Dados"
-                  >
-                    <Link to="/configuracoes/simulador">
-                      <Database className="h-4 w-4" />
-                      <span>Simulador</span>
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              )}
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
