@@ -51,6 +51,7 @@ import GeneralSettings from './pages/settings/GeneralSettings'
 import WebsiteContent from './pages/settings/website/WebsiteContent'
 import NewsManager from './pages/settings/website/NewsManager'
 import DocumentsManager from './pages/settings/website/DocumentsManager'
+import BackupRestore from './pages/settings/BackupRestore'
 import { UserProvider } from './stores/useUserStore'
 import { SchoolProvider } from './stores/useSchoolStore'
 import { StudentProvider } from './stores/useStudentStore'
@@ -281,6 +282,10 @@ const App = () => (
                                     <Route
                                       path="/configuracoes/usuarios"
                                       element={<UsersList />}
+                                    />
+                                    <Route
+                                      path="/configuracoes/backup"
+                                      element={<BackupRestore />}
                                     />
                                     {/* Website Management */}
                                     <Route

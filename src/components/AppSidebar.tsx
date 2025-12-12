@@ -15,6 +15,7 @@ import {
   ClipboardList,
   PenTool,
   Bell,
+  Database,
 } from 'lucide-react'
 import {
   Sidebar,
@@ -292,7 +293,8 @@ export function AppSidebar() {
                   asChild
                   isActive={
                     isActive('/configuracoes') &&
-                    !isActive('/configuracoes/site')
+                    !isActive('/configuracoes/site') &&
+                    !isActive('/configuracoes/backup')
                   }
                   tooltip="Configurações"
                 >
@@ -302,6 +304,20 @@ export function AppSidebar() {
                   </Link>
                 </SidebarMenuButton>
               </SidebarMenuItem>
+              {currentUser?.role === 'admin' && (
+                <SidebarMenuItem>
+                  <SidebarMenuButton
+                    asChild
+                    isActive={isActive('/configuracoes/backup')}
+                    tooltip="Backup e Restauração"
+                  >
+                    <Link to="/configuracoes/backup">
+                      <Database className="h-4 w-4" />
+                      <span>Backup de Dados</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              )}
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
