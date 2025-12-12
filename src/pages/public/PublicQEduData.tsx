@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
 import { BarChart3, AlertCircle, Loader2, Info, Building } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import {
@@ -56,6 +56,59 @@ export default function PublicQEduData() {
     }
   }, [settings.qeduMunicipalityId])
 
+  // Check Alerts Logic
+  const checkAlerts = useCallback(
+    (data: SchoolQEduData[], rules: AlertRule[]) => {
+      if (rules.length === 0 || data.length === 0) return
+
+      const allYears = data.flatMap((s) => s.idebHistory.map((h) => h.year))
+      if (allYears.length === 0) return
+
+      const latestYear = Math.max(...allYears)
+
+      const idebScores = data
+        .map((s) => s.idebHistory.find((h) => h.year === latestYear)?.score)
+        .filter((v) => v !== undefined) as number[]
+      const currentIdeb =
+        idebScores.reduce((a, b) => a + b, 0) / (idebScores.length || 1)
+
+      const approvalRates = data
+        .map((s) => s.approvalHistory.find((h) => h.year === latestYear)?.rate)
+        .filter((v) => v !== undefined) as number[]
+      const currentApproval =
+        approvalRates.reduce((a, b) => a + b, 0) / (approvalRates.length || 1)
+
+      rules.forEach((rule) => {
+        let triggered = false
+        if (rule.indicator === 'IDEB') {
+          if (rule.operator === 'gt' && currentIdeb > rule.value)
+            triggered = true
+          if (rule.operator === 'lt' && currentIdeb < rule.value)
+            triggered = true
+        } else if (rule.indicator === 'Approval') {
+          if (rule.operator === 'gt' && currentApproval > rule.value)
+            triggered = true
+          if (rule.operator === 'lt' && currentApproval < rule.value)
+            triggered = true
+        }
+
+        if (triggered) {
+          toast({
+            title: 'Alerta QEdu',
+            description: `O indicador ${rule.indicator} atingiu a condição (${rule.operator === 'gt' ? '>' : '<'} ${rule.value}).`,
+            duration: 10000,
+          })
+        }
+      })
+    },
+    [toast],
+  )
+
+  const handleRulesChange = (newRules: AlertRule[]) => {
+    setAlertRules(newRules)
+    localStorage.setItem('qedu_alert_rules', JSON.stringify(newRules))
+  }
+
   // Fetch Main Data
   useEffect(() => {
     async function loadData() {
@@ -65,7 +118,6 @@ export default function PublicQEduData() {
       try {
         const data = await fetchSchoolsQEduData(selectedMunicipalityId)
         setSchoolsData(data)
-        checkAlerts(data, alertRules)
       } catch (err) {
         console.error(err)
         setError(
@@ -77,6 +129,13 @@ export default function PublicQEduData() {
     }
     loadData()
   }, [selectedMunicipalityId])
+
+  // Check alerts when data or rules change
+  useEffect(() => {
+    if (schoolsData.length > 0) {
+      checkAlerts(schoolsData, alertRules)
+    }
+  }, [schoolsData, alertRules, checkAlerts])
 
   // Aggregate Data for current municipality
   const aggregateData = useMemo(() => {
@@ -139,53 +198,6 @@ export default function PublicQEduData() {
       .filter((d) => d.score !== null)
   }, [schoolsData])
 
-  // Check Alerts Logic
-  const checkAlerts = (data: SchoolQEduData[], rules: AlertRule[]) => {
-    if (rules.length === 0 || data.length === 0) return
-
-    const allYears = data.flatMap((s) => s.idebHistory.map((h) => h.year))
-    const latestYear = Math.max(...allYears)
-
-    const idebScores = data
-      .map((s) => s.idebHistory.find((h) => h.year === latestYear)?.score)
-      .filter((v) => v !== undefined) as number[]
-    const currentIdeb =
-      idebScores.reduce((a, b) => a + b, 0) / (idebScores.length || 1)
-
-    const approvalRates = data
-      .map((s) => s.approvalHistory.find((h) => h.year === latestYear)?.rate)
-      .filter((v) => v !== undefined) as number[]
-    const currentApproval =
-      approvalRates.reduce((a, b) => a + b, 0) / (approvalRates.length || 1)
-
-    rules.forEach((rule) => {
-      let triggered = false
-      if (rule.indicator === 'IDEB') {
-        if (rule.operator === 'gt' && currentIdeb > rule.value) triggered = true
-        if (rule.operator === 'lt' && currentIdeb < rule.value) triggered = true
-      } else if (rule.indicator === 'Approval') {
-        if (rule.operator === 'gt' && currentApproval > rule.value)
-          triggered = true
-        if (rule.operator === 'lt' && currentApproval < rule.value)
-          triggered = true
-      }
-
-      if (triggered) {
-        toast({
-          title: 'Alerta QEdu',
-          description: `O indicador ${rule.indicator} atingiu a condição (${rule.operator === 'gt' ? '>' : '<'} ${rule.value}).`,
-          duration: 10000,
-        })
-      }
-    })
-  }
-
-  const handleRulesChange = (newRules: AlertRule[]) => {
-    setAlertRules(newRules)
-    localStorage.setItem('qedu_alert_rules', JSON.stringify(newRules))
-    checkAlerts(schoolsData, newRules)
-  }
-
   // Fetch Comparison Data
   useEffect(() => {
     async function loadComparison() {
@@ -212,7 +224,7 @@ export default function PublicQEduData() {
       }
     }
     loadComparison()
-  }, [comparisonEntities])
+  }, [comparisonEntities, toast])
 
   return (
     <div className="container mx-auto px-4 py-8 animate-fade-in space-y-8">
