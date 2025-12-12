@@ -9,6 +9,8 @@ import {
   LogOut,
   GraduationCap,
   Database,
+  Globe,
+  Newspaper,
 } from 'lucide-react'
 import {
   Sidebar,
@@ -22,7 +24,6 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarRail,
-  SidebarSeparator,
 } from '@/components/ui/sidebar'
 import { Link, useLocation } from 'react-router-dom'
 import useUserStore from '@/stores/useUserStore'
@@ -102,6 +103,9 @@ export function AppSidebar() {
 
   const isActive = (url: string) => pathname.startsWith(url)
 
+  const canManageWebsite =
+    currentUser?.role === 'admin' || currentUser?.role === 'supervisor'
+
   return (
     <Sidebar>
       <SidebarHeader className="p-4 border-b">
@@ -177,6 +181,52 @@ export function AppSidebar() {
           </SidebarGroupContent>
         </SidebarGroup>
 
+        {canManageWebsite && (
+          <SidebarGroup>
+            <SidebarGroupLabel>Site Institucional</SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                <SidebarMenuItem>
+                  <SidebarMenuButton
+                    asChild
+                    isActive={isActive('/configuracoes/site/conteudo')}
+                    tooltip="Conteúdo"
+                  >
+                    <Link to="/configuracoes/site/conteudo">
+                      <Globe className="h-4 w-4" />
+                      <span>Conteúdo & Info</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+                <SidebarMenuItem>
+                  <SidebarMenuButton
+                    asChild
+                    isActive={isActive('/configuracoes/site/noticias')}
+                    tooltip="Notícias"
+                  >
+                    <Link to="/configuracoes/site/noticias">
+                      <Newspaper className="h-4 w-4" />
+                      <span>Notícias</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+                <SidebarMenuItem>
+                  <SidebarMenuButton
+                    asChild
+                    isActive={isActive('/configuracoes/site/documentos')}
+                    tooltip="Documentos"
+                  >
+                    <Link to="/configuracoes/site/documentos">
+                      <FileText className="h-4 w-4" />
+                      <span>Documentos</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        )}
+
         <SidebarGroup>
           <SidebarGroupLabel>Gestão</SidebarGroupLabel>
           <SidebarGroupContent>
@@ -198,7 +248,10 @@ export function AppSidebar() {
               <SidebarMenuItem>
                 <SidebarMenuButton
                   asChild
-                  isActive={isActive('/configuracoes')}
+                  isActive={
+                    isActive('/configuracoes') &&
+                    !isActive('/configuracoes/site')
+                  }
                   tooltip="Configurações"
                 >
                   <Link to="/configuracoes">

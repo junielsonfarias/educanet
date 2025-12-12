@@ -161,6 +161,40 @@ export interface GeneralSettings {
   defaultRecoveryStrategy?: 'replace_if_higher' | 'always_replace' | 'average'
 }
 
+// --- New Interfaces for Institutional Website ---
+
+export interface NewsPost {
+  id: string
+  title: string
+  summary: string
+  content: string
+  publishDate: string
+  imageUrl?: string
+  author: string
+  active: boolean
+}
+
+export interface PublicDocument {
+  id: string
+  organ: string // Órgão
+  documentNumber: string // Nº do documento
+  year: string // Ano
+  publishDate: string // Data de publicação
+  summary: string // Ementa
+  theme: string // Tema
+  driveLink: string // Google Drive Link
+  active: boolean
+}
+
+export interface InstitutionalContent {
+  section: 'semed_info' | 'semed_structure'
+  title: string
+  content: string // HTML or Rich Text
+  updatedAt: string
+}
+
+// ------------------------------------------------
+
 export const initialSettings: GeneralSettings = {
   municipalityName: 'Prefeitura Municipal',
   educationSecretaryName: 'Secretaria Municipal de Educação',
@@ -585,3 +619,73 @@ export const mockAssessments: Assessment[] = [
 ]
 
 export const mockAttendance: AttendanceRecord[] = []
+
+// --- Mock Data for Website ---
+
+export const mockNews: NewsPost[] = [
+  {
+    id: '1',
+    title: 'Volta às Aulas 2025',
+    summary:
+      'Prefeitura anuncia calendário para o retorno das atividades escolares.',
+    content:
+      'A Secretaria de Educação informa que o retorno às aulas está previsto para o dia 05 de fevereiro. Todas as escolas já estão preparadas para receber os alunos com segurança e novidades na infraestrutura.',
+    publishDate: new Date().toISOString(),
+    author: 'Ascom SEMED',
+    imageUrl: 'https://img.usecurling.com/p/800/600?q=classroom',
+    active: true,
+  },
+  {
+    id: '2',
+    title: 'Reformas nas Escolas Municipais',
+    summary: 'Três unidades escolares passam por ampliação e melhorias.',
+    content:
+      'As escolas Monteiro Lobato, Cecília Meireles e Vinícius de Moraes estão recebendo obras de manutenção, pintura e climatização das salas de aula. O investimento visa proporcionar um ambiente mais adequado para o aprendizado.',
+    publishDate: addDays(new Date(), -5).toISOString(),
+    author: 'Ascom Prefeitura',
+    imageUrl: 'https://img.usecurling.com/p/800/600?q=school%20renovation',
+    active: true,
+  },
+]
+
+export const mockPublicDocuments: PublicDocument[] = [
+  {
+    id: '1',
+    organ: 'SEMED',
+    documentNumber: '001/2024',
+    year: '2024',
+    publishDate: '2024-01-15',
+    summary: 'Estabelece o Calendário Escolar para o ano letivo de 2024.',
+    theme: 'Calendário Escolar',
+    driveLink: '#',
+    active: true,
+  },
+  {
+    id: '2',
+    organ: 'Prefeitura Municipal',
+    documentNumber: 'Decreto 123/2024',
+    year: '2024',
+    publishDate: '2024-01-10',
+    summary: 'Nomeia a nova Secretária de Educação.',
+    theme: 'Nomeação',
+    driveLink: '#',
+    active: true,
+  },
+]
+
+export const mockInstitutionalContent: InstitutionalContent[] = [
+  {
+    section: 'semed_info',
+    title: 'Sobre a SEMED',
+    content:
+      'A Secretaria Municipal de Educação tem como missão garantir o acesso a um ensino de qualidade para todas as crianças, jovens e adultos do município. Nossos valores são pautados na ética, transparência, inovação e valorização dos profissionais da educação.',
+    updatedAt: new Date().toISOString(),
+  },
+  {
+    section: 'semed_structure',
+    title: 'Estrutura Organizacional',
+    content:
+      'A SEMED está estruturada em departamentos pedagógico, administrativo e financeiro. Contamos com uma equipe multidisciplinar focada no suporte às escolas e no desenvolvimento de políticas públicas educacionais efetivas.',
+    updatedAt: new Date().toISOString(),
+  },
+]
