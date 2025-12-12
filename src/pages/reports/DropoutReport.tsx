@@ -16,11 +16,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { ArrowLeft, Printer, AlertTriangle, Filter } from 'lucide-react'
+import { ArrowLeft, AlertTriangle, Filter } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import useStudentStore from '@/stores/useStudentStore'
 import useSchoolStore from '@/stores/useSchoolStore'
 import { Badge } from '@/components/ui/badge'
+import { ExportActions } from '@/components/ExportActions'
 
 export default function DropoutReport() {
   const navigate = useNavigate()
@@ -50,7 +51,8 @@ export default function DropoutReport() {
             schoolName: school?.name || 'N/A',
             grade: enrollment.grade,
             year: enrollment.year.toString(),
-            contacts: student.contacts, // Useful for contact attempt
+            phone: student.contacts?.phone || '-',
+            email: student.contacts?.email || '-',
           }
         }),
     )
@@ -63,26 +65,37 @@ export default function DropoutReport() {
 
   return (
     <div className="space-y-6 animate-fade-in">
-      <div className="flex items-center gap-4">
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={() => navigate('/relatorios')}
-        >
-          <ArrowLeft className="h-5 w-5" />
-        </Button>
-        <div className="flex-1">
-          <h2 className="text-3xl font-bold tracking-tight text-primary flex items-center gap-2">
-            <AlertTriangle className="h-8 w-8 text-destructive" />
-            Relatório de Evasão (Abandono)
-          </h2>
-          <p className="text-muted-foreground">
-            Alunos em situação de abandono escolar.
-          </p>
+      <div className="flex items-center justify-between gap-4">
+        <div className="flex items-center gap-4">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => navigate('/relatorios')}
+          >
+            <ArrowLeft className="h-5 w-5" />
+          </Button>
+          <div>
+            <h2 className="text-3xl font-bold tracking-tight text-primary flex items-center gap-2">
+              <AlertTriangle className="h-8 w-8 text-destructive" />
+              Relatório de Evasão (Abandono)
+            </h2>
+            <p className="text-muted-foreground">
+              Alunos em situação de abandono escolar.
+            </p>
+          </div>
         </div>
-        <Button variant="outline" onClick={() => window.print()}>
-          <Printer className="mr-2 h-4 w-4" /> Imprimir
-        </Button>
+        <ExportActions
+          data={dropoutData}
+          filename="relatorio_evasao"
+          columns={[
+            'studentName',
+            'registration',
+            'schoolName',
+            'grade',
+            'year',
+            'phone',
+          ]}
+        />
       </div>
 
       <Card>
@@ -160,9 +173,9 @@ export default function DropoutReport() {
                     <TableCell>{row.grade}</TableCell>
                     <TableCell>{row.year}</TableCell>
                     <TableCell className="text-sm">
-                      <div>{row.contacts?.phone || '-'}</div>
+                      <div>{row.phone}</div>
                       <div className="text-muted-foreground text-xs">
-                        {row.contacts?.email || '-'}
+                        {row.email}
                       </div>
                     </TableCell>
                   </TableRow>

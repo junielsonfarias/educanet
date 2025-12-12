@@ -18,12 +18,29 @@ import {
   ArrowRightLeft,
   AlertTriangle,
   FileCheck,
+  LayoutTemplate,
+  TrendingUp,
 } from 'lucide-react'
 
 export default function ReportsDashboard() {
   const navigate = useNavigate()
 
   const internalReports = [
+    {
+      title: 'Relatório Personalizado',
+      description: 'Crie relatórios sob medida escolhendo campos e filtros.',
+      icon: LayoutTemplate,
+      path: '/relatorios/custom',
+      highlight: true,
+    },
+    {
+      title: 'Análise de Desempenho Acadêmico',
+      description:
+        'Visão avançada de indicadores, tendências e alunos em risco.',
+      icon: TrendingUp,
+      path: '/relatorios/analise-academica',
+      highlight: true,
+    },
     {
       title: 'Relatório de Transferências',
       description: 'Listagem de alunos transferidos da rede ou entre unidades.',
@@ -110,7 +127,7 @@ export default function ReportsDashboard() {
           {internalReports.map((report) => (
             <Card
               key={report.path}
-              className="cursor-pointer hover:border-primary/50 transition-colors hover:shadow-md"
+              className={`cursor-pointer hover:border-primary/50 transition-colors hover:shadow-md ${report.highlight ? 'border-primary/40 bg-primary/5' : ''}`}
               onClick={() => navigate(report.path)}
             >
               <CardHeader>

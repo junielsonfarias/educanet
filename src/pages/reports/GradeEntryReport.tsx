@@ -22,7 +22,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { ArrowLeft, Printer, FileCheck, Search } from 'lucide-react'
+import { ArrowLeft, FileCheck, Search } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
@@ -32,6 +32,7 @@ import useCourseStore from '@/stores/useCourseStore'
 import useStudentStore from '@/stores/useStudentStore'
 import useAssessmentStore from '@/stores/useAssessmentStore'
 import useTeacherStore from '@/stores/useTeacherStore'
+import { ExportActions } from '@/components/ExportActions'
 
 export default function GradeEntryReport() {
   const navigate = useNavigate()
@@ -110,10 +111,6 @@ export default function GradeEntryReport() {
             ? teachers.find((t) => t.allocations.includes(allocation))
             : null
 
-          // Count students with at least one assessment in this period/subject
-          // Note: Ideally check if they have enough assessments according to rules,
-          // but checking for ANY assessment is a good start for "Entry Status"
-
           let studentsWithGrades = 0
           if (totalStudents > 0) {
             studentsWithGrades = classStudents.filter((student) => {
@@ -139,7 +136,7 @@ export default function GradeEntryReport() {
             teacherName: teacher?.name || 'Não alocado',
             totalStudents,
             studentsWithGrades,
-            completionRate,
+            completionRate: parseFloat(completionRate.toFixed(1)),
             status:
               totalStudents === 0
                 ? 'Sem Alunos'
@@ -193,27 +190,38 @@ export default function GradeEntryReport() {
 
   return (
     <div className="space-y-6 animate-fade-in">
-      <div className="flex items-center gap-4">
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={() => navigate('/relatorios')}
-        >
-          <ArrowLeft className="h-5 w-5" />
-        </Button>
-        <div className="flex-1">
-          <h2 className="text-3xl font-bold tracking-tight text-primary flex items-center gap-2">
-            <FileCheck className="h-8 w-8" />
-            Relatório de Lançamento de Notas
-          </h2>
-          <p className="text-muted-foreground">
-            Acompanhamento do status de digitação de notas por turma e
-            disciplina.
-          </p>
+      <div className="flex items-center justify-between gap-4">
+        <div className="flex items-center gap-4">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => navigate('/relatorios')}
+          >
+            <ArrowLeft className="h-5 w-5" />
+          </Button>
+          <div>
+            <h2 className="text-3xl font-bold tracking-tight text-primary flex items-center gap-2">
+              <FileCheck className="h-8 w-8" />
+              Relatório de Lançamento de Notas
+            </h2>
+            <p className="text-muted-foreground">
+              Acompanhamento do status de digitação de notas por turma e
+              disciplina.
+            </p>
+          </div>
         </div>
-        <Button variant="outline" onClick={() => window.print()}>
-          <Printer className="mr-2 h-4 w-4" /> Imprimir
-        </Button>
+        <ExportActions
+          data={filteredData}
+          filename="relatorio_lancamento_notas"
+          columns={[
+            'className',
+            'subjectName',
+            'periodName',
+            'teacherName',
+            'completionRate',
+            'status',
+          ]}
+        />
       </div>
 
       <Card>

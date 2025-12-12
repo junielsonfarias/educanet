@@ -8,7 +8,6 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
 import {
   Select,
   SelectContent,
@@ -16,10 +15,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { ArrowLeft, Printer, ArrowRightLeft, Filter } from 'lucide-react'
+import { ArrowLeft, ArrowRightLeft, Filter } from 'lucide-react'
+import { Button } from '@/components/ui/button'
 import { useNavigate } from 'react-router-dom'
 import useStudentStore from '@/stores/useStudentStore'
 import useSchoolStore from '@/stores/useSchoolStore'
+import { ExportActions } from '@/components/ExportActions'
 
 export default function TransferReport() {
   const navigate = useNavigate()
@@ -63,26 +64,36 @@ export default function TransferReport() {
 
   return (
     <div className="space-y-6 animate-fade-in">
-      <div className="flex items-center gap-4">
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={() => navigate('/relatorios')}
-        >
-          <ArrowLeft className="h-5 w-5" />
-        </Button>
-        <div className="flex-1">
-          <h2 className="text-3xl font-bold tracking-tight text-primary flex items-center gap-2">
-            <ArrowRightLeft className="h-8 w-8" />
-            Relatório de Transferências
-          </h2>
-          <p className="text-muted-foreground">
-            Alunos transferidos da rede ou entre unidades escolares.
-          </p>
+      <div className="flex items-center justify-between gap-4">
+        <div className="flex items-center gap-4">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => navigate('/relatorios')}
+          >
+            <ArrowLeft className="h-5 w-5" />
+          </Button>
+          <div>
+            <h2 className="text-3xl font-bold tracking-tight text-primary flex items-center gap-2">
+              <ArrowRightLeft className="h-8 w-8" />
+              Relatório de Transferências
+            </h2>
+            <p className="text-muted-foreground">
+              Alunos transferidos da rede ou entre unidades escolares.
+            </p>
+          </div>
         </div>
-        <Button variant="outline" onClick={() => window.print()}>
-          <Printer className="mr-2 h-4 w-4" /> Imprimir
-        </Button>
+        <ExportActions
+          data={transferData}
+          filename="relatorio_transferencias"
+          columns={[
+            'studentName',
+            'registration',
+            'schoolName',
+            'grade',
+            'year',
+          ]}
+        />
       </div>
 
       <Card>

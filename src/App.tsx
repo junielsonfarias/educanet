@@ -41,6 +41,8 @@ import ComparativeReports from './pages/reports/ComparativeReports'
 import TransferReport from './pages/reports/TransferReport'
 import DropoutReport from './pages/reports/DropoutReport'
 import GradeEntryReport from './pages/reports/GradeEntryReport'
+import CustomReport from './pages/reports/CustomReport'
+import AcademicPerformanceAnalysis from './pages/reports/AcademicPerformanceAnalysis'
 import ReportCard from './pages/public/ReportCard'
 import EvaluationRulesList from './pages/academic/EvaluationRulesList'
 import AssessmentTypesList from './pages/academic/AssessmentTypesList'
@@ -68,6 +70,7 @@ import { PublicContentProvider } from './stores/usePublicContentStore'
 import { OccurrenceProvider } from './stores/useOccurrenceStore'
 import { LessonPlanProvider } from './stores/useLessonPlanStore'
 import { AlertProvider } from './stores/useAlertStore'
+import { ReportProvider } from './stores/useReportStore'
 
 const App = () => (
   <UserProvider>
@@ -83,244 +86,258 @@ const App = () => (
                       <LessonPlanProvider>
                         <PublicContentProvider>
                           <AlertProvider>
-                            <BrowserRouter
-                              future={{
-                                v7_startTransition: false,
-                                v7_relativeSplatPath: false,
-                              }}
-                            >
-                              <TooltipProvider>
-                                <Toaster />
-                                <Sonner />
-                                <Routes>
-                                  {/* Public Institutional Website Routes */}
-                                  <Route element={<PublicLayout />}>
-                                    <Route
-                                      path="/"
-                                      element={<InstitutionalHome />}
-                                    />
-                                    <Route
-                                      path="/publico/noticias"
-                                      element={<PublicNews />}
-                                    />
-                                    <Route
-                                      path="/publico/noticias/:id"
-                                      element={<PublicNewsDetail />}
-                                    />
-                                    <Route
-                                      path="/publico/documentos"
-                                      element={<PublicDocuments />}
-                                    />
-                                    <Route
-                                      path="/publico/documentos/:id"
-                                      element={<PublicDocumentDetail />}
-                                    />
-                                    <Route
-                                      path="/publico/boletim"
-                                      element={<ReportCard />}
-                                    />
-                                    <Route
-                                      path="/publico/portal-aluno"
-                                      element={<StudentPortal />}
-                                    />
-                                    <Route
-                                      path="/publico/portal-servidor"
-                                      element={<EmployeePortal />}
-                                    />
-                                    <Route
-                                      path="/publico/calendario"
-                                      element={<PublicCalendar />}
-                                    />
-                                    <Route
-                                      path="/publico/escolas"
-                                      element={<PublicSchools />}
-                                    />
-                                    <Route
-                                      path="/publico/estrutura"
-                                      element={<Structure />}
-                                    />
-                                    <Route
-                                      path="/publico/dados-qedu"
-                                      element={<PublicQEduData />}
-                                    />
-                                  </Route>
+                            <ReportProvider>
+                              <BrowserRouter
+                                future={{
+                                  v7_startTransition: false,
+                                  v7_relativeSplatPath: false,
+                                }}
+                              >
+                                <TooltipProvider>
+                                  <Toaster />
+                                  <Sonner />
+                                  <Routes>
+                                    {/* Public Institutional Website Routes */}
+                                    <Route element={<PublicLayout />}>
+                                      <Route
+                                        path="/"
+                                        element={<InstitutionalHome />}
+                                      />
+                                      <Route
+                                        path="/publico/noticias"
+                                        element={<PublicNews />}
+                                      />
+                                      <Route
+                                        path="/publico/noticias/:id"
+                                        element={<PublicNewsDetail />}
+                                      />
+                                      <Route
+                                        path="/publico/documentos"
+                                        element={<PublicDocuments />}
+                                      />
+                                      <Route
+                                        path="/publico/documentos/:id"
+                                        element={<PublicDocumentDetail />}
+                                      />
+                                      <Route
+                                        path="/publico/boletim"
+                                        element={<ReportCard />}
+                                      />
+                                      <Route
+                                        path="/publico/portal-aluno"
+                                        element={<StudentPortal />}
+                                      />
+                                      <Route
+                                        path="/publico/portal-servidor"
+                                        element={<EmployeePortal />}
+                                      />
+                                      <Route
+                                        path="/publico/calendario"
+                                        element={<PublicCalendar />}
+                                      />
+                                      <Route
+                                        path="/publico/escolas"
+                                        element={<PublicSchools />}
+                                      />
+                                      <Route
+                                        path="/publico/estrutura"
+                                        element={<Structure />}
+                                      />
+                                      <Route
+                                        path="/publico/dados-qedu"
+                                        element={<PublicQEduData />}
+                                      />
+                                    </Route>
 
-                                  {/* Auth Route */}
-                                  <Route path="/login" element={<Login />} />
+                                    {/* Auth Route */}
+                                    <Route path="/login" element={<Login />} />
 
-                                  {/* Admin Panel Routes */}
-                                  <Route element={<Layout />}>
-                                    <Route
-                                      path="/dashboard"
-                                      element={<Dashboard />}
-                                    />
-                                    <Route
-                                      path="/dashboard/estrategico"
-                                      element={<StrategicDashboard />}
-                                    />
-                                    <Route
-                                      path="/alertas"
-                                      element={<AlertsDashboard />}
-                                    />
-                                    <Route
-                                      path="/alertas/regras"
-                                      element={<AlertRules />}
-                                    />
+                                    {/* Admin Panel Routes */}
+                                    <Route element={<Layout />}>
+                                      <Route
+                                        path="/dashboard"
+                                        element={<Dashboard />}
+                                      />
+                                      <Route
+                                        path="/dashboard/estrategico"
+                                        element={<StrategicDashboard />}
+                                      />
+                                      <Route
+                                        path="/alertas"
+                                        element={<AlertsDashboard />}
+                                      />
+                                      <Route
+                                        path="/alertas/regras"
+                                        element={<AlertRules />}
+                                      />
 
-                                    {/* Schools Routes */}
-                                    <Route
-                                      path="/escolas"
-                                      element={<SchoolsList />}
-                                    />
-                                    <Route
-                                      path="/escolas/:id"
-                                      element={<SchoolDetails />}
-                                    />
+                                      {/* Schools Routes */}
+                                      <Route
+                                        path="/escolas"
+                                        element={<SchoolsList />}
+                                      />
+                                      <Route
+                                        path="/escolas/:id"
+                                        element={<SchoolDetails />}
+                                      />
 
-                                    {/* People Routes */}
-                                    <Route
-                                      path="/pessoas/alunos"
-                                      element={<StudentsList />}
-                                    />
-                                    <Route
-                                      path="/pessoas/alunos/:id"
-                                      element={<StudentDetails />}
-                                    />
-                                    <Route
-                                      path="/pessoas/professores"
-                                      element={<TeachersList />}
-                                    />
-                                    <Route
-                                      path="/pessoas/professores/:id"
-                                      element={<TeacherDetails />}
-                                    />
+                                      {/* People Routes */}
+                                      <Route
+                                        path="/pessoas/alunos"
+                                        element={<StudentsList />}
+                                      />
+                                      <Route
+                                        path="/pessoas/alunos/:id"
+                                        element={<StudentDetails />}
+                                      />
+                                      <Route
+                                        path="/pessoas/professores"
+                                        element={<TeachersList />}
+                                      />
+                                      <Route
+                                        path="/pessoas/professores/:id"
+                                        element={<TeacherDetails />}
+                                      />
 
-                                    {/* Academic Routes */}
-                                    <Route
-                                      path="/academico/cursos"
-                                      element={<CoursesList />}
-                                    />
-                                    <Route
-                                      path="/academico/cursos/:id"
-                                      element={<CourseDetails />}
-                                    />
-                                    <Route
-                                      path="/academico/turmas"
-                                      element={<ClassesList />}
-                                    />
-                                    <Route
-                                      path="/academico/regras-avaliacao"
-                                      element={<EvaluationRulesList />}
-                                    />
-                                    <Route
-                                      path="/academico/tipos-avaliacao"
-                                      element={<AssessmentTypesList />}
-                                    />
-                                    <Route
-                                      path="/avaliacao/lancamento"
-                                      element={<AssessmentInput />}
-                                    />
-                                    <Route
-                                      path="/academico/analise-avaliacoes"
-                                      element={<EvaluationAnalysis />}
-                                    />
-                                    <Route
-                                      path="/academico/diario"
-                                      element={<DigitalClassDiary />}
-                                    />
-                                    <Route
-                                      path="/academico/planejamento"
-                                      element={<LessonPlanning />}
-                                    />
+                                      {/* Academic Routes */}
+                                      <Route
+                                        path="/academico/cursos"
+                                        element={<CoursesList />}
+                                      />
+                                      <Route
+                                        path="/academico/cursos/:id"
+                                        element={<CourseDetails />}
+                                      />
+                                      <Route
+                                        path="/academico/turmas"
+                                        element={<ClassesList />}
+                                      />
+                                      <Route
+                                        path="/academico/regras-avaliacao"
+                                        element={<EvaluationRulesList />}
+                                      />
+                                      <Route
+                                        path="/academico/tipos-avaliacao"
+                                        element={<AssessmentTypesList />}
+                                      />
+                                      <Route
+                                        path="/avaliacao/lancamento"
+                                        element={<AssessmentInput />}
+                                      />
+                                      <Route
+                                        path="/academico/analise-avaliacoes"
+                                        element={<EvaluationAnalysis />}
+                                      />
+                                      <Route
+                                        path="/academico/diario"
+                                        element={<DigitalClassDiary />}
+                                      />
+                                      <Route
+                                        path="/academico/planejamento"
+                                        element={<LessonPlanning />}
+                                      />
 
-                                    {/* Calendar */}
-                                    <Route
-                                      path="/calendario"
-                                      element={<SchoolCalendar />}
-                                    />
+                                      {/* Calendar */}
+                                      <Route
+                                        path="/calendario"
+                                        element={<SchoolCalendar />}
+                                      />
 
-                                    {/* Reports */}
-                                    <Route
-                                      path="/relatorios"
-                                      element={<ReportsDashboard />}
-                                    />
-                                    <Route
-                                      path="/relatorios/comparativo"
-                                      element={<ComparativeReports />}
-                                    />
-                                    <Route
-                                      path="/relatorios/individual"
-                                      element={<IndividualPerformanceReport />}
-                                    />
-                                    <Route
-                                      path="/relatorios/matriculas"
-                                      element={<EnrollmentReport />}
-                                    />
-                                    <Route
-                                      path="/relatorios/desempenho"
-                                      element={<PerformanceReport />}
-                                    />
-                                    <Route
-                                      path="/relatorios/professores"
-                                      element={<TeacherAllocationReport />}
-                                    />
-                                    <Route
-                                      path="/relatorios/distorcao-idade-serie"
-                                      element={<AgeGradeDistortionReport />}
-                                    />
-                                    <Route
-                                      path="/relatorios/taxas-rendimento"
-                                      element={<ApprovalFailureReport />}
-                                    />
-                                    <Route
-                                      path="/relatorios/transferencias"
-                                      element={<TransferReport />}
-                                    />
-                                    <Route
-                                      path="/relatorios/evasao"
-                                      element={<DropoutReport />}
-                                    />
-                                    <Route
-                                      path="/relatorios/status-lancamento"
-                                      element={<GradeEntryReport />}
-                                    />
+                                      {/* Reports */}
+                                      <Route
+                                        path="/relatorios"
+                                        element={<ReportsDashboard />}
+                                      />
+                                      <Route
+                                        path="/relatorios/custom"
+                                        element={<CustomReport />}
+                                      />
+                                      <Route
+                                        path="/relatorios/analise-academica"
+                                        element={
+                                          <AcademicPerformanceAnalysis />
+                                        }
+                                      />
+                                      <Route
+                                        path="/relatorios/comparativo"
+                                        element={<ComparativeReports />}
+                                      />
+                                      <Route
+                                        path="/relatorios/individual"
+                                        element={
+                                          <IndividualPerformanceReport />
+                                        }
+                                      />
+                                      <Route
+                                        path="/relatorios/matriculas"
+                                        element={<EnrollmentReport />}
+                                      />
+                                      <Route
+                                        path="/relatorios/desempenho"
+                                        element={<PerformanceReport />}
+                                      />
+                                      <Route
+                                        path="/relatorios/professores"
+                                        element={<TeacherAllocationReport />}
+                                      />
+                                      <Route
+                                        path="/relatorios/distorcao-idade-serie"
+                                        element={<AgeGradeDistortionReport />}
+                                      />
+                                      <Route
+                                        path="/relatorios/taxas-rendimento"
+                                        element={<ApprovalFailureReport />}
+                                      />
+                                      <Route
+                                        path="/relatorios/transferencias"
+                                        element={<TransferReport />}
+                                      />
+                                      <Route
+                                        path="/relatorios/evasao"
+                                        element={<DropoutReport />}
+                                      />
+                                      <Route
+                                        path="/relatorios/status-lancamento"
+                                        element={<GradeEntryReport />}
+                                      />
 
-                                    {/* Settings */}
-                                    <Route
-                                      path="/configuracoes"
-                                      element={<GeneralSettings />}
-                                    />
-                                    <Route
-                                      path="/configuracoes/geral"
-                                      element={<GeneralSettings />}
-                                    />
-                                    <Route
-                                      path="/configuracoes/usuarios"
-                                      element={<UsersList />}
-                                    />
-                                    <Route
-                                      path="/configuracoes/backup"
-                                      element={<BackupRestore />}
-                                    />
-                                    {/* Website Management */}
-                                    <Route
-                                      path="/configuracoes/site/conteudo"
-                                      element={<WebsiteContent />}
-                                    />
-                                    <Route
-                                      path="/configuracoes/site/noticias"
-                                      element={<NewsManager />}
-                                    />
-                                    <Route
-                                      path="/configuracoes/site/documentos"
-                                      element={<DocumentsManager />}
-                                    />
-                                  </Route>
+                                      {/* Settings */}
+                                      <Route
+                                        path="/configuracoes"
+                                        element={<GeneralSettings />}
+                                      />
+                                      <Route
+                                        path="/configuracoes/geral"
+                                        element={<GeneralSettings />}
+                                      />
+                                      <Route
+                                        path="/configuracoes/usuarios"
+                                        element={<UsersList />}
+                                      />
+                                      <Route
+                                        path="/configuracoes/backup"
+                                        element={<BackupRestore />}
+                                      />
+                                      {/* Website Management */}
+                                      <Route
+                                        path="/configuracoes/site/conteudo"
+                                        element={<WebsiteContent />}
+                                      />
+                                      <Route
+                                        path="/configuracoes/site/noticias"
+                                        element={<NewsManager />}
+                                      />
+                                      <Route
+                                        path="/configuracoes/site/documentos"
+                                        element={<DocumentsManager />}
+                                      />
+                                    </Route>
 
-                                  <Route path="*" element={<NotFound />} />
-                                </Routes>
-                              </TooltipProvider>
-                            </BrowserRouter>
+                                    <Route path="*" element={<NotFound />} />
+                                  </Routes>
+                                </TooltipProvider>
+                              </BrowserRouter>
+                            </ReportProvider>
                           </AlertProvider>
                         </PublicContentProvider>
                       </LessonPlanProvider>
