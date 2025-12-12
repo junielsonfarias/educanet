@@ -5,14 +5,12 @@ import {
   CartesianGrid,
   XAxis,
   YAxis,
-  ResponsiveContainer,
   LineChart,
   Line,
   Legend,
 } from 'recharts'
 import {
   Building,
-  Search,
   School as SchoolIcon,
   TrendingUp,
   BarChart3,
@@ -37,6 +35,7 @@ import {
   ChartContainer,
   ChartTooltip,
   ChartTooltipContent,
+  ChartConfig,
 } from '@/components/ui/chart'
 import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -121,6 +120,41 @@ export default function PublicQEduData() {
       )
       return entry
     })
+  }, [schoolsData])
+
+  // Chart Configs
+  const idebConfig = {
+    score: {
+      label: 'Nota',
+      color: 'hsl(var(--primary))',
+    },
+    target: {
+      label: 'Meta',
+      color: 'hsl(var(--muted-foreground))',
+    },
+  } satisfies ChartConfig
+
+  const approvalConfig = {
+    rate: {
+      label: 'Aprovação',
+      color: 'hsl(142, 76%, 36%)',
+    },
+  } satisfies ChartConfig
+
+  const comparisonConfig = useMemo(() => {
+    const config: ChartConfig = {
+      'Média Município': {
+        label: 'Média Município',
+        color: 'hsl(var(--destructive))',
+      },
+    }
+    schoolsData.forEach((school, index) => {
+      config[school.name] = {
+        label: school.name,
+        color: `hsl(${index * 60 + 200}, 70%, 50%)`,
+      }
+    })
+    return config
   }, [schoolsData])
 
   return (
@@ -259,63 +293,58 @@ export default function PublicQEduData() {
                             <TrendingUp className="h-4 w-4 text-primary" />
                             Histórico IDEB
                           </h4>
-                          <div className="h-[200px] w-full">
-                            <ResponsiveContainer width="100%" height="100%">
-                              <LineChart data={school.idebHistory}>
-                                <CartesianGrid
-                                  strokeDasharray="3 3"
-                                  vertical={false}
-                                />
-                                <XAxis dataKey="year" />
-                                <YAxis domain={[0, 10]} />
-                                <ChartTooltip
-                                  content={<ChartTooltipContent />}
-                                />
-                                <Line
-                                  type="monotone"
-                                  dataKey="score"
-                                  stroke="hsl(var(--primary))"
-                                  strokeWidth={2}
-                                  name="Nota"
-                                  activeDot={{ r: 6 }}
-                                />
-                                <Line
-                                  type="monotone"
-                                  dataKey="target"
-                                  stroke="hsl(var(--muted-foreground))"
-                                  strokeDasharray="5 5"
-                                  name="Meta"
-                                />
-                              </LineChart>
-                            </ResponsiveContainer>
-                          </div>
+                          <ChartContainer
+                            config={idebConfig}
+                            className="h-[200px] w-full aspect-auto"
+                          >
+                            <LineChart data={school.idebHistory}>
+                              <CartesianGrid
+                                strokeDasharray="3 3"
+                                vertical={false}
+                              />
+                              <XAxis dataKey="year" />
+                              <YAxis domain={[0, 10]} />
+                              <ChartTooltip content={<ChartTooltipContent />} />
+                              <Line
+                                type="monotone"
+                                dataKey="score"
+                                stroke="var(--color-score)"
+                                strokeWidth={2}
+                                activeDot={{ r: 6 }}
+                              />
+                              <Line
+                                type="monotone"
+                                dataKey="target"
+                                stroke="var(--color-target)"
+                                strokeDasharray="5 5"
+                              />
+                            </LineChart>
+                          </ChartContainer>
                         </div>
                         <div>
                           <h4 className="font-semibold mb-4 flex items-center gap-2">
                             <BarChart3 className="h-4 w-4 text-primary" />
                             Taxa de Aprovação (%)
                           </h4>
-                          <div className="h-[200px] w-full">
-                            <ResponsiveContainer width="100%" height="100%">
-                              <BarChart data={school.approvalHistory}>
-                                <CartesianGrid
-                                  strokeDasharray="3 3"
-                                  vertical={false}
-                                />
-                                <XAxis dataKey="year" />
-                                <YAxis domain={[0, 100]} />
-                                <ChartTooltip
-                                  content={<ChartTooltipContent />}
-                                />
-                                <Bar
-                                  dataKey="rate"
-                                  fill="hsl(142, 76%, 36%)"
-                                  radius={[4, 4, 0, 0]}
-                                  name="Aprovação"
-                                />
-                              </BarChart>
-                            </ResponsiveContainer>
-                          </div>
+                          <ChartContainer
+                            config={approvalConfig}
+                            className="h-[200px] w-full aspect-auto"
+                          >
+                            <BarChart data={school.approvalHistory}>
+                              <CartesianGrid
+                                strokeDasharray="3 3"
+                                vertical={false}
+                              />
+                              <XAxis dataKey="year" />
+                              <YAxis domain={[0, 100]} />
+                              <ChartTooltip content={<ChartTooltipContent />} />
+                              <Bar
+                                dataKey="rate"
+                                fill="var(--color-rate)"
+                                radius={[4, 4, 0, 0]}
+                              />
+                            </BarChart>
+                          </ChartContainer>
                         </div>
                       </div>
                     </div>
@@ -334,34 +363,37 @@ export default function PublicQEduData() {
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <div className="h-[500px] w-full">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <LineChart data={idebComparisonData}>
-                        <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                        <XAxis dataKey="year" />
-                        <YAxis domain={[0, 10]} />
-                        <ChartTooltip content={<ChartTooltipContent />} />
-                        <Legend />
+                  <ChartContainer
+                    config={comparisonConfig}
+                    className="h-[500px] w-full aspect-auto"
+                  >
+                    <LineChart data={idebComparisonData}>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                      <XAxis dataKey="year" />
+                      <YAxis domain={[0, 10]} />
+                      <ChartTooltip content={<ChartTooltipContent />} />
+                      <Legend />
+                      <Line
+                        type="monotone"
+                        dataKey="Média Município"
+                        stroke="var(--color-Média Município)"
+                        strokeWidth={3}
+                        dot={{ r: 6 }}
+                      />
+                      {schoolsData.map((school) => (
                         <Line
+                          key={school.id}
                           type="monotone"
-                          dataKey="Média Município"
-                          stroke="hsl(var(--destructive))"
-                          strokeWidth={3}
-                          dot={{ r: 6 }}
+                          dataKey={school.name}
+                          stroke={
+                            comparisonConfig[school.name]?.color || '#888888'
+                          }
+                          strokeWidth={1}
+                          dot={false}
                         />
-                        {schoolsData.map((school, index) => (
-                          <Line
-                            key={school.id}
-                            type="monotone"
-                            dataKey={school.name}
-                            stroke={`hsl(${index * 60 + 200}, 70%, 50%)`}
-                            strokeWidth={1}
-                            dot={false}
-                          />
-                        ))}
-                      </LineChart>
-                    </ResponsiveContainer>
-                  </div>
+                      ))}
+                    </LineChart>
+                  </ChartContainer>
                 </CardContent>
               </Card>
             </TabsContent>
