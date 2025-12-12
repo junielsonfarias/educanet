@@ -161,6 +161,7 @@ export interface GeneralSettings {
   defaultRecoveryStrategy?: 'replace_if_higher' | 'always_replace' | 'average'
   facebookHandle?: string
   footerText?: string
+  qeduMunicipalityId?: string
 }
 
 // --- New Interfaces for Institutional Website ---
@@ -204,6 +205,7 @@ export const initialSettings: GeneralSettings = {
   facebookHandle: '@semed_oficial',
   footerText:
     '© 2025 Prefeitura Municipal de São Sebastião da Boa Vista. Todos os direitos reservados.',
+  qeduMunicipalityId: '1507300', // Default to São Sebastião da Boa Vista - PA (IBGE Code)
 }
 
 export const mockEvaluationRules: EvaluationRule[] = [

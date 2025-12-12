@@ -11,6 +11,7 @@ import {
   Database,
   Globe,
   Newspaper,
+  PieChart,
 } from 'lucide-react'
 import {
   Sidebar,
@@ -91,9 +92,9 @@ const academicItems = [
 
 const reportsItems = [
   {
-    title: 'Relatórios',
+    title: 'Relatórios Educacionais',
     url: '/relatorios',
-    icon: FileText,
+    icon: PieChart,
   },
 ]
 

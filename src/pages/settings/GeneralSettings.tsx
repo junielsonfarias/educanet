@@ -7,6 +7,7 @@ import {
   Settings as SettingsIcon,
   Facebook,
   Type,
+  BarChart,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -30,6 +31,7 @@ import useSettingsStore from '@/stores/useSettingsStore'
 import { useToast } from '@/hooks/use-toast'
 import { fileToBase64 } from '@/lib/file-utils'
 import { Textarea } from '@/components/ui/textarea'
+import { availableMunicipalities } from '@/services/qedu-service'
 
 export default function GeneralSettings() {
   const { settings, updateSettings } = useSettingsStore()
@@ -93,9 +95,12 @@ export default function GeneralSettings() {
       </div>
 
       <Tabs defaultValue="institution" className="w-full">
-        <TabsList className="w-full justify-start">
+        <TabsList className="w-full justify-start overflow-x-auto">
           <TabsTrigger value="institution">Instituição & Visual</TabsTrigger>
           <TabsTrigger value="recovery">Políticas de Recuperação</TabsTrigger>
+          <TabsTrigger value="qedu" className="gap-2">
+            <BarChart className="h-4 w-4" /> Integração QEdu
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="institution" className="space-y-6 mt-4">
@@ -380,6 +385,52 @@ export default function GeneralSettings() {
                     entre a nota original e a nota de recuperação.
                   </li>
                 </ul>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="qedu" className="space-y-6 mt-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <BarChart className="h-5 w-5 text-primary" />
+                Dados do QEdu
+              </CardTitle>
+              <CardDescription>
+                Selecione o município para integrar dados de relatórios
+                educacionais oficiais.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="grid gap-4 max-w-xl">
+                <div className="space-y-2">
+                  <Label htmlFor="qeduMunicipalityId">Município</Label>
+                  <Select
+                    value={formData.qeduMunicipalityId}
+                    onValueChange={(value) =>
+                      handleSelectChange('qeduMunicipalityId', value)
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione o município" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {availableMunicipalities.map((municipality) => (
+                        <SelectItem
+                          key={municipality.id}
+                          value={municipality.id}
+                        >
+                          {municipality.name} - {municipality.state}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Esta seleção determinará a fonte de dados para os relatórios
+                    de Distorção Idade-Série e Taxas de Rendimento.
+                  </p>
+                </div>
               </div>
             </CardContent>
           </Card>

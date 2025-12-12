@@ -28,6 +28,8 @@ import EnrollmentReport from './pages/reports/EnrollmentReport'
 import PerformanceReport from './pages/reports/PerformanceReport'
 import IndividualPerformanceReport from './pages/reports/IndividualPerformanceReport'
 import TeacherAllocationReport from './pages/reports/TeacherAllocationReport'
+import AgeGradeDistortionReport from './pages/reports/AgeGradeDistortionReport'
+import ApprovalFailureReport from './pages/reports/ApprovalFailureReport'
 import ReportCard from './pages/public/ReportCard'
 import EvaluationRulesList from './pages/academic/EvaluationRulesList'
 import AssessmentTypesList from './pages/academic/AssessmentTypesList'
@@ -199,6 +201,14 @@ const App = () => (
                               <Route
                                 path="/relatorios/professores"
                                 element={<TeacherAllocationReport />}
+                              />
+                              <Route
+                                path="/relatorios/distorcao-idade-serie"
+                                element={<AgeGradeDistortionReport />}
+                              />
+                              <Route
+                                path="/relatorios/taxas-rendimento"
+                                element={<ApprovalFailureReport />}
                               />
 
                               {/* Settings */}
