@@ -152,9 +152,10 @@ export default function InstitutionalHome() {
         </div>
       </section>
 
-      <div className="grid gap-12 lg:grid-cols-3 container mx-auto px-4">
-        {/* News Section */}
-        <div className="lg:col-span-2 space-y-6">
+      {/* Main Content Grid - Adjusted to 5 columns to give sidebar more width (2/5 = 40%) */}
+      <div className="grid gap-12 lg:grid-cols-5 container mx-auto px-4">
+        {/* News Section - Takes 3 columns (60%) */}
+        <div className="lg:col-span-3 space-y-6">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <Newspaper className="h-6 w-6 text-primary" />
@@ -211,8 +212,8 @@ export default function InstitutionalHome() {
           </div>
         </div>
 
-        {/* Sidebar Info Section */}
-        <div className="space-y-8">
+        {/* Sidebar Info Section - Takes 2 columns (40%) */}
+        <div className="lg:col-span-2 space-y-8">
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
@@ -238,8 +239,8 @@ export default function InstitutionalHome() {
             </CardHeader>
             <CardContent className="flex justify-center p-4 pt-0">
               <iframe
-                src="https://www.facebook.com/plugins/page.php?href=https%3A%2F%2Fwww.facebook.com%2Fsemedssbvpa&tabs=timeline&width=340&height=500&small_header=false&adapt_container_width=true&hide_cover=false&show_facepile=true&appId"
-                width="340"
+                src="https://www.facebook.com/plugins/page.php?href=https%3A%2F%2Fwww.facebook.com%2Fsemedssbvpa&tabs=timeline&width=500&height=500&small_header=false&adapt_container_width=true&hide_cover=false&show_facepile=true&appId"
+                width="500"
                 height="500"
                 style={{ border: 'none', overflow: 'hidden' }}
                 allowFullScreen={true}
