@@ -8,6 +8,7 @@ import {
   Calendar,
   UserCircle,
   School,
+  Facebook,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -134,7 +135,6 @@ export default function InstitutionalHome() {
             </Card>
           </Link>
           <Link to="/login">
-            {/* Placeholder for now */}
             <Card className="hover:shadow-lg transition-shadow cursor-pointer h-full group">
               <CardContent className="p-6 flex flex-col items-center text-center gap-4">
                 <div className="h-14 w-14 rounded-full bg-orange-100 flex items-center justify-center text-orange-600 group-hover:scale-110 transition-transform">
@@ -226,6 +226,27 @@ export default function InstitutionalHome() {
               ) : (
                 <p>Informações institucionais não cadastradas.</p>
               )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Facebook className="h-5 w-5 text-primary" />
+                Nossas Redes Sociais
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="flex justify-center p-4 pt-0">
+              <iframe
+                src="https://www.facebook.com/plugins/page.php?href=https%3A%2F%2Fwww.facebook.com%2Fsemedssbvpa&tabs=timeline&width=340&height=500&small_header=false&adapt_container_width=true&hide_cover=false&show_facepile=true&appId"
+                width="340"
+                height="500"
+                style={{ border: 'none', overflow: 'hidden' }}
+                allowFullScreen={true}
+                allow="autoplay; clipboard-write; encrypted-media; picture-in-picture; web-share"
+                title="Facebook SEMED"
+                className="max-w-full rounded-md"
+              />
             </CardContent>
           </Card>
 
