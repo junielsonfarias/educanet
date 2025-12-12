@@ -23,7 +23,7 @@ export interface SubjectCalculationResult {
 
 /**
  * Calculates student grades based on evaluation rules, assessments and periods.
- * Provides a detailed breakdown of the calculation process.
+ * Provides a detailed breakdown of the calculation process including individual recovery linkage.
  */
 export function calculateGrades(
   studentAssessments: Assessment[],
@@ -50,6 +50,50 @@ export function calculateGrades(
       (a) => a.category === 'recuperation',
     )
 
+    // Process Individual Linked Recoveries
+    const effectiveAssessments = regularAssessments.map((reg) => {
+      const linkedRecovery = recoveryAssessments.find(
+        (rec) => rec.relatedAssessmentId === reg.id,
+      )
+      let effectiveValue = Number(reg.value)
+      const originalValue = Number(reg.value)
+      let isRecovered = false
+
+      if (linkedRecovery) {
+        const recVal = Number(linkedRecovery.value)
+        isRecovered = true
+        if (rule.recoveryStrategy === 'always_replace') {
+          effectiveValue = recVal
+          periodLog.push(
+            `Recuperação Individual: Avaliação (${originalValue}) substituída por (${recVal}) [Sempre Substituir].`,
+          )
+        } else if (rule.recoveryStrategy === 'average') {
+          effectiveValue = (originalValue + recVal) / 2
+          periodLog.push(
+            `Recuperação Individual: Média entre (${originalValue}) e (${recVal}) = ${effectiveValue.toFixed(2)}.`,
+          )
+        } else {
+          // Default: replace_if_higher
+          if (recVal > originalValue) {
+            effectiveValue = recVal
+            periodLog.push(
+              `Recuperação Individual: Avaliação (${originalValue}) substituída por (${recVal}) [Maior Nota].`,
+            )
+          } else {
+            periodLog.push(
+              `Recuperação Individual: Recuperação (${recVal}) não superou original (${originalValue}). Mantida original.`,
+            )
+          }
+        }
+      }
+      return {
+        ...reg,
+        value: effectiveValue, // Override value for calculation
+        originalValue,
+        isRecovered,
+      }
+    })
+
     let regularAverage = 0
 
     // Check for Type Weights
@@ -61,7 +105,8 @@ export function calculateGrades(
       for (const [typeId, weight] of Object.entries(rule.typeWeights)) {
         const typeName =
           assessmentTypes.find((t) => t.id === typeId)?.name || 'Desconhecido'
-        const typeAssessments = regularAssessments.filter(
+        // Filter effective assessments by type
+        const typeAssessments = effectiveAssessments.filter(
           (a) => a.assessmentTypeId === typeId,
         )
 
@@ -88,8 +133,8 @@ export function calculateGrades(
       regularAverage = weightedSum
     } else {
       // Simple Average
-      // Filter out excluded types (e.g. 'Simulado Extra' marked as excludeFromAverage)
-      const validAssessments = regularAssessments.filter((a) => {
+      // Filter out excluded types
+      const validAssessments = effectiveAssessments.filter((a) => {
         const type = assessmentTypes.find((t) => t.id === a.assessmentTypeId)
         if (type?.excludeFromAverage) {
           periodLog.push(
@@ -101,7 +146,7 @@ export function calculateGrades(
       })
 
       if (validAssessments.length > 0) {
-        let values = validAssessments.map((a) => Number(a.value))
+        const values = validAssessments.map((a) => Number(a.value))
 
         // Handle Exclusions (Drop lowest)
         if (rule.allowedExclusions && values.length > 1) {
@@ -125,15 +170,19 @@ export function calculateGrades(
       }
     }
 
-    // Handle Recovery
+    // Handle Period Recovery (Unlinked Assessments)
+    const unlinkedRecoveryAssessments = recoveryAssessments.filter(
+      (a) => !a.relatedAssessmentId,
+    )
+
     let finalPeriodGrade = regularAverage
     let recoveryGrade: number | null = null
     let isRecoveryUsed = false
 
-    if (recoveryAssessments.length > 0) {
+    if (unlinkedRecoveryAssessments.length > 0) {
       // Take max recovery grade
       const maxRecovery = Math.max(
-        ...recoveryAssessments.map((a) => Number(a.value)),
+        ...unlinkedRecoveryAssessments.map((a) => Number(a.value)),
       )
       recoveryGrade = maxRecovery
 
@@ -141,13 +190,13 @@ export function calculateGrades(
         finalPeriodGrade = maxRecovery
         isRecoveryUsed = true
         periodLog.push(
-          `Regra de Recuperação (Sempre Substituir): Nota de recuperação (${maxRecovery}) substitui a média (${regularAverage.toFixed(2)}).`,
+          `Recuperação Periódica (Sempre Substituir): Nota de recuperação (${maxRecovery}) substitui a média (${regularAverage.toFixed(2)}).`,
         )
       } else if (rule.recoveryStrategy === 'average') {
         finalPeriodGrade = (regularAverage + maxRecovery) / 2
         isRecoveryUsed = true
         periodLog.push(
-          `Regra de Recuperação (Média): Média entre original (${regularAverage.toFixed(2)}) e recuperação (${maxRecovery}) = ${finalPeriodGrade.toFixed(2)}.`,
+          `Recuperação Periódica (Média): Média entre original (${regularAverage.toFixed(2)}) e recuperação (${maxRecovery}) = ${finalPeriodGrade.toFixed(2)}.`,
         )
       } else {
         // Default: replace_if_higher
@@ -155,15 +204,21 @@ export function calculateGrades(
           finalPeriodGrade = maxRecovery
           isRecoveryUsed = true
           periodLog.push(
-            `Regra de Recuperação (Maior Nota): Recuperação (${maxRecovery}) é maior que a média regular (${regularAverage.toFixed(2)}). Nota substituída.`,
+            `Recuperação Periódica (Maior Nota): Recuperação (${maxRecovery}) é maior que a média regular (${regularAverage.toFixed(2)}). Nota substituída.`,
           )
         } else {
           periodLog.push(
-            `Regra de Recuperação (Maior Nota): Recuperação (${maxRecovery}) não superou a média regular (${regularAverage.toFixed(2)}). Mantida a nota original.`,
+            `Recuperação Periódica (Maior Nota): Recuperação (${maxRecovery}) não superou a média regular (${regularAverage.toFixed(2)}). Mantida a nota original.`,
           )
         }
       }
     }
+
+    // Combine effective assessments and unlinked recoveries for display
+    const displayAssessments = [
+      ...effectiveAssessments,
+      ...unlinkedRecoveryAssessments,
+    ]
 
     periodResults.push({
       periodId: period.id,
@@ -173,7 +228,7 @@ export function calculateGrades(
       finalPeriodGrade,
       isRecoveryUsed,
       logs: periodLog,
-      assessments: pAssessments,
+      assessments: displayAssessments,
     })
   }
 

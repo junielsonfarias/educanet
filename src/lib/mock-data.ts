@@ -138,6 +138,7 @@ export interface Assessment {
   value: number | string
   date: string
   assessmentTypeId?: string
+  relatedAssessmentId?: string // Link recovery to specific assessment
 }
 
 export interface GeneralSettings {
@@ -537,6 +538,7 @@ export const mockAssessments: Assessment[] = [
     value: 8.0,
     date: '2024-04-15',
     assessmentTypeId: 'at1',
+    relatedAssessmentId: 'as1',
   },
   {
     id: 'as2',

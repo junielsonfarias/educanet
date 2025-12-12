@@ -74,6 +74,7 @@ export default function AssessmentInput() {
   const schoolId = form.watch('schoolId')
   const academicYearId = form.watch('academicYearId')
   const classId = form.watch('classId')
+  const category = form.watch('category')
 
   const selectedSchool = schools.find((s) => s.id === schoolId)
   const academicYears = selectedSchool?.academicYears || []
@@ -111,6 +112,9 @@ export default function AssessmentInput() {
     })
 
     classStudents.forEach((student) => {
+      // If we are in regular mode, we find the regular assessment
+      // If we are in recuperation mode, we find the recuperation assessment
+      // We match by TYPE if provided
       const assessment = assessments.find(
         (a) =>
           a.studentId === student.id &&
@@ -144,6 +148,28 @@ export default function AssessmentInput() {
     classStudents.forEach((student) => {
       const value = studentGrades[student.id]
       if (value !== undefined && value !== '') {
+        // Automatic Linking Logic for Recuperation
+        let relatedAssessmentId: string | undefined = undefined
+
+        if (
+          values.category === 'recuperation' &&
+          values.assessmentTypeId &&
+          values.assessmentTypeId !== ''
+        ) {
+          // Find the regular assessment of the SAME type in the SAME period
+          const related = assessments.find(
+            (a) =>
+              a.studentId === student.id &&
+              a.periodId === values.periodId &&
+              a.subjectId === values.subjectId &&
+              a.assessmentTypeId === values.assessmentTypeId &&
+              (a.category || 'regular') === 'regular',
+          )
+          if (related) {
+            relatedAssessmentId = related.id
+          }
+        }
+
         addAssessment({
           studentId: student.id,
           schoolId: values.schoolId,
@@ -156,6 +182,7 @@ export default function AssessmentInput() {
           value: value,
           date: new Date().toISOString().split('T')[0],
           assessmentTypeId: values.assessmentTypeId || undefined,
+          relatedAssessmentId,
         })
       }
     })
@@ -361,7 +388,9 @@ export default function AssessmentInput() {
                 name="assessmentTypeId"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Tipo de Avaliação</FormLabel>
+                    <FormLabel>
+                      Tipo de Avaliação {category === 'recuperation' && '*'}
+                    </FormLabel>
                     <Select onValueChange={field.onChange} value={field.value}>
                       <FormControl>
                         <SelectTrigger>
@@ -377,6 +406,12 @@ export default function AssessmentInput() {
                       </SelectContent>
                     </Select>
                     <FormMessage />
+                    {category === 'recuperation' && (
+                      <p className="text-[10px] text-muted-foreground mt-1">
+                        * Selecione o tipo da avaliação regular que será
+                        recuperada (ex: Prova Bimestral).
+                      </p>
+                    )}
                   </FormItem>
                 )}
               />

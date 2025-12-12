@@ -22,6 +22,7 @@ import TeacherAllocationReport from './pages/reports/TeacherAllocationReport'
 import ReportCard from './pages/public/ReportCard'
 import EvaluationRulesList from './pages/academic/EvaluationRulesList'
 import AssessmentTypesList from './pages/academic/AssessmentTypesList'
+import DataSimulator from './pages/settings/DataSimulator'
 import NotFound from './pages/NotFound'
 import Layout from './components/Layout'
 import UsersList from './pages/settings/UsersList'
@@ -150,6 +151,10 @@ const App = () => (
                           <Route
                             path="/configuracoes/usuarios"
                             element={<UsersList />}
+                          />
+                          <Route
+                            path="/configuracoes/simulador"
+                            element={<DataSimulator />}
                           />
                         </Route>
 
