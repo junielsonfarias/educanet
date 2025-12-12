@@ -3,7 +3,13 @@ import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import * as z from 'zod'
 import { Loader2, Save, Filter, AlertCircle, RefreshCw } from 'lucide-react'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+} from '@/components/ui/card'
 import {
   Select,
   SelectContent,
@@ -188,7 +194,7 @@ export default function AssessmentInput() {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(value))
     })
     return () => subscription.unsubscribe()
-  }, [form.watch])
+  }, [form])
 
   // --- Derived Options with Memoization ---
 
@@ -278,26 +284,26 @@ export default function AssessmentInput() {
     } else {
       form.setValue('academicYearId', '')
     }
-  }, [schoolId, academicYears]) // Depend on lists to re-validate
+  }, [schoolId, academicYears, academicYearId, form])
 
   useEffect(() => {
     const validGrade = availableGrades.find((g) => g.id === gradeId)
     if (!validGrade) form.setValue('gradeId', '')
-  }, [academicYearId, availableGrades])
+  }, [availableGrades, gradeId, form])
 
   useEffect(() => {
     if (!availableShifts.includes(shift)) form.setValue('shift', '')
-  }, [gradeId, availableShifts])
+  }, [availableShifts, shift, form])
 
   useEffect(() => {
     const validClass = availableClasses.find((c) => c.id === classId)
     if (!validClass) form.setValue('classId', '')
-  }, [shift, availableClasses])
+  }, [availableClasses, classId, form])
 
   useEffect(() => {
     const validSubject = subjects.find((s) => s.id === subjectId)
     if (!validSubject) form.setValue('subjectId', '')
-  }, [gradeId, subjects])
+  }, [subjects, subjectId, form])
 
   // --- Load Grades Data ---
 
