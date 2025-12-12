@@ -11,6 +11,7 @@ import PublicCalendar from './pages/public/PublicCalendar'
 import PublicSchools from './pages/public/PublicSchools'
 import PublicNews from './pages/public/PublicNews'
 import Structure from './pages/public/Structure'
+import PublicQEduData from './pages/public/PublicQEduData'
 import Dashboard from './pages/Dashboard'
 import SchoolsList from './pages/schools/SchoolsList'
 import SchoolDetails from './pages/schools/SchoolDetails'
@@ -108,6 +109,10 @@ const App = () => (
                               <Route
                                 path="/publico/estrutura"
                                 element={<Structure />}
+                              />
+                              <Route
+                                path="/publico/dados-qedu"
+                                element={<PublicQEduData />}
                               />
                             </Route>
 

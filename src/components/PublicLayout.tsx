@@ -21,6 +21,7 @@ export default function PublicLayout() {
     { label: 'Início', path: '/' },
     { label: 'Notícias', path: '/publico/noticias' },
     { label: 'Escolas', path: '/publico/escolas' },
+    { label: 'Dados QEdu', path: '/publico/dados-qedu' },
     { label: 'Estrutura', path: '/publico/estrutura' },
     { label: 'Documentos', path: '/publico/documentos' },
   ]
@@ -204,6 +205,11 @@ export default function PublicLayout() {
                 <li>
                   <Link to="/publico/escolas" className="hover:underline">
                     Nossas Escolas
+                  </Link>
+                </li>
+                <li>
+                  <Link to="/publico/dados-qedu" className="hover:underline">
+                    Dados QEdu
                   </Link>
                 </li>
                 <li>

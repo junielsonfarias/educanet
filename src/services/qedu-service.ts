@@ -30,6 +30,18 @@ export interface ApprovalFailureData {
   dropoutRate: number
 }
 
+export interface SchoolQEduData {
+  id: string
+  name: string
+  idebHistory: { year: number; score: number; target?: number }[]
+  approvalHistory: { year: number; rate: number }[]
+}
+
+export interface MunicipalityQEduData {
+  municipalityId: string
+  schools: SchoolQEduData[]
+}
+
 // Mock Data for "São Sebastião da Boa Vista - PA" (ID: 1507300)
 const mockDistortionData_1507300: AgeGradeDistortionData[] = [
   { year: 2023, series: '1º ano', distortionRate: 5.2 },
@@ -67,6 +79,57 @@ const mockApprovalData_1507300: ApprovalFailureData[] = [
   },
 ]
 
+const mockSchoolsQEduData_1507300: SchoolQEduData[] = [
+  {
+    id: 's1',
+    name: 'Escola Municipal Monteiro Lobato',
+    idebHistory: [
+      { year: 2017, score: 4.2, target: 4.5 },
+      { year: 2019, score: 4.5, target: 4.8 },
+      { year: 2021, score: 4.8, target: 5.0 },
+      { year: 2023, score: 5.1, target: 5.2 },
+    ],
+    approvalHistory: [
+      { year: 2017, rate: 85 },
+      { year: 2019, rate: 88 },
+      { year: 2021, rate: 90 },
+      { year: 2023, rate: 92 },
+    ],
+  },
+  {
+    id: 's2',
+    name: 'Escola Municipal Cecília Meireles',
+    idebHistory: [
+      { year: 2017, score: 3.8, target: 4.0 },
+      { year: 2019, score: 4.0, target: 4.3 },
+      { year: 2021, score: 4.2, target: 4.5 },
+      { year: 2023, score: 4.6, target: 4.8 },
+    ],
+    approvalHistory: [
+      { year: 2017, rate: 80 },
+      { year: 2019, rate: 82 },
+      { year: 2021, rate: 85 },
+      { year: 2023, rate: 88 },
+    ],
+  },
+  {
+    id: 's3',
+    name: 'Escola Municipal Vinícius de Moraes',
+    idebHistory: [
+      { year: 2017, score: 4.5, target: 4.6 },
+      { year: 2019, score: 4.7, target: 4.9 },
+      { year: 2021, score: 5.0, target: 5.1 },
+      { year: 2023, score: 5.3, target: 5.4 },
+    ],
+    approvalHistory: [
+      { year: 2017, rate: 88 },
+      { year: 2019, rate: 90 },
+      { year: 2021, rate: 92 },
+      { year: 2023, rate: 94 },
+    ],
+  },
+]
+
 // Generic mock data for other municipalities to show functionality
 const mockGenericDistortionData: AgeGradeDistortionData[] = [
   { year: 2023, series: '1º ano', distortionRate: 2.0 },
@@ -88,6 +151,37 @@ const mockGenericApprovalData: ApprovalFailureData[] = [
     approvalRate: 90.0,
     failureRate: 8.0,
     dropoutRate: 2.0,
+  },
+]
+
+const mockGenericSchoolsQEduData: SchoolQEduData[] = [
+  {
+    id: 'g1',
+    name: 'Escola Exemplo A',
+    idebHistory: [
+      { year: 2019, score: 5.0 },
+      { year: 2021, score: 5.2 },
+      { year: 2023, score: 5.5 },
+    ],
+    approvalHistory: [
+      { year: 2019, rate: 90 },
+      { year: 2021, rate: 92 },
+      { year: 2023, rate: 95 },
+    ],
+  },
+  {
+    id: 'g2',
+    name: 'Escola Exemplo B',
+    idebHistory: [
+      { year: 2019, score: 4.0 },
+      { year: 2021, score: 4.2 },
+      { year: 2023, score: 4.5 },
+    ],
+    approvalHistory: [
+      { year: 2019, rate: 80 },
+      { year: 2021, rate: 85 },
+      { year: 2023, rate: 88 },
+    ],
   },
 ]
 
@@ -113,6 +207,18 @@ export const fetchApprovalFailureRates = async (
     return mockApprovalData_1507300
   }
   return mockGenericApprovalData
+}
+
+export const fetchSchoolsQEduData = async (
+  municipalityId: string,
+): Promise<SchoolQEduData[]> => {
+  // Simulate API delay
+  await new Promise((resolve) => setTimeout(resolve, 1000))
+
+  if (municipalityId === '1507300') {
+    return mockSchoolsQEduData_1507300
+  }
+  return mockGenericSchoolsQEduData
 }
 
 export const getMunicipalityName = (id: string) => {
