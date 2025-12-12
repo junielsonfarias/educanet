@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react'
-import { Search, Printer, Info, AlertTriangle } from 'lucide-react'
+import { Search, AlertTriangle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
@@ -16,33 +16,24 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table'
-import { Badge } from '@/components/ui/badge'
+import { Label } from '@/components/ui/label'
 import useStudentStore from '@/stores/useStudentStore'
 import useAssessmentStore from '@/stores/useAssessmentStore'
 import useCourseStore from '@/stores/useCourseStore'
 import useSchoolStore from '@/stores/useSchoolStore'
 import { calculateGrades } from '@/lib/grade-calculator'
 import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from '@/components/ui/tooltip'
-import { Label } from '@/components/ui/label'
+  ReportCardDisplay,
+  ReportCardData,
+  GradeData,
+} from './components/ReportCardDisplay'
 
 export default function ReportCard() {
   const [searchRegistration, setSearchRegistration] = useState('')
   const [selectedSchool, setSelectedSchool] = useState('')
   const [selectedYear, setSelectedYear] = useState('')
   const [selectedGradeName, setSelectedGradeName] = useState('')
-  const [result, setResult] = useState<any>(null)
+  const [result, setResult] = useState<ReportCardData | null>(null)
   const [error, setError] = useState<string | null>(null)
 
   const { students } = useStudentStore()
@@ -50,12 +41,10 @@ export default function ReportCard() {
   const { courses, evaluationRules } = useCourseStore()
   const { schools } = useSchoolStore()
 
-  // Helper lists for dropdowns
   const activeSchool = schools.find((s) => s.id === selectedSchool)
   const academicYears = activeSchool?.academicYears || []
   const activeYear = academicYears.find((y) => y.id === selectedYear)
 
-  // Extract unique grade names from the selected year classes
   const availableGrades = useMemo(() => {
     if (!activeYear) return []
     const gradeNames = new Set(
@@ -64,12 +53,52 @@ export default function ReportCard() {
     return Array.from(gradeNames) as string[]
   }, [activeYear])
 
+  const calculateSubjectGrades = (
+    subjects: any[],
+    studentId: string,
+    yearId: string,
+    classId: string,
+    rule: any,
+    periods: any[],
+    isYearActive: boolean,
+  ): GradeData[] => {
+    return subjects.map((subject: any) => {
+      const subjectAssessments = assessments.filter(
+        (a) =>
+          a.studentId === studentId &&
+          a.subjectId === subject.id &&
+          yearId === a.yearId &&
+          a.classroomId === classId,
+      )
+
+      const calculation = calculateGrades(
+        subjectAssessments,
+        rule,
+        periods,
+        assessmentTypes,
+      )
+
+      return {
+        subject: subject.name,
+        periodGrades: periods.map((p: any) => {
+          const pRes = calculation.periodResults.find(
+            (pr) => pr.periodId === p.id,
+          )
+          return pRes ? pRes.finalPeriodGrade : 0
+        }),
+        final: calculation.finalGrade,
+        status: isYearActive ? 'Cursando' : calculation.status,
+        passing: calculation.isPassing,
+        formula: calculation.formulaUsed,
+      }
+    })
+  }
+
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault()
     setError(null)
     setResult(null)
 
-    // Validation
     if (
       !selectedSchool ||
       !selectedYear ||
@@ -80,38 +109,18 @@ export default function ReportCard() {
       return
     }
 
-    // Find Student
     const student = students.find((s) => s.registration === searchRegistration)
     if (!student) {
       setError('Aluno não encontrado com a matrícula informada.')
       return
     }
 
-    // Verify Enrollment matches criteria
-    const enrollment = student.enrollments.find(
-      (e) =>
-        e.schoolId === selectedSchool &&
-        activeYear?.name === e.year.toString() &&
-        (e.grade === selectedGradeName || e.grade.includes(selectedGradeName)), // Loose match for simplicity or exact? User story asks for Grade
-    )
-
-    // Note: The dropdown selects "Grade Name" (e.g. 5º Ano), but enrollment might store "5º Ano A".
-    // Usually enrollment stores the Class Name or Grade Name. In this mock, enrollment.grade seems to be Class Name.
-    // Let's assume we match if the enrollment grade includes the selected grade name or matches class.
-    // Better logic: Enrollment stores "grade" string which is Class Name. Class has "gradeName".
-    // We should find if the student is enrolled in a class that belongs to the selected grade name.
-
-    const relevantClass = activeYear?.classes.find(
-      (c) =>
-        c.gradeName === selectedGradeName &&
-        (c.name === enrollment?.grade || enrollment?.grade.includes(c.name)),
-    )
-    // Or simpler: check if any enrollment matches
+    // Find Regular Enrollment
     const validEnrollment = student.enrollments.find((e) => {
       if (e.schoolId !== selectedSchool) return false
       if (e.year.toString() !== activeYear?.name) return false
+      if (e.type !== 'regular') return false
 
-      // Find class for this enrollment string
       const cls = activeYear?.classes.find((c) => c.name === e.grade)
       return cls && cls.gradeName === selectedGradeName
     })
@@ -121,81 +130,126 @@ export default function ReportCard() {
       return
     }
 
-    const enrollmentData = validEnrollment
-    const school = schools.find((s) => s.id === enrollmentData.schoolId)
+    const school = schools.find((s) => s.id === validEnrollment.schoolId)
     const academicYear = school?.academicYears.find(
-      (y) => y.name === enrollmentData.year.toString(),
+      (y) => y.name === validEnrollment.year.toString(),
     )
     const classroom = academicYear?.classes.find(
-      (c) => c.name === enrollmentData.grade,
+      (c) => c.name === validEnrollment.grade,
     )
 
-    // Find Course Structure
-    let gradeStructure: any = null
-    let courseEvaluationRule: any = null
+    if (!academicYear || !classroom) {
+      setError('Dados acadêmicos incompletos.')
+      return
+    }
+
+    // Determine Regular Structure
+    let regularGradeStructure: any = null
+    let regularRule: any = null
 
     for (const course of courses) {
       const g = course.grades.find(
         (gr) =>
-          gr.name === selectedGradeName || // Match selected grade name
+          gr.name === selectedGradeName ||
           (classroom && gr.id === classroom.gradeId),
       )
       if (g) {
-        gradeStructure = g
-        courseEvaluationRule = evaluationRules.find(
-          (r) => r.id === g.evaluationRuleId,
-        )
+        regularGradeStructure = g
+        regularRule = evaluationRules.find((r) => r.id === g.evaluationRuleId)
         break
       }
     }
 
-    if (!gradeStructure || !courseEvaluationRule) {
-      setError('Erro na configuração curricular. Contate a escola.')
+    if (!regularGradeStructure || !regularRule) {
+      setError('Erro na configuração curricular.')
       return
     }
 
-    const periods = academicYear?.periods || []
+    const periods = academicYear.periods || []
+    const isYearActive = academicYear.status === 'active'
 
-    // Process Grades using centralized calculator
-    const reportCardGrades = gradeStructure.subjects.map((subject: any) => {
-      const subjectAssessments = assessments.filter(
-        (a) =>
-          a.studentId === student.id &&
-          a.subjectId === subject.id &&
-          academicYear!.id === a.yearId,
+    // Calculate Regular Grades
+    const reportCardGrades = calculateSubjectGrades(
+      regularGradeStructure.subjects,
+      student.id,
+      academicYear.id,
+      classroom.id,
+      regularRule,
+      periods,
+      isYearActive,
+    )
+
+    // Calculate Dependency Grades
+    const dependencyEnrollments = student.enrollments.filter(
+      (e) =>
+        e.schoolId === selectedSchool &&
+        e.year.toString() === activeYear?.name &&
+        e.type === 'dependency',
+    )
+
+    const dependenciesData = []
+
+    for (const depEnrollment of dependencyEnrollments) {
+      const depClass = activeYear.classes.find(
+        (c) => c.name === depEnrollment.grade,
       )
+      if (!depClass) continue
 
-      const calculation = calculateGrades(
-        subjectAssessments,
-        courseEvaluationRule,
-        periods,
-        assessmentTypes,
-      )
+      let depGradeStructure: any = null
+      let depRule: any = null
 
-      return {
-        subject: subject.name,
-        periodGrades: periods.map((p) => {
-          const pRes = calculation.periodResults.find(
-            (pr) => pr.periodId === p.id,
-          )
-          return pRes ? pRes.finalPeriodGrade : 0
-        }),
-        final: calculation.finalGrade,
-        status: calculation.status,
-        passing: calculation.isPassing,
-        formula: calculation.formulaUsed,
+      for (const course of courses) {
+        const g = course.grades.find((gr) => gr.id === depClass.gradeId)
+        if (g) {
+          depGradeStructure = g
+          depRule = evaluationRules.find((r) => r.id === g.evaluationRuleId)
+          break
+        }
       }
-    })
+
+      if (!depGradeStructure || !depRule) continue
+
+      // Filter subjects with assessments
+      const activeSubjects = depGradeStructure.subjects.filter(
+        (subject: any) => {
+          return assessments.some(
+            (a) =>
+              a.studentId === student.id &&
+              a.subjectId === subject.id &&
+              a.classroomId === depClass.id &&
+              a.yearId === academicYear.id,
+          )
+        },
+      )
+
+      if (activeSubjects.length > 0) {
+        const depGrades = calculateSubjectGrades(
+          activeSubjects,
+          student.id,
+          academicYear.id,
+          depClass.id,
+          depRule,
+          periods,
+          isYearActive,
+        )
+
+        dependenciesData.push({
+          className: depClass.name,
+          grades: depGrades,
+          ruleName: depRule.name,
+        })
+      }
+    }
 
     setResult({
       name: student.name,
-      school: school?.name,
-      grade: enrollmentData.grade, // Display actual class name
-      gradeName: selectedGradeName,
-      year: enrollmentData.year,
-      ruleName: courseEvaluationRule.name,
+      school: school?.name || '',
+      grade: validEnrollment.grade,
+      year: validEnrollment.year,
+      ruleName: regularRule.name,
       grades: reportCardGrades,
       periodNames: periods.map((p) => p.name),
+      dependencies: dependenciesData,
     })
   }
 
@@ -322,98 +376,7 @@ export default function ReportCard() {
           </CardContent>
         </Card>
 
-        {result && (
-          <Card className="animate-slide-up">
-            <CardHeader className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-              <div>
-                <CardTitle className="text-xl">{result.name}</CardTitle>
-                <CardDescription className="text-base mt-1">
-                  {result.school} • {result.grade} • {result.year}
-                </CardDescription>
-              </div>
-              <div className="flex gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => window.print()}
-                >
-                  <Printer className="mr-2 h-4 w-4" /> Imprimir
-                </Button>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="rounded-md border overflow-x-auto">
-                <Table>
-                  <TableHeader className="bg-muted/50">
-                    <TableRow>
-                      <TableHead className="font-bold min-w-[200px]">
-                        Disciplina
-                      </TableHead>
-                      {result.periodNames.map((p: string) => (
-                        <TableHead key={p} className="text-center min-w-[80px]">
-                          {p}
-                        </TableHead>
-                      ))}
-                      <TableHead className="text-center font-bold min-w-[100px]">
-                        Média Final
-                      </TableHead>
-                      <TableHead className="text-center min-w-[120px]">
-                        Situação
-                      </TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {result.grades.map((grade: any) => (
-                      <TableRow key={grade.subject}>
-                        <TableCell className="font-medium">
-                          {grade.subject}
-                        </TableCell>
-                        {grade.periodGrades.map((p: number, idx: number) => (
-                          <TableCell key={idx} className="text-center">
-                            {p.toFixed(1)}
-                          </TableCell>
-                        ))}
-                        <TableCell className="text-center font-bold bg-muted/20">
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <div className="flex items-center justify-center gap-1 cursor-help">
-                                {grade.final.toFixed(1)}
-                              </div>
-                            </TooltipTrigger>
-                            <TooltipContent>
-                              <p className="text-xs">
-                                Fórmula: {grade.formula}
-                              </p>
-                            </TooltipContent>
-                          </Tooltip>
-                        </TableCell>
-                        <TableCell className="text-center">
-                          <Badge
-                            variant={grade.passing ? 'default' : 'destructive'}
-                            className={
-                              grade.passing
-                                ? 'bg-green-600 hover:bg-green-700'
-                                : ''
-                            }
-                          >
-                            {grade.status}
-                          </Badge>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-              <div className="mt-4 flex items-center justify-center gap-2 text-xs text-muted-foreground">
-                <Info className="h-3 w-3" />
-                <span>
-                  Regra de Avaliação Aplicada:{' '}
-                  <strong>{result.ruleName}</strong>
-                </span>
-              </div>
-            </CardContent>
-          </Card>
-        )}
+        {result && <ReportCardDisplay data={result} />}
       </div>
     </div>
   )
