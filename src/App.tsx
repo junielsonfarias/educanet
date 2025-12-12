@@ -23,6 +23,7 @@ import CoursesList from './pages/academic/CoursesList'
 import CourseDetails from './pages/academic/CourseDetails'
 import ClassesList from './pages/academic/ClassesList'
 import AssessmentInput from './pages/academic/AssessmentInput'
+import EvaluationAnalysis from './pages/academic/EvaluationAnalysis'
 import SchoolCalendar from './pages/calendar/SchoolCalendar'
 import ReportsDashboard from './pages/reports/ReportsDashboard'
 import EnrollmentReport from './pages/reports/EnrollmentReport'
@@ -178,6 +179,10 @@ const App = () => (
                               <Route
                                 path="/avaliacao/lancamento"
                                 element={<AssessmentInput />}
+                              />
+                              <Route
+                                path="/academico/analise-avaliacoes"
+                                element={<EvaluationAnalysis />}
                               />
 
                               {/* Calendar */}

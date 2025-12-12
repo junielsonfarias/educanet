@@ -1,4 +1,4 @@
-import { Printer, Info, AlertCircle, FileText, Download } from 'lucide-react'
+import { Printer, Info, AlertCircle, FileText } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
   Card,
@@ -222,6 +222,11 @@ export function ReportCardDisplay({ data }: ReportCardDisplayProps) {
                 <Badge variant="outline" className="text-sm font-semibold px-3">
                   {type.name}
                 </Badge>
+                {type.excludeFromAverage && (
+                  <Badge variant="secondary" className="text-xs bg-muted">
+                    Não Compõe Média
+                  </Badge>
+                )}
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {Object.entries(bySubject).map(([subject, entries]) => (

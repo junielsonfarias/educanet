@@ -12,6 +12,7 @@ import {
   Globe,
   Newspaper,
   PieChart,
+  BarChart,
 } from 'lucide-react'
 import {
   Sidebar,
@@ -87,6 +88,11 @@ const academicItems = [
     title: 'Lançamento de Notas',
     url: '/avaliacao/lancamento',
     icon: GraduationCap,
+  },
+  {
+    title: 'Análise e Comparação',
+    url: '/academico/analise-avaliacoes',
+    icon: BarChart,
   },
 ]
 

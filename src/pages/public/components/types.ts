@@ -21,6 +21,7 @@ export type EvaluationEntry = {
 export type EvaluationTypeData = {
   id: string
   name: string
+  excludeFromAverage: boolean
   entries: EvaluationEntry[]
 }
 

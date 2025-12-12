@@ -96,29 +96,11 @@ export default function ReportCard() {
         const type = assessmentTypes.find((t) => t.id === a.assessmentTypeId)
         const period = periods.find((p: any) => p.id === a.periodId)
 
-        // Check if this is a recovery linked to another assessment
-        const isRecovered = assessments.some(
+        const recovery = assessments.find(
           (rec) => rec.relatedAssessmentId === a.id,
         )
-        const recoveryAssessment = assessments.find(
-          (rec) => rec.relatedAssessmentId === a.id,
-        )
-
-        // Add to history list (exclude if it's a recovery assessment itself, we can merge or show separate)
-        // Let's show all, but mark them
-
-        if (a.category === 'recuperation' && a.relatedAssessmentId) {
-          // It's a linked recovery, usually we show it inside the original in complex views,
-          // but here let's list it as a separate entry or handle it in the main entry?
-          // The PublicAssessmentHistory handles `isRecovered` prop.
-          // We should find the ORIGINAL assessment and mark it.
-          return // Skip adding recovery directly to list if we want to merge, OR add it.
-          // Strategy: Add ALL regular assessments. If recovered, enrich data.
-          // Independent recoveries (period recovery) are added as separate entries.
-        }
 
         if ((a.category || 'regular') === 'regular') {
-          const rec = assessments.find((r) => r.relatedAssessmentId === a.id)
           history.push({
             id: a.id,
             date: a.date,
@@ -128,8 +110,8 @@ export default function ReportCard() {
             category: 'regular',
             value: Number(a.value),
             originalValue: Number(a.value),
-            isRecovered: !!rec,
-            recoveryValue: rec ? Number(rec.value) : undefined,
+            isRecovered: !!recovery,
+            recoveryValue: recovery ? Number(recovery.value) : undefined,
           })
         } else {
           // Unlinked recovery (e.g. Period Recovery)
@@ -219,6 +201,7 @@ export default function ReportCard() {
         evaluationTypes.push({
           id: type.id,
           name: type.name,
+          excludeFromAverage: type.excludeFromAverage || false,
           entries,
         })
       }
