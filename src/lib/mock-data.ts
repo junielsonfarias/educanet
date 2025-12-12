@@ -242,13 +242,11 @@ export const mockEvaluationRules: EvaluationRule[] = [
     passingGrade: 6.0,
     minDependencyGrade: 4.0,
     minAttendance: 75,
-    // Using 'x' for multiplication to demonstrate support for user story requirement
-    formula:
-      '(( eval1 x2 ) + ( eval2 x 3 ) + ( eval3 x 2 ) + ( eval4 x 3)) / 10',
+    formula: '((eval1 * 2) + (eval2 * 3) + (eval3 * 2) + (eval4 * 3)) / 10',
     isStandard: false,
     periodCount: 4,
     allowedExclusions: true,
-    recoveryStrategy: 'average',
+    recoveryStrategy: 'replace_if_higher',
   },
 ]
 
@@ -269,7 +267,7 @@ export const mockCourses: Course[] = [
       {
         id: 'g5',
         name: '5º Ano',
-        evaluationRuleId: 'rule1',
+        evaluationRuleId: 'rule3', // Updated to use rule3 for weighted average requirement
         subjects: [
           { id: 's9', name: 'Português', workload: 180 },
           { id: 's10', name: 'Matemática', workload: 180 },
@@ -374,6 +372,20 @@ export const mockSchools: School[] = [
             operatingDays: ['seg', 'ter', 'qua', 'qui', 'sex'],
             isMultiGrade: false,
             maxDependencySubjects: 2,
+          },
+          {
+            id: 'cl2', // Added class for dependency testing
+            name: '1º Ano A',
+            shift: 'Vespertino',
+            gradeId: 'g1',
+            gradeName: '1º Ano',
+            studentCount: 20,
+            acronym: '1A-V',
+            operatingHours: '13:00 - 18:00',
+            minStudents: 15,
+            operatingDays: ['seg', 'ter', 'qua', 'qui', 'sex'],
+            isMultiGrade: false,
+            maxDependencySubjects: 0,
           },
         ],
       },
@@ -536,6 +548,14 @@ export const mockStudents: Student[] = [
         status: 'Cursando',
         type: 'regular',
       },
+      {
+        id: 'e2', // Dependency enrollment
+        schoolId: '1',
+        grade: '1º Ano A',
+        year: 2024,
+        status: 'Cursando',
+        type: 'dependency',
+      },
     ],
     projectIds: [],
     grade: '5º Ano A',
@@ -623,6 +643,21 @@ export const mockAssessments: Assessment[] = [
     value: 9.5,
     date: '2024-04-12',
     assessmentTypeId: 'at1',
+  },
+  // Dependency Assessment (Math 1st Year)
+  {
+    id: 'as_dep1',
+    studentId: '1',
+    schoolId: '1',
+    yearId: 'y2024',
+    classroomId: 'cl2',
+    subjectId: 's2',
+    periodId: 'p1',
+    type: 'numeric',
+    category: 'regular',
+    value: 4.5, // Red grade
+    date: '2024-04-10',
+    assessmentTypeId: 'at1', // Assuming compatible type
   },
 ]
 

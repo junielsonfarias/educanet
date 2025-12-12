@@ -37,6 +37,7 @@ import {
   FileText,
   ArrowRight,
   TrendingUp,
+  AlertTriangle,
 } from 'lucide-react'
 import { Student, EvaluationRule } from '@/lib/mock-data'
 import useAssessmentStore from '@/stores/useAssessmentStore'
@@ -55,9 +56,23 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip'
+import { cn } from '@/lib/utils'
 
 interface StudentPerformanceCardProps {
   student: Student
+}
+
+type CalculatedEnrollment = {
+  enrollmentId: string
+  type: 'regular' | 'dependency'
+  gradeName: string
+  className: string
+  results: {
+    subjectId: string
+    subjectName: string
+    calculation: SubjectCalculationResult
+  }[]
+  periods: any[]
 }
 
 export function StudentPerformanceCard({
@@ -84,83 +99,213 @@ export function StudentPerformanceCard({
   }, [years, selectedYear])
 
   const getPerformanceData = (yearStr: string) => {
-    // 1. Find academic years (ids) that match the selected year string
-    let relevantSchool: any = null
-    let relevantAcademicYear: any = null
-
-    // Find the correct school and academic year for the selected year string
-    for (const school of schools) {
-      const ay = school.academicYears.find(
-        (y) => y.name === yearStr || y.name.includes(yearStr),
-      )
-      if (ay) {
-        relevantSchool = school
-        relevantAcademicYear = ay
-        break
-      }
-    }
-
-    if (!relevantAcademicYear) return []
-
-    // 2. Identify subjects based on student's class
-    // Find student's class/grade in this year
-    const enrollment = student.enrollments.find(
+    const enrollmentsInYear = student.enrollments.filter(
       (e) => e.year.toString() === yearStr,
     )
-    // Find corresponding class object (simplified matching by grade name for mock)
-    const classroom = relevantAcademicYear.classes.find(
-      (c: any) => c.name === enrollment?.grade,
-    )
 
-    // Find Course/Grade structure
-    // We iterate courses to find the grade that matches the classroom gradeId
-    let gradeStructure: any = null
-    let courseEvaluationRule: EvaluationRule | undefined = undefined
+    const calculatedEnrollments: CalculatedEnrollment[] = []
+    let academicYearStatus = 'active' // Default fallback
 
-    for (const course of courses) {
-      const g = course.grades.find(
-        (gr) => gr.id === classroom?.gradeId || gr.name === enrollment?.grade,
+    for (const enrollment of enrollmentsInYear) {
+      // 1. Find school and academic year
+      const school = schools.find((s) => s.id === enrollment.schoolId)
+      const academicYear = school?.academicYears.find(
+        (y) => y.name === yearStr || y.name.includes(yearStr),
       )
-      if (g) {
-        gradeStructure = g
-        courseEvaluationRule = evaluationRules.find(
-          (r) => r.id === g.evaluationRuleId,
+
+      if (!academicYear) continue
+      academicYearStatus = academicYear.status
+
+      // 2. Find classroom
+      const classroom = academicYear.classes.find(
+        (c) => c.name === enrollment.grade,
+      )
+
+      // 3. Find course/grade/subjects
+      let gradeStructure: any = null
+      let courseEvaluationRule: EvaluationRule | undefined = undefined
+
+      for (const course of courses) {
+        const g = course.grades.find(
+          (gr) => gr.id === classroom?.gradeId || gr.name === enrollment.grade,
         )
-        break
+        if (g) {
+          gradeStructure = g
+          courseEvaluationRule = evaluationRules.find(
+            (r) => r.id === g.evaluationRuleId,
+          )
+          break
+        }
       }
+
+      if (!gradeStructure || !courseEvaluationRule) continue
+
+      const periods = academicYear.periods || []
+
+      // 4. Calculate
+      const results = gradeStructure.subjects.map((subject: any) => {
+        const subjectAssessments = assessments.filter(
+          (a) =>
+            a.studentId === student.id &&
+            a.subjectId === subject.id &&
+            academicYear.id === a.yearId,
+        )
+
+        const calculation = calculateGrades(
+          subjectAssessments,
+          courseEvaluationRule!,
+          periods,
+          assessmentTypes,
+          settings.defaultRecoveryStrategy,
+        )
+
+        // Override status if Academic Year is active
+        if (
+          academicYear.status === 'active' &&
+          calculation.status !== 'Cursando'
+        ) {
+          calculation.status = 'Cursando'
+        }
+
+        return {
+          subjectId: subject.id,
+          subjectName: subject.name,
+          calculation,
+        }
+      })
+
+      calculatedEnrollments.push({
+        enrollmentId: enrollment.id,
+        type: enrollment.type,
+        gradeName: enrollment.grade,
+        className: classroom?.name || enrollment.grade,
+        results,
+        periods,
+      })
     }
 
-    if (!gradeStructure || !courseEvaluationRule) return []
-
-    const periods = relevantAcademicYear.periods || []
-
-    // 3. Calculate for each subject
-    return gradeStructure.subjects.map((subject: any) => {
-      // Filter assessments for this subject
-      const subjectAssessments = assessments.filter(
-        (a) =>
-          a.studentId === student.id &&
-          a.subjectId === subject.id &&
-          relevantAcademicYear.id === a.yearId, // Ensure year matches
-      )
-
-      const calculation = calculateGrades(
-        subjectAssessments,
-        courseEvaluationRule!,
-        periods,
-        assessmentTypes,
-        settings.defaultRecoveryStrategy, // Pass global setting
-      )
-
-      return {
-        subjectId: subject.id,
-        subjectName: subject.name,
-        calculation,
-      }
-    })
+    return { calculatedEnrollments, academicYearStatus }
   }
 
-  const performanceData = selectedYear ? getPerformanceData(selectedYear) : []
+  const { calculatedEnrollments } = selectedYear
+    ? getPerformanceData(selectedYear)
+    : { calculatedEnrollments: [], academicYearStatus: '' }
+
+  const regularEnrollments = calculatedEnrollments.filter(
+    (e) => e.type === 'regular',
+  )
+  const dependencyEnrollments = calculatedEnrollments.filter(
+    (e) => e.type === 'dependency',
+  )
+
+  const getGradeColorClass = (grade: number) => {
+    if (grade < 5) return 'text-red-600 font-bold'
+    return 'text-blue-600 font-bold'
+  }
+
+  const formatPeriodName = (name: string, index: number) => {
+    return `${index + 1}º Avaliação`
+  }
+
+  const renderGradesTable = (enrollment: CalculatedEnrollment) => (
+    <div className="rounded-md border overflow-x-auto">
+      <Table>
+        <TableHeader className="bg-muted/50">
+          <TableRow>
+            <TableHead className="min-w-[180px]">Disciplina</TableHead>
+            {enrollment.periods.map((p, idx) => (
+              <TableHead key={p.id} className="text-center min-w-[80px]">
+                {formatPeriodName(p.name, idx)}
+              </TableHead>
+            ))}
+            <TableHead className="text-center min-w-[100px]">
+              Média Final
+            </TableHead>
+            <TableHead className="min-w-[120px]">Situação</TableHead>
+            <TableHead className="text-right w-[100px]">Detalhes</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {enrollment.results.map((data) => (
+            <TableRow key={data.subjectId}>
+              <TableCell className="font-medium">{data.subjectName}</TableCell>
+              {enrollment.periods.map((p) => {
+                const periodResult = data.calculation.periodResults.find(
+                  (pr) => pr.periodId === p.id,
+                )
+                const grade = periodResult?.finalPeriodGrade
+                return (
+                  <TableCell key={p.id} className="text-center">
+                    {grade !== undefined ? (
+                      <span className={cn(getGradeColorClass(grade))}>
+                        {grade.toFixed(1)}
+                      </span>
+                    ) : (
+                      <span className="text-muted-foreground">-</span>
+                    )}
+                  </TableCell>
+                )
+              })}
+              <TableCell className="text-center">
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span
+                        className={cn(
+                          'cursor-help border-b border-dotted',
+                          getGradeColorClass(data.calculation.finalGrade),
+                        )}
+                      >
+                        {data.calculation.finalGrade.toFixed(1)}
+                      </span>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p className="text-xs">
+                        Fórmula: {data.calculation.formulaUsed}
+                      </p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              </TableCell>
+              <TableCell>
+                <Badge
+                  variant={
+                    data.calculation.status === 'Aprovado'
+                      ? 'default'
+                      : data.calculation.status === 'Cursando'
+                        ? 'outline'
+                        : data.calculation.status === 'Dependência'
+                          ? 'secondary'
+                          : 'destructive'
+                  }
+                  className={cn({
+                    'bg-green-600 hover:bg-green-700 text-white border-transparent':
+                      data.calculation.status === 'Aprovado',
+                    'bg-blue-50 text-blue-700 border-blue-200':
+                      data.calculation.status === 'Cursando',
+                  })}
+                >
+                  {data.calculation.status}
+                </Badge>
+              </TableCell>
+              <TableCell className="text-right">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    setSelectedSubjectName(data.subjectName)
+                    setDetailsDialog(data.calculation)
+                  }}
+                >
+                  <Info className="h-4 w-4" />
+                </Button>
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    </div>
+  )
 
   return (
     <Card className="col-span-1 md:col-span-2">
@@ -189,72 +334,77 @@ export function StudentPerformanceCard({
           </Select>
         </div>
       </CardHeader>
-      <CardContent>
-        {performanceData.length === 0 ? (
+      <CardContent className="space-y-8">
+        {regularEnrollments.length === 0 &&
+        dependencyEnrollments.length === 0 ? (
           <p className="text-sm text-muted-foreground py-8 text-center bg-muted/20 rounded-md">
             Nenhum dado de avaliação encontrado ou configuração incompleta para
             o ano selecionado.
           </p>
         ) : (
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="w-[30%]">Disciplina</TableHead>
-                <TableHead>Média Final</TableHead>
-                <TableHead>Situação</TableHead>
-                <TableHead className="text-right">Detalhes</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {performanceData.map((data: any) => (
-                <TableRow key={data.subjectId}>
-                  <TableCell className="font-medium">
-                    {data.subjectName}
-                  </TableCell>
-                  <TableCell>
-                    <span
-                      className={`font-bold text-lg ${
-                        data.calculation.isPassing
-                          ? 'text-green-600'
-                          : 'text-red-600'
-                      }`}
-                    >
-                      {data.calculation.finalGrade.toFixed(1)}
-                    </span>
-                  </TableCell>
-                  <TableCell>
-                    <Badge
-                      variant={
-                        data.calculation.isPassing
-                          ? 'default'
-                          : data.calculation.status === 'Dependência'
-                            ? 'secondary'
-                            : 'destructive'
-                      }
-                    >
-                      {data.calculation.status}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => {
-                        setSelectedSubjectName(data.subjectName)
-                        setDetailsDialog(data.calculation)
-                      }}
-                    >
-                      <Info className="h-4 w-4 mr-2" /> Ver Cálculo
-                    </Button>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+          <>
+            {/* Regular Enrollments */}
+            {regularEnrollments.map((enrollment) => (
+              <div key={enrollment.enrollmentId} className="space-y-4">
+                <div className="flex items-center gap-2">
+                  <Badge variant="outline" className="text-sm px-3 py-1">
+                    Matrícula Regular
+                  </Badge>
+                  <span className="text-sm text-muted-foreground">
+                    Turma: {enrollment.className}
+                  </span>
+                </div>
+                {renderGradesTable(enrollment)}
+              </div>
+            ))}
+
+            {/* Dependency Enrollments */}
+            {dependencyEnrollments.length > 0 && (
+              <div className="space-y-6 pt-4 border-t">
+                <div className="flex items-center gap-2 text-amber-700">
+                  <AlertTriangle className="h-5 w-5" />
+                  <h3 className="text-lg font-semibold">
+                    Disciplinas em Dependência
+                  </h3>
+                </div>
+
+                {dependencyEnrollments.map((enrollment) => (
+                  <div
+                    key={enrollment.enrollmentId}
+                    className="bg-amber-50/50 p-4 rounded-lg border border-amber-100 space-y-4"
+                  >
+                    <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
+                      <Badge
+                        variant="secondary"
+                        className="bg-amber-100 text-amber-800 hover:bg-amber-200"
+                      >
+                        Dependência
+                      </Badge>
+                      <div className="flex items-center gap-1">
+                        <span className="font-semibold text-foreground">
+                          Turma:
+                        </span>
+                        {enrollment.className}
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <span className="font-semibold text-foreground">
+                          Matrícula:
+                        </span>
+                        {enrollment.type === 'dependency'
+                          ? 'Parcial'
+                          : 'Integral'}
+                      </div>
+                    </div>
+                    {renderGradesTable(enrollment)}
+                  </div>
+                ))}
+              </div>
+            )}
+          </>
         )}
       </CardContent>
 
-      {/* Details Dialog */}
+      {/* Details Dialog - Kept similar to original but with improved data */}
       <Dialog
         open={!!detailsDialog}
         onOpenChange={(open) => !open && setDetailsDialog(null)}
@@ -266,31 +416,23 @@ export function StudentPerformanceCard({
               Memória de Cálculo: {selectedSubjectName}
             </DialogTitle>
             <DialogDescription>
-              Detalhamento de como a nota final foi obtida baseada na regra:{' '}
-              <span className="font-semibold text-primary">
-                {detailsDialog?.ruleName}
-              </span>
-              <span className="block mt-1 text-xs">
-                Estratégia de Recuperação:{' '}
-                {detailsDialog?.recoveryStrategyApplied === 'replace_if_higher'
-                  ? 'Substituir se Maior'
-                  : detailsDialog?.recoveryStrategyApplied === 'always_replace'
-                    ? 'Sempre Substituir'
-                    : 'Média'}
+              Regra: {detailsDialog?.ruleName}
+              <span className="block mt-1 text-xs text-muted-foreground">
+                Estratégia: {detailsDialog?.recoveryStrategyApplied}
               </span>
             </DialogDescription>
           </DialogHeader>
 
           <ScrollArea className="flex-1 pr-4">
             <div className="space-y-6 py-4">
-              {detailsDialog?.periodResults.map((period) => (
+              {detailsDialog?.periodResults.map((period, idx) => (
                 <div
                   key={period.periodId}
                   className="border rounded-lg p-4 space-y-3"
                 >
                   <div className="flex justify-between items-center">
                     <h4 className="font-semibold text-sm">
-                      {period.periodName}
+                      {formatPeriodName(period.periodName, idx)}
                     </h4>
                     <div className="flex items-center gap-2">
                       {period.isRecoveryUsed && (
@@ -331,15 +473,9 @@ export function StudentPerformanceCard({
                                   title={type?.name || 'Avaliação'}
                                 >
                                   {type?.name || 'Avaliação'}
+                                  {assessment.category === 'recuperation' &&
+                                    ' (Recuperação)'}
                                 </span>
-                                {assessment.category === 'recuperation' && (
-                                  <Badge
-                                    variant="outline"
-                                    className="text-[10px] h-4 px-1"
-                                  >
-                                    Recuperação Avulsa
-                                  </Badge>
-                                )}
                               </div>
 
                               <div className="flex items-center gap-3">
@@ -363,17 +499,12 @@ export function StudentPerformanceCard({
                                         </TooltipTrigger>
                                         <TooltipContent>
                                           <p className="font-semibold">
-                                            Recuperado!
+                                            Nota Recuperada
                                           </p>
                                           <p>
-                                            Nota Recuperação:{' '}
+                                            Valor Recuperação:{' '}
                                             {assessment.recoveryValue}
                                           </p>
-                                          {assessment.recoveryDate && (
-                                            <p className="text-xs opacity-75">
-                                              Data: {assessment.recoveryDate}
-                                            </p>
-                                          )}
                                         </TooltipContent>
                                       </Tooltip>
                                     </TooltipProvider>
@@ -396,31 +527,13 @@ export function StudentPerformanceCard({
                       Nenhuma avaliação lançada neste período.
                     </p>
                   )}
-
-                  <div className="text-xs text-muted-foreground space-y-1 bg-muted/30 p-2 rounded mt-2">
-                    <p className="font-semibold text-foreground mb-1">
-                      Log de Processamento:
-                    </p>
-                    {period.logs.map((log, idx) => (
-                      <p key={idx}>• {log}</p>
-                    ))}
-                  </div>
-                  <div className="grid grid-cols-2 text-sm gap-2 mt-2">
-                    <div>
-                      <span className="text-muted-foreground">
-                        Média Regular:
-                      </span>{' '}
-                      {period.regularAverage.toFixed(2)}
+                  {period.logs.length > 0 && (
+                    <div className="bg-muted/30 p-2 rounded text-xs text-muted-foreground space-y-1 mt-2">
+                      {period.logs.map((log, i) => (
+                        <p key={i}>• {log}</p>
+                      ))}
                     </div>
-                    {period.recoveryGrade !== null && (
-                      <div>
-                        <span className="text-muted-foreground">
-                          Nota Recuperação Final:
-                        </span>{' '}
-                        {period.recoveryGrade}
-                      </div>
-                    )}
-                  </div>
+                  )}
                 </div>
               ))}
 
@@ -428,31 +541,24 @@ export function StudentPerformanceCard({
                 <h4 className="font-semibold mb-2">Cálculo Final</h4>
                 <div className="bg-primary/5 p-4 rounded-lg">
                   <div className="flex justify-between items-center mb-2">
-                    <span className="text-sm font-medium">
-                      Fórmula Utilizada:
-                    </span>
+                    <span className="text-sm font-medium">Fórmula:</span>
                     <code className="text-xs bg-background p-1 rounded border">
                       {detailsDialog?.formulaUsed}
                     </code>
                   </div>
                   <div className="flex justify-between items-center pt-2 border-t border-primary/10">
-                    <span className="text-lg font-bold">
-                      Nota Final Calculada
-                    </span>
+                    <span className="text-lg font-bold">Média Final</span>
                     <span
-                      className={`text-2xl font-bold ${detailsDialog?.isPassing ? 'text-green-600' : 'text-red-600'}`}
+                      className={cn(
+                        'text-2xl font-bold',
+                        getGradeColorClass(detailsDialog?.finalGrade || 0),
+                      )}
                     >
                       {detailsDialog?.finalGrade.toFixed(1)}
                     </span>
                   </div>
                   <div className="text-right mt-1">
-                    <Badge
-                      variant={
-                        detailsDialog?.isPassing ? 'default' : 'destructive'
-                      }
-                    >
-                      {detailsDialog?.status}
-                    </Badge>
+                    <Badge variant="outline">{detailsDialog?.status}</Badge>
                   </div>
                 </div>
               </div>
