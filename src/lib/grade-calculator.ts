@@ -258,9 +258,13 @@ export function calculateGrades(
   let finalGrade = 0
   let formulaUsed = 'Média Aritmética dos Períodos'
 
-  if (rule.formula) {
+  if (rule.formula && rule.formula.trim() !== '') {
     formulaUsed = rule.formula
     try {
+      // Normalize formula: replace 'x' with '*' and handle spaces
+      // Using global replace for 'x' to allow users to type 'eval1 x 2' or 'eval1x2'
+      let expression = rule.formula.toLowerCase().replace(/x/g, '*')
+
       // Construct context
       const context: Record<string, number> = {}
       periodResults.forEach((res, index) => {
@@ -268,16 +272,16 @@ export function calculateGrades(
       })
 
       // Parse formula
-      let expression = rule.formula
-
+      // Replace known variables with values using word boundaries
       Object.keys(context).forEach((key) => {
         expression = expression.replace(
-          new RegExp(key, 'g'),
+          new RegExp(`\\b${key}\\b`, 'g'),
           context[key].toString(),
         )
       })
 
-      expression = expression.replace(/eval\d+/g, '0')
+      // Replace any remaining evalN variables (that had no data) with 0
+      expression = expression.replace(/\beval\d+\b/g, '0')
 
       if (/^[\d.+\-*/()\s]+$/.test(expression)) {
         // eslint-disable-next-line no-new-func

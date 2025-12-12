@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Plus, Edit, Scale, Star, Calculator } from 'lucide-react'
+import { Plus, Pencil, Calculator, Check, AlertCircle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
   Card,
@@ -8,7 +8,6 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
 import {
   Table,
   TableBody,
@@ -17,170 +16,149 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
+import { Badge } from '@/components/ui/badge'
 import useCourseStore from '@/stores/useCourseStore'
-import { EvaluationRuleFormDialog } from './components/EvaluationRuleFormDialog'
-import { useToast } from '@/hooks/use-toast'
 import { EvaluationRule } from '@/lib/mock-data'
+import { EvaluationRuleFormDialog } from './components/EvaluationRuleFormDialog'
 
 export default function EvaluationRulesList() {
   const { evaluationRules, addEvaluationRule, updateEvaluationRule } =
     useCourseStore()
   const [isDialogOpen, setIsDialogOpen] = useState(false)
-  const [editingRule, setEditingRule] = useState<EvaluationRule | null>(null)
-  const { toast } = useToast()
+  const [selectedRule, setSelectedRule] = useState<EvaluationRule | null>(null)
 
-  const handleCreate = (data: any) => {
-    addEvaluationRule(data)
-    toast({
-      title: 'Regra Criada',
-      description: 'A nova regra de avaliação foi adicionada com sucesso.',
-    })
+  const handleAdd = () => {
+    setSelectedRule(null)
+    setIsDialogOpen(true)
   }
 
-  const handleUpdate = (data: any) => {
-    if (editingRule?.id) {
-      updateEvaluationRule(editingRule.id, data)
-      toast({
-        title: 'Regra Atualizada',
-        description: 'As alterações na regra de avaliação foram salvas.',
-      })
+  const handleEdit = (rule: EvaluationRule) => {
+    setSelectedRule(rule)
+    setIsDialogOpen(true)
+  }
+
+  const handleSave = (data: Omit<EvaluationRule, 'id'>) => {
+    if (selectedRule) {
+      updateEvaluationRule(selectedRule.id, data)
+    } else {
+      addEvaluationRule(data)
     }
-    setEditingRule(null)
-  }
-
-  const openEditDialog = (rule: EvaluationRule) => {
-    setEditingRule(rule)
-    setIsDialogOpen(true)
-  }
-
-  const openCreateDialog = () => {
-    setEditingRule(null)
-    setIsDialogOpen(true)
   }
 
   return (
     <div className="space-y-6 animate-fade-in">
-      <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <h2 className="text-3xl font-bold tracking-tight text-primary">
             Regras de Avaliação
           </h2>
           <p className="text-muted-foreground">
-            Defina critérios de aprovação, fórmulas e recuperação.
+            Gerencie as fórmulas de cálculo de notas e critérios de aprovação.
           </p>
         </div>
-        <Button onClick={openCreateDialog} className="w-full sm:w-auto">
-          <Plus className="mr-2 h-4 w-4" />
-          Nova Regra
+        <Button onClick={handleAdd}>
+          <Plus className="mr-2 h-4 w-4" /> Nova Regra
         </Button>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Conjuntos de Regras Definidos</CardTitle>
-          <CardDescription>
-            Estas regras podem ser aplicadas às séries e turmas.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Nome</TableHead>
-                <TableHead>Tipo</TableHead>
-                <TableHead>Cálculo</TableHead>
-                <TableHead>Critérios</TableHead>
-                <TableHead className="text-right">Ações</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {evaluationRules.map((rule) => (
-                <TableRow key={rule.id}>
-                  <TableCell className="font-medium">
-                    <div className="flex flex-col">
-                      <div className="flex items-center gap-2">
+      <div className="grid gap-6">
+        <Card>
+          <CardHeader>
+            <CardTitle>Regras Configuradas</CardTitle>
+            <CardDescription>
+              Lista de todas as regras de avaliação disponíveis para uso nos
+              cursos.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Nome</TableHead>
+                  <TableHead>Tipo</TableHead>
+                  <TableHead>Média Aprovação</TableHead>
+                  <TableHead>Fórmula Personalizada</TableHead>
+                  <TableHead className="text-right">Ações</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {evaluationRules.map((rule) => (
+                  <TableRow key={rule.id}>
+                    <TableCell className="font-medium">
+                      <div className="flex flex-col">
                         <span>{rule.name}</span>
-                        {rule.isStandard && (
-                          <Badge
-                            variant="outline"
-                            className="text-amber-500 border-amber-500/20 bg-amber-500/10 gap-1 h-5 px-1.5 text-[10px]"
-                          >
-                            <Star className="h-3 w-3 fill-amber-500" /> Padrão
-                          </Badge>
-                        )}
-                      </div>
-                      <span
-                        className="text-xs text-muted-foreground truncate max-w-[200px]"
-                        title={rule.description}
-                      >
-                        {rule.description}
-                      </span>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <Badge
-                      variant={
-                        rule.type === 'numeric' ? 'default' : 'secondary'
-                      }
-                    >
-                      {rule.type === 'numeric' ? 'Numérica' : 'Descritiva'}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    {rule.formula ? (
-                      <div
-                        className="flex items-center gap-1 text-sm font-mono text-muted-foreground"
-                        title={rule.formula}
-                      >
-                        <Calculator className="h-3 w-3" />
-                        <span className="truncate max-w-[150px]">
-                          {rule.formula}
+                        <span className="text-xs text-muted-foreground truncate max-w-[200px]">
+                          {rule.description}
                         </span>
                       </div>
-                    ) : (
-                      <span className="text-muted-foreground">-</span>
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    {rule.type === 'numeric' ? (
-                      <div className="text-sm space-y-1">
-                        <div className="flex items-center gap-1">
-                          <Scale className="h-3 w-3 text-muted-foreground" />
-                          <span>Média: ≥ {rule.passingGrade?.toFixed(1)}</span>
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant="outline">
+                        {rule.type === 'numeric' ? 'Numérica' : 'Descritiva'}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      {rule.type === 'numeric' ? rule.passingGrade : '-'}
+                    </TableCell>
+                    <TableCell>
+                      {rule.formula ? (
+                        <div className="flex items-center gap-2 text-sm">
+                          <Calculator className="h-4 w-4 text-muted-foreground" />
+                          <code className="bg-muted px-1.5 py-0.5 rounded text-xs font-mono">
+                            {rule.formula}
+                          </code>
                         </div>
-                        {rule.minDependencyGrade !== undefined && (
-                          <div className="text-xs text-muted-foreground">
-                            Dep: ≥ {rule.minDependencyGrade?.toFixed(1)}
-                          </div>
-                        )}
-                      </div>
-                    ) : (
-                      <span className="text-sm text-muted-foreground italic">
-                        Qualitativo
-                      </span>
-                    )}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => openEditDialog(rule)}
-                    >
-                      <Edit className="h-4 w-4" />
-                    </Button>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
+                      ) : (
+                        <span className="text-muted-foreground text-sm flex items-center gap-2">
+                          {rule.type === 'numeric' && (
+                            <Check className="h-3 w-3" />
+                          )}
+                          {rule.type === 'numeric' ? 'Média Aritmética' : 'N/A'}
+                        </span>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleEdit(rule)}
+                      >
+                        <Pencil className="h-4 w-4 mr-2" /> Editar
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 flex gap-3 text-blue-800">
+          <AlertCircle className="h-5 w-5 shrink-0 mt-0.5" />
+          <div className="space-y-1">
+            <h4 className="font-semibold text-sm">
+              Como funcionam as fórmulas?
+            </h4>
+            <p className="text-sm opacity-90">
+              Caso nenhuma fórmula seja definida, o sistema utilizará a média
+              aritmética simples das notas dos períodos. Para fórmulas
+              personalizadas, utilize as variáveis <code>eval1</code>,{' '}
+              <code>eval2</code>, etc. para representar a nota de cada
+              bimestre/período.
+            </p>
+            <p className="text-sm font-mono mt-2 bg-white/50 p-2 rounded">
+              Exemplo Ponderado: ((eval1 * 2) + (eval2 * 3) + (eval3 * 2) +
+              (eval4 * 3)) / 10
+            </p>
+          </div>
+        </div>
+      </div>
 
       <EvaluationRuleFormDialog
         open={isDialogOpen}
         onOpenChange={setIsDialogOpen}
-        onSubmit={editingRule ? handleUpdate : handleCreate}
-        initialData={editingRule}
+        rule={selectedRule}
+        onSave={handleSave}
       />
     </div>
   )

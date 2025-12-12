@@ -242,7 +242,9 @@ export const mockEvaluationRules: EvaluationRule[] = [
     passingGrade: 6.0,
     minDependencyGrade: 4.0,
     minAttendance: 75,
-    formula: '((eval1 * 2) + (eval2 * 3) + (eval3 * 2) + (eval4 * 3)) / 10',
+    // Using 'x' for multiplication to demonstrate support for user story requirement
+    formula:
+      '(( eval1 x2 ) + ( eval2 x 3 ) + ( eval3 x 2 ) + ( eval4 x 3)) / 10',
     isStandard: false,
     periodCount: 4,
     allowedExclusions: true,
