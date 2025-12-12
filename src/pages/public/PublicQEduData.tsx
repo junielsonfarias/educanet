@@ -62,7 +62,10 @@ export default function PublicQEduData() {
         const data = await fetchSchoolsQEduData(selectedMunicipalityId)
         setSchoolsData(data)
       } catch (err) {
-        setError('Não foi possível carregar os dados das escolas.')
+        console.error(err)
+        setError(
+          'Não foi possível carregar os dados das escolas. Verifique a conexão ou tente novamente mais tarde.',
+        )
       } finally {
         setLoading(false)
       }
@@ -71,26 +74,36 @@ export default function PublicQEduData() {
   }, [selectedMunicipalityId])
 
   const aggregateData = useMemo(() => {
-    if (!schoolsData.length) return { idebAverage: 0, approvalAverage: 0 }
+    if (!schoolsData.length)
+      return { idebAverage: 0, approvalAverage: 0, latestYear: 0 }
 
-    // Calculate latest year averages
-    const latestYear = Math.max(
-      ...schoolsData.flatMap((s) => s.idebHistory.map((h) => h.year)),
+    // Find the latest year available in any school's history
+    const allYears = schoolsData.flatMap((s) =>
+      s.idebHistory.map((h) => h.year),
     )
+    const latestYear = allYears.length
+      ? Math.max(...allYears)
+      : new Date().getFullYear()
 
-    const idebSum = schoolsData.reduce((acc, school) => {
-      const entry = school.idebHistory.find((h) => h.year === latestYear)
-      return acc + (entry ? entry.score : 0)
-    }, 0)
+    const idebValues = schoolsData
+      .map((s) => s.idebHistory.find((h) => h.year === latestYear)?.score)
+      .filter((v): v is number => v !== undefined)
 
-    const approvalSum = schoolsData.reduce((acc, school) => {
-      const entry = school.approvalHistory.find((h) => h.year === latestYear)
-      return acc + (entry ? entry.rate : 0)
-    }, 0)
+    const approvalValues = schoolsData
+      .map((s) => s.approvalHistory.find((h) => h.year === latestYear)?.rate)
+      .filter((v): v is number => v !== undefined)
+
+    const idebAverage = idebValues.length
+      ? idebValues.reduce((a, b) => a + b, 0) / idebValues.length
+      : 0
+
+    const approvalAverage = approvalValues.length
+      ? approvalValues.reduce((a, b) => a + b, 0) / approvalValues.length
+      : 0
 
     return {
-      idebAverage: idebSum / schoolsData.length,
-      approvalAverage: approvalSum / schoolsData.length,
+      idebAverage,
+      approvalAverage,
       latestYear,
     }
   }, [schoolsData])
@@ -104,20 +117,23 @@ export default function PublicQEduData() {
 
     return years.map((year) => {
       const entry: any = { year }
+      let totalScore = 0
+      let count = 0
+
       schoolsData.forEach((school) => {
         const h = school.idebHistory.find((hist) => hist.year === year)
         if (h) {
           entry[school.name] = h.score
+          totalScore += h.score
+          count++
         }
       })
+
       // Calculate Municipality Average for this year
-      const totalScore = schoolsData.reduce((acc, school) => {
-        const h = school.idebHistory.find((hist) => hist.year === year)
-        return acc + (h ? h.score : 0)
-      }, 0)
-      entry['Média Município'] = Number(
-        (totalScore / schoolsData.length).toFixed(1),
-      )
+      if (count > 0) {
+        entry['Média Município'] = Number((totalScore / count).toFixed(1))
+      }
+
       return entry
     })
   }, [schoolsData])
@@ -213,6 +229,17 @@ export default function PublicQEduData() {
             </CardContent>
           </Card>
         </div>
+      ) : schoolsData.length === 0 ? (
+        <div className="flex justify-center py-10">
+          <Card className="bg-muted/50 border-muted max-w-lg">
+            <CardContent className="flex flex-col items-center gap-4 p-6 text-center">
+              <AlertCircle className="h-8 w-8 text-muted-foreground" />
+              <p className="text-muted-foreground font-medium">
+                Nenhum dado encontrado para este município.
+              </p>
+            </CardContent>
+          </Card>
+        </div>
       ) : (
         <>
           {/* Summary Cards */}
@@ -233,7 +260,10 @@ export default function PublicQEduData() {
             <Card>
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm font-medium text-muted-foreground">
-                  Média IDEB ({aggregateData.latestYear})
+                  Média IDEB{' '}
+                  {aggregateData.latestYear
+                    ? `(${aggregateData.latestYear})`
+                    : ''}
                 </CardTitle>
               </CardHeader>
               <CardContent>
@@ -264,7 +294,10 @@ export default function PublicQEduData() {
                   {aggregateData.approvalAverage.toFixed(1)}%
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  Média de aprovação das escolas ({aggregateData.latestYear})
+                  Média de aprovação das escolas{' '}
+                  {aggregateData.latestYear
+                    ? `(${aggregateData.latestYear})`
+                    : ''}
                 </p>
               </CardContent>
             </Card>

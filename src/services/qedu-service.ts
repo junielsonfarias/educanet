@@ -10,7 +10,7 @@ export interface QEduMunicipality {
 }
 
 export const availableMunicipalities: QEduMunicipality[] = [
-  { id: '1507706', name: 'São Sebastião da Boa Vista', state: 'PA' }, // Updated ID based on User Story
+  { id: '1507706', name: 'São Sebastião da Boa Vista', state: 'PA' },
   { id: '1501402', name: 'Belém', state: 'PA' },
   { id: '3550308', name: 'São Paulo', state: 'SP' },
   { id: '3304557', name: 'Rio de Janeiro', state: 'RJ' },
@@ -18,8 +18,8 @@ export const availableMunicipalities: QEduMunicipality[] = [
 
 export interface AgeGradeDistortionData {
   year: number
-  series: string // e.g., "1º ano", "5º ano", "9º ano"
-  distortionRate: number // percentage
+  series: string
+  distortionRate: number
 }
 
 export interface ApprovalFailureData {
@@ -43,11 +43,12 @@ export interface MunicipalityQEduData {
 }
 
 const API_KEY = import.meta.env.VITE_QEDU_API_KEY
-const BASE_URL = 'https://api.qedu.org.br/v1' // Base URL for QEdu API
+const BASE_URL = 'https://api.qedu.org.br/v1'
 
-// --- MOCK DATA FOR FALLBACK OR OTHER ENDPOINTS ---
+// --- MOCK DATA FOR OTHER REPORTS (DISTORTION / APPROVAL) ---
+// Kept to avoid breaking existing reports that rely on these specific mocks
+// while we transition the main School Data to Real API.
 
-// Mock Data for "São Sebastião da Boa Vista - PA" (Using new ID 1507706 for consistency)
 const mockDistortionData_1507706: AgeGradeDistortionData[] = [
   { year: 2023, series: '1º ano', distortionRate: 5.2 },
   { year: 2023, series: '2º ano', distortionRate: 12.5 },
@@ -84,38 +85,6 @@ const mockApprovalData_1507706: ApprovalFailureData[] = [
   },
 ]
 
-// Mock Schools data specifically for Fallback or other cities
-const mockGenericSchoolsQEduData: SchoolQEduData[] = [
-  {
-    id: 'g1',
-    name: 'Escola Exemplo A',
-    idebHistory: [
-      { year: 2019, score: 5.0 },
-      { year: 2021, score: 5.2 },
-      { year: 2023, score: 5.5 },
-    ],
-    approvalHistory: [
-      { year: 2019, rate: 90 },
-      { year: 2021, rate: 92 },
-      { year: 2023, rate: 95 },
-    ],
-  },
-  {
-    id: 'g2',
-    name: 'Escola Exemplo B',
-    idebHistory: [
-      { year: 2019, score: 4.0 },
-      { year: 2021, score: 4.2 },
-      { year: 2023, score: 4.5 },
-    ],
-    approvalHistory: [
-      { year: 2019, rate: 80 },
-      { year: 2021, rate: 85 },
-      { year: 2023, rate: 88 },
-    ],
-  },
-]
-
 const mockGenericDistortionData: AgeGradeDistortionData[] = [
   { year: 2023, series: '1º ano', distortionRate: 2.0 },
   { year: 2023, series: '5º ano', distortionRate: 15.0 },
@@ -144,9 +113,7 @@ const mockGenericApprovalData: ApprovalFailureData[] = [
 export const fetchAgeGradeDistortion = async (
   municipalityId: string,
 ): Promise<AgeGradeDistortionData[]> => {
-  // Simulate API delay
   await new Promise((resolve) => setTimeout(resolve, 800))
-
   if (municipalityId === '1507706' || municipalityId === '1507300') {
     return mockDistortionData_1507706
   }
@@ -156,53 +123,51 @@ export const fetchAgeGradeDistortion = async (
 export const fetchApprovalFailureRates = async (
   municipalityId: string,
 ): Promise<ApprovalFailureData[]> => {
-  // Simulate API delay
   await new Promise((resolve) => setTimeout(resolve, 800))
-
   if (municipalityId === '1507706' || municipalityId === '1507300') {
     return mockApprovalData_1507706
   }
   return mockGenericApprovalData
 }
 
-// Helper to transform API School object to our interface
+// --- REAL API INTEGRATION FOR SCHOOLS ---
+
 const mapApiSchoolToLocal = (apiSchool: any): SchoolQEduData => {
-  // Try to extract IDEB history from API response
-  // Assuming API returns 'ideb' object with years or 'history'
-  const idebHistory = []
-  if (apiSchool.ideb && typeof apiSchool.ideb === 'object') {
-    // If ideb is key-value pair year:score
-    Object.entries(apiSchool.ideb).forEach(([year, score]) => {
-      if (!isNaN(Number(year))) {
+  const idebHistory: { year: number; score: number; target?: number }[] = []
+
+  // Try to find IDEB data. API might return 'ideb' object or 'ideb_anos_iniciais' / 'ideb_anos_finais'
+  let idebSource = apiSchool.ideb
+
+  // Fallback strategies for different API response shapes
+  if (!idebSource && apiSchool.ideb_anos_iniciais)
+    idebSource = apiSchool.ideb_anos_iniciais
+  if (!idebSource && apiSchool.ideb_anos_finais)
+    idebSource = apiSchool.ideb_anos_finais
+
+  if (idebSource && typeof idebSource === 'object') {
+    Object.entries(idebSource).forEach(([year, score]) => {
+      const y = Number(year)
+      const s = Number(score)
+      if (!isNaN(y) && !isNaN(s)) {
         idebHistory.push({
-          year: Number(year),
-          score: Number(score),
-          target: apiSchool.ideb_metas?.[year] || undefined,
+          year: y,
+          score: s,
+          // Target handling if available in response
+          target: apiSchool.metas?.[year]
+            ? Number(apiSchool.metas[year])
+            : undefined,
         })
       }
     })
-  } else if (Array.isArray(apiSchool.ideb_history)) {
-    // If it's an array
-    idebHistory.push(
-      ...apiSchool.ideb_history.map((h: any) => ({
-        year: h.year,
-        score: h.score,
-        target: h.target,
-      })),
-    )
   }
 
-  // Fallback if no history found but current ideb exists
-  if (idebHistory.length === 0 && apiSchool.ideb_current) {
-    idebHistory.push({ year: 2023, score: apiSchool.ideb_current })
-  }
-
-  // Try to extract Approval history
-  const approvalHistory = []
+  const approvalHistory: { year: number; rate: number }[] = []
   if (apiSchool.approval && typeof apiSchool.approval === 'object') {
     Object.entries(apiSchool.approval).forEach(([year, rate]) => {
-      if (!isNaN(Number(year))) {
-        approvalHistory.push({ year: Number(year), rate: Number(rate) })
+      const y = Number(year)
+      const r = Number(rate)
+      if (!isNaN(y) && !isNaN(r)) {
+        approvalHistory.push({ year: y, rate: r })
       }
     })
   }
@@ -218,16 +183,12 @@ const mapApiSchoolToLocal = (apiSchool: any): SchoolQEduData => {
 export const fetchSchoolsQEduData = async (
   municipalityId: string,
 ): Promise<SchoolQEduData[]> => {
-  // Check if API Key is configured
   if (!API_KEY) {
-    console.warn(
-      'QEdu API Key is missing. Please configure VITE_QEDU_API_KEY in .env file. Falling back to mock data.',
+    throw new Error(
+      'Chave de API do QEdu não configurada. Verifique as variáveis de ambiente.',
     )
-    return mockGenericSchoolsQEduData
   }
 
-  // We primarily fetch real data for the requested municipality
-  // For others, we might fallback to generic if API doesn't support them or returns empty
   try {
     const url = `${BASE_URL}/cities/${municipalityId}/schools?api_key=${API_KEY}&include=ideb,approval`
     const response = await fetch(url, {
@@ -239,32 +200,27 @@ export const fetchSchoolsQEduData = async (
 
     if (!response.ok) {
       if (response.status === 404) {
-        console.warn(
-          `Municipality ${municipalityId} not found in QEdu API. Returning empty list.`,
-        )
         return []
       }
       throw new Error(
-        `QEdu API Error: ${response.status} ${response.statusText}`,
+        `Falha na comunicação com API QEdu: ${response.status} ${response.statusText}`,
       )
     }
 
-    const data = await response.json()
-    const schoolsList = Array.isArray(data) ? data : data.data || data.schools
+    const json = await response.json()
+    // Handle different possible response structures (array or wrapper object)
+    const schoolsList = Array.isArray(json)
+      ? json
+      : json.data || json.schools || []
 
-    if (!schoolsList || !Array.isArray(schoolsList)) {
-      console.warn('Invalid data format received from QEdu API', data)
+    if (!Array.isArray(schoolsList)) {
+      console.warn('Formato de dados inválido recebido da API QEdu', json)
       return []
     }
 
-    const mappedSchools = schoolsList.map(mapApiSchoolToLocal)
-
-    // Filter out schools with no data if desired, or return all
-    return mappedSchools
+    return schoolsList.map(mapApiSchoolToLocal)
   } catch (error) {
-    console.error('Failed to fetch data from QEdu API:', error)
-    // In production, we might want to throw the error to show it to the user
-    // instead of showing fake data, as requested by the User Story ("replacing mock data")
+    console.error('Erro ao buscar dados do QEdu:', error)
     throw error
   }
 }
