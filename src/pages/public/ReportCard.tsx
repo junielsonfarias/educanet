@@ -26,7 +26,11 @@ import {
   ReportCardDisplay,
   ReportCardData,
   GradeData,
+  RecoveryGradeData,
+  EvaluationTypeData,
+  EvaluationEntry,
 } from './components/ReportCardDisplay'
+import { AssessmentType, Assessment } from '@/lib/mock-data'
 
 export default function ReportCard() {
   const [searchRegistration, setSearchRegistration] = useState('')
@@ -61,8 +65,21 @@ export default function ReportCard() {
     rule: any,
     periods: any[],
     isYearActive: boolean,
-  ): GradeData[] => {
-    return subjects.map((subject: any) => {
+  ): {
+    grades: GradeData[]
+    recoveries: RecoveryGradeData[]
+    evaluationTypes: EvaluationTypeData[]
+  } => {
+    const grades: GradeData[] = []
+    const recoveries: RecoveryGradeData[] = []
+    const allAssessments: {
+      typeId: string
+      subject: string
+      periodName: string
+      value: number
+    }[] = []
+
+    subjects.forEach((subject: any) => {
       const subjectAssessments = assessments.filter(
         (a) =>
           a.studentId === studentId &&
@@ -71,6 +88,25 @@ export default function ReportCard() {
           a.classroomId === classId,
       )
 
+      // Collect raw assessments for other evaluations
+      subjectAssessments.forEach((a) => {
+        // Exclude recovery category from 'Other Evaluations' list
+        if (
+          a.assessmentTypeId &&
+          (a.category || 'regular') !== 'recuperation'
+        ) {
+          const p = periods.find((pr: any) => pr.id === a.periodId)
+          if (p) {
+            allAssessments.push({
+              typeId: a.assessmentTypeId,
+              subject: subject.name,
+              periodName: p.name,
+              value: Number(a.value),
+            })
+          }
+        }
+      })
+
       const calculation = calculateGrades(
         subjectAssessments,
         rule,
@@ -78,7 +114,8 @@ export default function ReportCard() {
         assessmentTypes,
       )
 
-      return {
+      // Main Grades Data
+      grades.push({
         subject: subject.name,
         periodGrades: periods.map((p: any) => {
           const pRes = calculation.periodResults.find(
@@ -90,8 +127,46 @@ export default function ReportCard() {
         status: isYearActive ? 'Cursando' : calculation.status,
         passing: calculation.isPassing,
         formula: calculation.formulaUsed,
+      })
+
+      // Recovery Data
+      recoveries.push({
+        subject: subject.name,
+        periodGrades: periods.map((p: any) => {
+          const pRes = calculation.periodResults.find(
+            (pr) => pr.periodId === p.id,
+          )
+          return pRes && pRes.recoveryGrade !== null ? pRes.recoveryGrade : null
+        }),
+      })
+    })
+
+    // Group Other Evaluations
+    const evaluationTypes: EvaluationTypeData[] = []
+    const groupedByType = new Map<string, EvaluationEntry[]>()
+
+    allAssessments.forEach((a) => {
+      const existing = groupedByType.get(a.typeId) || []
+      existing.push({
+        subject: a.subject,
+        periodName: a.periodName,
+        value: a.value,
+      })
+      groupedByType.set(a.typeId, existing)
+    })
+
+    groupedByType.forEach((entries, typeId) => {
+      const type = assessmentTypes.find((t) => t.id === typeId)
+      if (type) {
+        evaluationTypes.push({
+          id: type.id,
+          name: type.name,
+          entries,
+        })
       }
     })
+
+    return { grades, recoveries, evaluationTypes }
   }
 
   const handleSearch = (e: React.FormEvent) => {
@@ -169,7 +244,11 @@ export default function ReportCard() {
     const isYearActive = academicYear.status === 'active'
 
     // Calculate Regular Grades
-    const reportCardGrades = calculateSubjectGrades(
+    const {
+      grades: reportCardGrades,
+      recoveries: reportCardRecoveries,
+      evaluationTypes: reportCardEvaluations,
+    } = calculateSubjectGrades(
       regularGradeStructure.subjects,
       student.id,
       academicYear.id,
@@ -223,7 +302,11 @@ export default function ReportCard() {
       )
 
       if (activeSubjects.length > 0) {
-        const depGrades = calculateSubjectGrades(
+        const {
+          grades: depGrades,
+          recoveries: depRecoveries,
+          evaluationTypes: depEvaluations,
+        } = calculateSubjectGrades(
           activeSubjects,
           student.id,
           academicYear.id,
@@ -236,6 +319,8 @@ export default function ReportCard() {
         dependenciesData.push({
           className: depClass.name,
           grades: depGrades,
+          recoveries: depRecoveries,
+          evaluationTypes: depEvaluations,
           ruleName: depRule.name,
         })
       }
@@ -248,6 +333,8 @@ export default function ReportCard() {
       year: validEnrollment.year,
       ruleName: regularRule.name,
       grades: reportCardGrades,
+      recoveries: reportCardRecoveries,
+      evaluationTypes: reportCardEvaluations,
       periodNames: periods.map((p) => p.name),
       dependencies: dependenciesData,
     })

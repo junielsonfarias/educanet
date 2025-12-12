@@ -1,4 +1,4 @@
-import { Printer, Info } from 'lucide-react'
+import { Printer, Info, AlertCircle, FileText } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
   Card,
@@ -32,9 +32,28 @@ export type GradeData = {
   formula?: string
 }
 
+export type RecoveryGradeData = {
+  subject: string
+  periodGrades: (number | null)[]
+}
+
+export type EvaluationEntry = {
+  subject: string
+  periodName: string
+  value: number
+}
+
+export type EvaluationTypeData = {
+  id: string
+  name: string
+  entries: EvaluationEntry[]
+}
+
 export type DependencyData = {
   className: string
   grades: GradeData[]
+  recoveries: RecoveryGradeData[]
+  evaluationTypes: EvaluationTypeData[]
   ruleName: string
 }
 
@@ -46,6 +65,8 @@ export type ReportCardData = {
   ruleName: string
   periodNames: string[]
   grades: GradeData[]
+  recoveries: RecoveryGradeData[]
+  evaluationTypes: EvaluationTypeData[]
   dependencies: DependencyData[]
 }
 
@@ -156,6 +177,131 @@ export function ReportCardDisplay({ data }: ReportCardDisplayProps) {
     </div>
   )
 
+  const renderRecoveriesTable = (
+    recoveries: RecoveryGradeData[],
+    periodNames: string[],
+  ) => {
+    // Check if there are any recoveries to show
+    const hasRecoveries = recoveries.some((r) =>
+      r.periodGrades.some((g) => g !== null),
+    )
+
+    if (!hasRecoveries) return null
+
+    return (
+      <div className="space-y-2 mt-6 animate-fade-in">
+        <h4 className="text-sm font-semibold text-muted-foreground flex items-center gap-2">
+          <AlertCircle className="h-4 w-4" /> Notas de Recuperação
+        </h4>
+        <div className="rounded-md border overflow-x-auto">
+          <Table>
+            <TableHeader className="bg-amber-50/50">
+              <TableRow>
+                <TableHead className="font-bold min-w-[200px]">
+                  Disciplina
+                </TableHead>
+                {periodNames.map((_, idx) => (
+                  <TableHead key={idx} className="text-center min-w-[100px]">
+                    {idx + 1}º Recuperação
+                  </TableHead>
+                ))}
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {recoveries.map((rec) => (
+                <TableRow key={rec.subject}>
+                  <TableCell className="font-medium">{rec.subject}</TableCell>
+                  {rec.periodGrades.map((grade, idx) => (
+                    <TableCell key={idx} className="text-center">
+                      {grade !== null ? (
+                        <span className={cn(getGradeColorClass(grade))}>
+                          {grade.toFixed(1)}
+                        </span>
+                      ) : (
+                        <span className="text-muted-foreground">-</span>
+                      )}
+                    </TableCell>
+                  ))}
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+      </div>
+    )
+  }
+
+  const renderOtherEvaluations = (evaluationTypes: EvaluationTypeData[]) => {
+    if (evaluationTypes.length === 0) return null
+
+    return (
+      <div className="space-y-6 mt-6 pt-6 border-t animate-fade-in">
+        <h3 className="text-lg font-semibold flex items-center gap-2">
+          <FileText className="h-5 w-5 text-primary" />
+          Outras Avaliações (Detalhamento)
+        </h3>
+
+        {evaluationTypes.map((type) => {
+          // Group by Subject
+          const bySubject: Record<string, EvaluationEntry[]> = {}
+          type.entries.forEach((entry) => {
+            if (!bySubject[entry.subject]) bySubject[entry.subject] = []
+            bySubject[entry.subject].push(entry)
+          })
+
+          return (
+            <div key={type.id} className="space-y-3">
+              <div className="flex items-center gap-2">
+                <Badge variant="outline" className="text-sm font-semibold px-3">
+                  {type.name}
+                </Badge>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {Object.entries(bySubject).map(([subject, entries]) => (
+                  <Card key={subject} className="bg-secondary/10 border-0">
+                    <CardContent className="p-4">
+                      <div className="font-bold mb-3 text-sm">{subject}</div>
+                      <div className="flex flex-wrap gap-2">
+                        {entries.map((entry, idx) => {
+                          // Try to derive a short stage name
+                          let stageLabel = entry.periodName
+                          // Check if period name starts with a number (e.g. "1º Bimestre")
+                          const match = entry.periodName.match(/^(\d+º)/)
+                          if (match) {
+                            stageLabel = `${match[1]} ${type.name}`
+                          }
+
+                          return (
+                            <div
+                              key={idx}
+                              className="flex items-center gap-1.5 bg-background border rounded px-2 py-1 text-xs"
+                            >
+                              <span className="text-muted-foreground">
+                                {stageLabel}:
+                              </span>
+                              <span
+                                className={cn(
+                                  'font-bold',
+                                  getGradeColorClass(entry.value),
+                                )}
+                              >
+                                {entry.value.toFixed(1)}
+                              </span>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            </div>
+          )
+        })}
+      </div>
+    )
+  }
+
   return (
     <Card className="animate-slide-up">
       <CardHeader className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
@@ -175,6 +321,8 @@ export function ReportCardDisplay({ data }: ReportCardDisplayProps) {
         <div>
           <h3 className="text-lg font-semibold mb-4">Grade Curricular</h3>
           {renderGradesTable(data.grades, data.periodNames, data.ruleName)}
+          {renderRecoveriesTable(data.recoveries, data.periodNames)}
+          {renderOtherEvaluations(data.evaluationTypes)}
         </div>
 
         {data.dependencies.length > 0 && (
@@ -199,6 +347,8 @@ export function ReportCardDisplay({ data }: ReportCardDisplayProps) {
                   dep.ruleName,
                   true,
                 )}
+                {renderRecoveriesTable(dep.recoveries, data.periodNames)}
+                {renderOtherEvaluations(dep.evaluationTypes)}
               </div>
             ))}
           </div>
