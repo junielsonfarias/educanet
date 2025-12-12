@@ -134,7 +134,7 @@ export interface Assessment {
   subjectId: string
   periodId: string
   type: 'numeric' | 'descriptive'
-  category?: 'regular' | 'recuperation'
+  category?: 'regular' | 'recuperation' | 'external_exam'
   value: number | string
   date: string
   assessmentTypeId?: string

@@ -48,7 +48,9 @@ const filterSchema = z.object({
   classId: z.string().min(1, 'Selecione a turma'),
   periodId: z.string().min(1, 'Selecione o período'),
   subjectId: z.string().min(1, 'Selecione a disciplina'),
-  category: z.enum(['regular', 'recuperation']).default('regular'),
+  category: z
+    .enum(['regular', 'recuperation', 'external_exam'])
+    .default('regular'),
   assessmentTypeId: z.string().optional(),
 })
 
@@ -266,13 +268,22 @@ export default function AssessmentInput() {
   // Available Assessment Types
   const availableAssessmentTypes = useMemo(() => {
     if (!currentGradeStructure) return []
-    // If category is 'recuperation', maybe show different types?
-    // Requirement says: "displayed 'Tipo de Avaliação' options must be precisely correlated"
-    // Usually AssessmentTypes are linked to Grades.
-    return assessmentTypes.filter((t) =>
+
+    // Filter by grade
+    const gradeTypes = assessmentTypes.filter((t) =>
       t.applicableGradeIds.includes(currentGradeStructure.id),
     )
-  }, [assessmentTypes, currentGradeStructure])
+
+    // Filter by category
+    if (category === 'external_exam') {
+      // External exams: excludeFromAverage === true
+      return gradeTypes.filter((t) => t.excludeFromAverage === true)
+    } else {
+      // Regular and Recuperation: Include types that usually count towards average (excludeFromAverage === false or undefined)
+      // Using !t.excludeFromAverage ensures false or undefined are included.
+      return gradeTypes.filter((t) => !t.excludeFromAverage)
+    }
+  }, [assessmentTypes, currentGradeStructure, category])
 
   // --- Reset Effects for Dependent Fields ---
 
@@ -304,6 +315,16 @@ export default function AssessmentInput() {
     const validSubject = subjects.find((s) => s.id === subjectId)
     if (!validSubject) form.setValue('subjectId', '')
   }, [subjects, subjectId, form])
+
+  // Reset assessment type if not in the new available list
+  useEffect(() => {
+    if (assessmentTypeId && availableAssessmentTypes.length > 0) {
+      const exists = availableAssessmentTypes.find(
+        (t) => t.id === assessmentTypeId,
+      )
+      if (!exists) form.setValue('assessmentTypeId', '')
+    }
+  }, [availableAssessmentTypes, assessmentTypeId, form])
 
   // --- Load Grades Data ---
 
@@ -738,6 +759,9 @@ export default function AssessmentInput() {
                           <SelectItem value="recuperation">
                             Recuperação
                           </SelectItem>
+                          <SelectItem value="external_exam">
+                            Prova Externa
+                          </SelectItem>
                         </SelectContent>
                       </Select>
                     </FormItem>
@@ -784,8 +808,8 @@ export default function AssessmentInput() {
               {availableAssessmentTypes.length === 0 && gradeId && (
                 <div className="bg-yellow-50 text-yellow-800 p-3 rounded-md flex items-center gap-2 text-sm border border-yellow-200">
                   <AlertCircle className="h-4 w-4" />
-                  Nenhum tipo de avaliação configurado para esta série. Contate
-                  a coordenação.
+                  Nenhum tipo de avaliação configurado para esta
+                  categoria/série.
                 </div>
               )}
             </form>
