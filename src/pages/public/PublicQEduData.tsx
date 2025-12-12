@@ -1,29 +1,6 @@
 import { useState, useEffect, useMemo } from 'react'
-import {
-  Bar,
-  BarChart,
-  CartesianGrid,
-  XAxis,
-  YAxis,
-  LineChart,
-  Line,
-  Legend,
-} from 'recharts'
-import {
-  Building,
-  School as SchoolIcon,
-  TrendingUp,
-  BarChart3,
-  AlertCircle,
-  Loader2,
-} from 'lucide-react'
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card'
+import { BarChart3, AlertCircle, Loader2, Info, Building } from 'lucide-react'
+import { Card, CardContent } from '@/components/ui/card'
 import {
   Select,
   SelectContent,
@@ -31,28 +8,55 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import {
-  ChartContainer,
-  ChartTooltip,
-  ChartTooltipContent,
-  ChartConfig,
-} from '@/components/ui/chart'
-import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import {
   availableMunicipalities,
   fetchSchoolsQEduData,
+  fetchMunicipalityAggregatedData,
   SchoolQEduData,
+  AggregatedMunicipalityData,
 } from '@/services/qedu-service'
+import useSettingsStore from '@/stores/useSettingsStore'
+import { QEduAlertsDialog, AlertRule } from './components/QEduAlertsDialog'
+import { QEduOverview } from './components/QEduOverview'
+import { QEduSchoolList } from './components/QEduSchoolList'
+import { QEduComparison } from './components/QEduComparison'
+import { useToast } from '@/hooks/use-toast'
 
 export default function PublicQEduData() {
-  const [selectedMunicipalityId, setSelectedMunicipalityId] = useState(
-    availableMunicipalities[0]?.id || '',
-  )
+  const { settings } = useSettingsStore()
+  const { toast } = useToast()
+
+  // State
+  const [selectedMunicipalityId, setSelectedMunicipalityId] = useState('')
   const [schoolsData, setSchoolsData] = useState<SchoolQEduData[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [activeTab, setActiveTab] = useState('overview')
 
+  // Comparison State
+  const [comparisonEntities, setComparisonEntities] = useState<string[]>([])
+  const [comparisonData, setComparisonData] = useState<
+    AggregatedMunicipalityData[]
+  >([])
+  const [loadingComparison, setLoadingComparison] = useState(false)
+
+  // Alerts State
+  const [alertRules, setAlertRules] = useState<AlertRule[]>(() => {
+    const stored = localStorage.getItem('qedu_alert_rules')
+    return stored ? JSON.parse(stored) : []
+  })
+
+  // Initialize Municipality from Settings or Default
+  useEffect(() => {
+    if (settings.qeduMunicipalityId) {
+      setSelectedMunicipalityId(settings.qeduMunicipalityId)
+    } else if (availableMunicipalities.length > 0) {
+      setSelectedMunicipalityId(availableMunicipalities[0].id)
+    }
+  }, [settings.qeduMunicipalityId])
+
+  // Fetch Main Data
   useEffect(() => {
     async function loadData() {
       if (!selectedMunicipalityId) return
@@ -61,10 +65,11 @@ export default function PublicQEduData() {
       try {
         const data = await fetchSchoolsQEduData(selectedMunicipalityId)
         setSchoolsData(data)
+        checkAlerts(data, alertRules)
       } catch (err) {
         console.error(err)
         setError(
-          'Não foi possível carregar os dados das escolas. Verifique a conexão ou tente novamente mais tarde.',
+          'Não foi possível carregar os dados das escolas. Verifique a conexão ou a disponibilidade dos dados no QEdu.',
         )
       } finally {
         setLoading(false)
@@ -73,11 +78,11 @@ export default function PublicQEduData() {
     loadData()
   }, [selectedMunicipalityId])
 
+  // Aggregate Data for current municipality
   const aggregateData = useMemo(() => {
     if (!schoolsData.length)
       return { idebAverage: 0, approvalAverage: 0, latestYear: 0 }
 
-    // Find the latest year available in any school's history
     const allYears = schoolsData.flatMap((s) =>
       s.idebHistory.map((h) => h.year),
     )
@@ -108,92 +113,135 @@ export default function PublicQEduData() {
     }
   }, [schoolsData])
 
-  // Prepare chart data for IDEB Comparison
-  const idebComparisonData = useMemo(() => {
+  // Historical Data for Current Municipality (aggregated from schools)
+  const historicalTrendData = useMemo(() => {
     if (!schoolsData.length) return []
     const years = Array.from(
       new Set(schoolsData.flatMap((s) => s.idebHistory.map((h) => h.year))),
-    ).sort()
+    ).sort((a, b) => a - b)
 
-    return years.map((year) => {
-      const entry: any = { year }
-      let totalScore = 0
-      let count = 0
+    return years
+      .map((year) => {
+        const scores = schoolsData
+          .map((s) => s.idebHistory.find((h) => h.year === year)?.score)
+          .filter((s): s is number => s !== undefined)
 
-      schoolsData.forEach((school) => {
-        const h = school.idebHistory.find((hist) => hist.year === year)
-        if (h) {
-          entry[school.name] = h.score
-          totalScore += h.score
-          count++
+        const avg =
+          scores.length > 0
+            ? scores.reduce((a, b) => a + b, 0) / scores.length
+            : null
+
+        return {
+          year,
+          score: avg ? Number(avg.toFixed(1)) : null,
         }
       })
-
-      // Calculate Municipality Average for this year
-      if (count > 0) {
-        entry['Média Município'] = Number((totalScore / count).toFixed(1))
-      }
-
-      return entry
-    })
+      .filter((d) => d.score !== null)
   }, [schoolsData])
 
-  // Chart Configs
-  const idebConfig = {
-    score: {
-      label: 'Nota',
-      color: 'hsl(var(--primary))',
-    },
-    target: {
-      label: 'Meta',
-      color: 'hsl(var(--muted-foreground))',
-    },
-  } satisfies ChartConfig
+  // Check Alerts Logic
+  const checkAlerts = (data: SchoolQEduData[], rules: AlertRule[]) => {
+    if (rules.length === 0 || data.length === 0) return
 
-  const approvalConfig = {
-    rate: {
-      label: 'Aprovação',
-      color: 'hsl(142, 76%, 36%)',
-    },
-  } satisfies ChartConfig
+    const allYears = data.flatMap((s) => s.idebHistory.map((h) => h.year))
+    const latestYear = Math.max(...allYears)
 
-  const comparisonConfig = useMemo(() => {
-    const config: ChartConfig = {
-      'Média Município': {
-        label: 'Média Município',
-        color: 'hsl(var(--destructive))',
-      },
+    const idebScores = data
+      .map((s) => s.idebHistory.find((h) => h.year === latestYear)?.score)
+      .filter((v) => v !== undefined) as number[]
+    const currentIdeb =
+      idebScores.reduce((a, b) => a + b, 0) / (idebScores.length || 1)
+
+    const approvalRates = data
+      .map((s) => s.approvalHistory.find((h) => h.year === latestYear)?.rate)
+      .filter((v) => v !== undefined) as number[]
+    const currentApproval =
+      approvalRates.reduce((a, b) => a + b, 0) / (approvalRates.length || 1)
+
+    rules.forEach((rule) => {
+      let triggered = false
+      if (rule.indicator === 'IDEB') {
+        if (rule.operator === 'gt' && currentIdeb > rule.value) triggered = true
+        if (rule.operator === 'lt' && currentIdeb < rule.value) triggered = true
+      } else if (rule.indicator === 'Approval') {
+        if (rule.operator === 'gt' && currentApproval > rule.value)
+          triggered = true
+        if (rule.operator === 'lt' && currentApproval < rule.value)
+          triggered = true
+      }
+
+      if (triggered) {
+        toast({
+          title: 'Alerta QEdu',
+          description: `O indicador ${rule.indicator} atingiu a condição (${rule.operator === 'gt' ? '>' : '<'} ${rule.value}).`,
+          duration: 10000,
+        })
+      }
+    })
+  }
+
+  const handleRulesChange = (newRules: AlertRule[]) => {
+    setAlertRules(newRules)
+    localStorage.setItem('qedu_alert_rules', JSON.stringify(newRules))
+    checkAlerts(schoolsData, newRules)
+  }
+
+  // Fetch Comparison Data
+  useEffect(() => {
+    async function loadComparison() {
+      if (comparisonEntities.length === 0) {
+        setComparisonData([])
+        return
+      }
+      setLoadingComparison(true)
+      try {
+        const promises = comparisonEntities.map((id) =>
+          fetchMunicipalityAggregatedData(id),
+        )
+        const results = await Promise.all(promises)
+        setComparisonData(results)
+      } catch (e) {
+        console.error(e)
+        toast({
+          variant: 'destructive',
+          title: 'Erro na comparação',
+          description: 'Não foi possível carregar dados de alguns municípios.',
+        })
+      } finally {
+        setLoadingComparison(false)
+      }
     }
-    schoolsData.forEach((school, index) => {
-      config[school.name] = {
-        label: school.name,
-        color: `hsl(${index * 60 + 200}, 70%, 50%)`,
-      }
-    })
-    return config
-  }, [schoolsData])
+    loadComparison()
+  }, [comparisonEntities])
 
   return (
     <div className="container mx-auto px-4 py-8 animate-fade-in space-y-8">
-      <div className="flex flex-col gap-4 text-center">
-        <h1 className="text-4xl font-bold text-primary flex items-center justify-center gap-3">
-          <BarChart3 className="h-10 w-10" />
-          Dados e Indicadores QEdu
-        </h1>
-        <p className="text-xl text-muted-foreground max-w-3xl mx-auto">
-          Transparência total nos indicadores educacionais. Compare o desempenho
-          das escolas e acompanhe a evolução do IDEB.
-        </p>
+      {/* Header */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+        <div className="space-y-2">
+          <h1 className="text-4xl font-bold text-primary flex items-center gap-3">
+            <BarChart3 className="h-10 w-10" />
+            Dados QEdu
+          </h1>
+          <p className="text-muted-foreground max-w-2xl">
+            Transparência total nos indicadores educacionais.
+          </p>
+        </div>
+        <div className="flex gap-2">
+          <QEduAlertsDialog
+            onRulesChange={handleRulesChange}
+            currentRules={alertRules}
+          />
+        </div>
       </div>
 
-      <Card>
+      {/* Municipality Selector */}
+      <Card className="border-l-4 border-l-primary">
         <CardContent className="pt-6">
           <div className="flex flex-col md:flex-row items-center gap-4">
-            <div className="flex items-center gap-2 text-muted-foreground w-full md:w-auto">
+            <div className="flex items-center gap-2 text-muted-foreground w-full md:w-auto min-w-[150px]">
               <Building className="h-5 w-5" />
-              <span className="font-medium whitespace-nowrap">
-                Selecione o Município:
-              </span>
+              <span className="font-medium whitespace-nowrap">Município:</span>
             </div>
             <div className="flex-1 w-full">
               <Select
@@ -216,9 +264,11 @@ export default function PublicQEduData() {
         </CardContent>
       </Card>
 
+      {/* Main Content */}
       {loading ? (
-        <div className="flex justify-center py-20">
+        <div className="flex flex-col items-center justify-center py-20 gap-4">
           <Loader2 className="h-12 w-12 animate-spin text-primary" />
+          <p className="text-muted-foreground">Carregando dados oficiais...</p>
         </div>
       ) : error ? (
         <div className="flex justify-center py-10">
@@ -233,205 +283,44 @@ export default function PublicQEduData() {
         <div className="flex justify-center py-10">
           <Card className="bg-muted/50 border-muted max-w-lg">
             <CardContent className="flex flex-col items-center gap-4 p-6 text-center">
-              <AlertCircle className="h-8 w-8 text-muted-foreground" />
+              <Info className="h-8 w-8 text-muted-foreground" />
               <p className="text-muted-foreground font-medium">
-                Nenhum dado encontrado para este município.
+                Nenhum dado encontrado para este município no QEdu.
               </p>
             </CardContent>
           </Card>
         </div>
       ) : (
-        <>
-          {/* Summary Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <Card className="bg-primary/5 border-primary/20">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground">
-                  Escolas Monitoradas
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-3xl font-bold">{schoolsData.length}</div>
-                <p className="text-xs text-muted-foreground">
-                  Unidades escolares no município
-                </p>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground">
-                  Média IDEB{' '}
-                  {aggregateData.latestYear
-                    ? `(${aggregateData.latestYear})`
-                    : ''}
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="flex items-center gap-2">
-                  <div className="text-3xl font-bold">
-                    {aggregateData.idebAverage.toFixed(1)}
-                  </div>
-                  <Badge
-                    variant="secondary"
-                    className="bg-green-100 text-green-800"
-                  >
-                    <TrendingUp className="h-3 w-3 mr-1" /> Meta Nacional
-                  </Badge>
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  Índice de Desenvolvimento da Educação Básica
-                </p>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground">
-                  Taxa de Aprovação Média
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-3xl font-bold">
-                  {aggregateData.approvalAverage.toFixed(1)}%
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  Média de aprovação das escolas{' '}
-                  {aggregateData.latestYear
-                    ? `(${aggregateData.latestYear})`
-                    : ''}
-                </p>
-              </CardContent>
-            </Card>
-          </div>
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+          <TabsList className="w-full justify-start overflow-x-auto">
+            <TabsTrigger value="overview">Visão Geral</TabsTrigger>
+            <TabsTrigger value="schools">Detalhes por Escola</TabsTrigger>
+            <TabsTrigger value="compare">Comparativo Regional</TabsTrigger>
+          </TabsList>
 
-          <Tabs defaultValue="list" className="w-full">
-            <div className="flex justify-between items-center mb-4">
-              <TabsList>
-                <TabsTrigger value="list">Lista de Escolas</TabsTrigger>
-                <TabsTrigger value="compare">Comparativo Anual</TabsTrigger>
-              </TabsList>
-            </div>
+          <TabsContent value="overview" className="mt-4">
+            <QEduOverview
+              aggregateData={aggregateData}
+              schoolsData={schoolsData}
+              historicalTrendData={historicalTrendData}
+            />
+          </TabsContent>
 
-            <TabsContent value="list" className="space-y-6">
-              {schoolsData.map((school) => (
-                <Card key={school.id} className="overflow-hidden">
-                  <div className="md:flex">
-                    <div className="bg-muted p-6 flex flex-col items-center justify-center md:w-48 text-center border-r border-border/50">
-                      <SchoolIcon className="h-12 w-12 text-primary mb-2" />
-                      <h3 className="font-bold text-sm">{school.name}</h3>
-                    </div>
-                    <div className="flex-1 p-6">
-                      <div className="grid md:grid-cols-2 gap-8">
-                        <div>
-                          <h4 className="font-semibold mb-4 flex items-center gap-2">
-                            <TrendingUp className="h-4 w-4 text-primary" />
-                            Histórico IDEB
-                          </h4>
-                          <ChartContainer
-                            config={idebConfig}
-                            className="h-[200px] w-full aspect-auto"
-                          >
-                            <LineChart data={school.idebHistory}>
-                              <CartesianGrid
-                                strokeDasharray="3 3"
-                                vertical={false}
-                              />
-                              <XAxis dataKey="year" />
-                              <YAxis domain={[0, 10]} />
-                              <ChartTooltip content={<ChartTooltipContent />} />
-                              <Line
-                                type="monotone"
-                                dataKey="score"
-                                stroke="var(--color-score)"
-                                strokeWidth={2}
-                                activeDot={{ r: 6 }}
-                              />
-                              <Line
-                                type="monotone"
-                                dataKey="target"
-                                stroke="var(--color-target)"
-                                strokeDasharray="5 5"
-                              />
-                            </LineChart>
-                          </ChartContainer>
-                        </div>
-                        <div>
-                          <h4 className="font-semibold mb-4 flex items-center gap-2">
-                            <BarChart3 className="h-4 w-4 text-primary" />
-                            Taxa de Aprovação (%)
-                          </h4>
-                          <ChartContainer
-                            config={approvalConfig}
-                            className="h-[200px] w-full aspect-auto"
-                          >
-                            <BarChart data={school.approvalHistory}>
-                              <CartesianGrid
-                                strokeDasharray="3 3"
-                                vertical={false}
-                              />
-                              <XAxis dataKey="year" />
-                              <YAxis domain={[0, 100]} />
-                              <ChartTooltip content={<ChartTooltipContent />} />
-                              <Bar
-                                dataKey="rate"
-                                fill="var(--color-rate)"
-                                radius={[4, 4, 0, 0]}
-                              />
-                            </BarChart>
-                          </ChartContainer>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </Card>
-              ))}
-            </TabsContent>
+          <TabsContent value="schools" className="mt-4">
+            <QEduSchoolList schoolsData={schoolsData} />
+          </TabsContent>
 
-            <TabsContent value="compare">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Comparativo de Evolução do IDEB</CardTitle>
-                  <CardDescription>
-                    Compare o desempenho das escolas em relação à média do
-                    município.
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <ChartContainer
-                    config={comparisonConfig}
-                    className="h-[500px] w-full aspect-auto"
-                  >
-                    <LineChart data={idebComparisonData}>
-                      <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                      <XAxis dataKey="year" />
-                      <YAxis domain={[0, 10]} />
-                      <ChartTooltip content={<ChartTooltipContent />} />
-                      <Legend />
-                      <Line
-                        type="monotone"
-                        dataKey="Média Município"
-                        stroke="var(--color-Média Município)"
-                        strokeWidth={3}
-                        dot={{ r: 6 }}
-                      />
-                      {schoolsData.map((school) => (
-                        <Line
-                          key={school.id}
-                          type="monotone"
-                          dataKey={school.name}
-                          stroke={
-                            comparisonConfig[school.name]?.color || '#888888'
-                          }
-                          strokeWidth={1}
-                          dot={false}
-                        />
-                      ))}
-                    </LineChart>
-                  </ChartContainer>
-                </CardContent>
-              </Card>
-            </TabsContent>
-          </Tabs>
-        </>
+          <TabsContent value="compare" className="mt-4">
+            <QEduComparison
+              currentMunicipalityId={selectedMunicipalityId}
+              historicalTrendData={historicalTrendData}
+              comparisonEntities={comparisonEntities}
+              setComparisonEntities={setComparisonEntities}
+              comparisonData={comparisonData}
+              loadingComparison={loadingComparison}
+            />
+          </TabsContent>
+        </Tabs>
       )}
     </div>
   )

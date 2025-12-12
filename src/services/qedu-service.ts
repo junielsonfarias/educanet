@@ -14,6 +14,10 @@ export const availableMunicipalities: QEduMunicipality[] = [
   { id: '1501402', name: 'Belém', state: 'PA' },
   { id: '3550308', name: 'São Paulo', state: 'SP' },
   { id: '3304557', name: 'Rio de Janeiro', state: 'RJ' },
+  { id: '1302603', name: 'Manaus', state: 'AM' },
+  { id: '2304400', name: 'Fortaleza', state: 'CE' },
+  { id: '5300108', name: 'Brasília', state: 'DF' },
+  { id: '2927408', name: 'Salvador', state: 'BA' },
 ]
 
 export interface AgeGradeDistortionData {
@@ -37,17 +41,16 @@ export interface SchoolQEduData {
   approvalHistory: { year: number; rate: number }[]
 }
 
-export interface MunicipalityQEduData {
-  municipalityId: string
-  schools: SchoolQEduData[]
+export interface AggregatedMunicipalityData {
+  id: string
+  name: string
+  idebHistory: { year: number; score: number }[]
 }
 
 const API_KEY = import.meta.env.VITE_QEDU_API_KEY
 const BASE_URL = 'https://api.qedu.org.br/v1'
 
 // --- MOCK DATA FOR OTHER REPORTS (DISTORTION / APPROVAL) ---
-// Kept to avoid breaking existing reports that rely on these specific mocks
-// while we transition the main School Data to Real API.
 
 const mockDistortionData_1507706: AgeGradeDistortionData[] = [
   { year: 2023, series: '1º ano', distortionRate: 5.2 },
@@ -108,6 +111,22 @@ const mockGenericApprovalData: ApprovalFailureData[] = [
   },
 ]
 
+// Mock reference data for State/National averages (as API doesn't provide easy aggregate endpoint for these)
+export const mockReferenceData = {
+  national: [
+    { year: 2017, score: 5.5 },
+    { year: 2019, score: 5.7 },
+    { year: 2021, score: 5.8 },
+    { year: 2023, score: 6.0 },
+  ],
+  state: [
+    { year: 2017, score: 4.8 },
+    { year: 2019, score: 5.0 },
+    { year: 2021, score: 5.2 },
+    { year: 2023, score: 5.4 },
+  ],
+}
+
 // --- FETCH FUNCTIONS ---
 
 export const fetchAgeGradeDistortion = async (
@@ -135,10 +154,7 @@ export const fetchApprovalFailureRates = async (
 const mapApiSchoolToLocal = (apiSchool: any): SchoolQEduData => {
   const idebHistory: { year: number; score: number; target?: number }[] = []
 
-  // Try to find IDEB data. API might return 'ideb' object or 'ideb_anos_iniciais' / 'ideb_anos_finais'
   let idebSource = apiSchool.ideb
-
-  // Fallback strategies for different API response shapes
   if (!idebSource && apiSchool.ideb_anos_iniciais)
     idebSource = apiSchool.ideb_anos_iniciais
   if (!idebSource && apiSchool.ideb_anos_finais)
@@ -152,7 +168,6 @@ const mapApiSchoolToLocal = (apiSchool: any): SchoolQEduData => {
         idebHistory.push({
           year: y,
           score: s,
-          // Target handling if available in response
           target: apiSchool.metas?.[year]
             ? Number(apiSchool.metas[year])
             : undefined,
@@ -208,7 +223,6 @@ export const fetchSchoolsQEduData = async (
     }
 
     const json = await response.json()
-    // Handle different possible response structures (array or wrapper object)
     const schoolsList = Array.isArray(json)
       ? json
       : json.data || json.schools || []
@@ -227,5 +241,37 @@ export const fetchSchoolsQEduData = async (
 
 export const getMunicipalityName = (id: string) => {
   const m = availableMunicipalities.find((m) => m.id === id)
-  return m ? `${m.name} - ${m.state}` : 'Município Desconhecido'
+  return m ? `${m.name} - ${m.state}` : 'Município'
+}
+
+// Function to fetch and aggregate data for a specific municipality to allow comparison
+export const fetchMunicipalityAggregatedData = async (
+  id: string,
+): Promise<AggregatedMunicipalityData> => {
+  const schools = await fetchSchoolsQEduData(id)
+  const name = getMunicipalityName(id)
+
+  // Aggregate IDEB
+  const yearScores: Record<number, { total: number; count: number }> = {}
+
+  schools.forEach((school) => {
+    school.idebHistory.forEach((h) => {
+      if (!yearScores[h.year]) yearScores[h.year] = { total: 0, count: 0 }
+      yearScores[h.year].total += h.score
+      yearScores[h.year].count++
+    })
+  })
+
+  const idebHistory = Object.entries(yearScores)
+    .map(([year, data]) => ({
+      year: Number(year),
+      score: Number((data.total / data.count).toFixed(1)),
+    }))
+    .sort((a, b) => a.year - b.year)
+
+  return {
+    id,
+    name,
+    idebHistory,
+  }
 }
