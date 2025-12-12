@@ -46,10 +46,19 @@ export default function GradeEntryReport() {
   const [selectedPeriod, setSelectedPeriod] = useState<string>('all')
   const [searchTerm, setSearchTerm] = useState('')
 
-  const activeSchool = schools.find((s) => s.id === selectedSchool)
-  const academicYears = activeSchool?.academicYears || []
-  const activeYear = academicYears.find((y) => y.id === selectedYear)
-  const periods = activeYear?.periods || []
+  const activeSchool = useMemo(
+    () => schools.find((s) => s.id === selectedSchool),
+    [schools, selectedSchool],
+  )
+  const academicYears = useMemo(
+    () => activeSchool?.academicYears || [],
+    [activeSchool],
+  )
+  const activeYear = useMemo(
+    () => academicYears.find((y) => y.id === selectedYear),
+    [academicYears, selectedYear],
+  )
+  const periods = useMemo(() => activeYear?.periods || [], [activeYear])
 
   // Logic to build the report data
   const reportData = useMemo(() => {
