@@ -45,7 +45,7 @@ export interface School {
   inepCode?: string
   administrativeDependency?: 'Federal' | 'Estadual' | 'Municipal' | 'Privada'
   locationType?: 'Urbana' | 'Rural'
-  polo?: string // Added Polo field
+  polo?: string
   infrastructure?: {
     classrooms: number
     accessible: boolean
@@ -166,6 +166,14 @@ export interface Occurrence {
   createdAt: string
 }
 
+export interface Material {
+  id: string
+  name: string
+  type: 'pdf' | 'docx' | 'image' | 'video' | 'link'
+  url: string
+  size?: string
+}
+
 export interface LessonPlan {
   id: string
   teacherId: string
@@ -181,13 +189,28 @@ export interface LessonPlan {
   evaluation: string
   status: 'draft' | 'submitted' | 'approved' | 'rejected'
   feedback?: string
-  attachments?: { name: string; url: string }[]
+  attachments?: Material[]
   createdAt: string
   updatedAt: string
 }
 
 export interface ReportCardViewSettings {
   visibleColumns: string[]
+}
+
+export interface DashboardWidget {
+  id: string
+  type: 'chart' | 'metric' | 'list'
+  title: string
+  dataKey: string
+  visible: boolean
+  w: number
+}
+
+export interface DashboardLayout {
+  id: string
+  name: string
+  widgets: DashboardWidget[]
 }
 
 export interface GeneralSettings {
@@ -200,9 +223,33 @@ export interface GeneralSettings {
   footerText?: string
   qeduMunicipalityId?: string
   reportCardView?: ReportCardViewSettings
+  dashboardLayout?: DashboardLayout
+  savedLayouts?: DashboardLayout[]
 }
 
-// --- New Interfaces for Institutional Website ---
+export type AlertType = 'dropout_risk' | 'low_performance' | 'system'
+
+export interface Alert {
+  id: string
+  title: string
+  message: string
+  type: AlertType
+  severity: 'high' | 'medium' | 'low'
+  date: string
+  studentId?: string
+  read: boolean
+}
+
+export interface AlertRule {
+  id: string
+  name: string
+  type: AlertType
+  condition: 'lt' | 'gt'
+  threshold: number
+  target: 'attendance' | 'grade'
+  roles: string[]
+  active: boolean
+}
 
 export interface NewsPost {
   id: string
@@ -234,7 +281,68 @@ export interface InstitutionalContent {
   updatedAt: string
 }
 
-// ------------------------------------------------
+export const initialDashboardLayout: DashboardLayout = {
+  id: 'default',
+  name: 'Padrão',
+  widgets: [
+    {
+      id: 'w1',
+      type: 'metric',
+      title: 'Total de Alunos',
+      dataKey: 'totalStudents',
+      visible: true,
+      w: 1,
+    },
+    {
+      id: 'w2',
+      type: 'metric',
+      title: 'Escolas Ativas',
+      dataKey: 'activeSchools',
+      visible: true,
+      w: 1,
+    },
+    {
+      id: 'w3',
+      type: 'metric',
+      title: 'Turmas',
+      dataKey: 'totalClasses',
+      visible: true,
+      w: 1,
+    },
+    {
+      id: 'w4',
+      type: 'metric',
+      title: 'Taxa de Aprovação',
+      dataKey: 'approvalRate',
+      visible: true,
+      w: 1,
+    },
+    {
+      id: 'w5',
+      type: 'chart',
+      title: 'Evolução das Matrículas',
+      dataKey: 'enrollmentGrowth',
+      visible: true,
+      w: 2,
+    },
+    {
+      id: 'w6',
+      type: 'chart',
+      title: 'Média por Disciplina',
+      dataKey: 'subjectAverage',
+      visible: true,
+      w: 2,
+    },
+    {
+      id: 'w7',
+      type: 'list',
+      title: 'Atenção Necessária',
+      dataKey: 'attentionList',
+      visible: true,
+      w: 4,
+    },
+  ],
+}
 
 export const initialSettings: GeneralSettings = {
   municipalityName: 'Prefeitura Municipal',
@@ -243,7 +351,9 @@ export const initialSettings: GeneralSettings = {
   facebookHandle: '@semed_oficial',
   footerText:
     '© 2025 Prefeitura Municipal de São Sebastião da Boa Vista. Todos os direitos reservados.',
-  qeduMunicipalityId: '1507300', // Default to São Sebastião da Boa Vista - PA (IBGE Code)
+  qeduMunicipalityId: '1507300',
+  dashboardLayout: initialDashboardLayout,
+  savedLayouts: [initialDashboardLayout],
 }
 
 export const mockEvaluationRules: EvaluationRule[] = [
@@ -307,7 +417,7 @@ export const mockCourses: Course[] = [
       {
         id: 'g5',
         name: '5º Ano',
-        evaluationRuleId: 'rule3', // Updated to use rule3 for weighted average requirement
+        evaluationRuleId: 'rule3',
         subjects: [
           { id: 's9', name: 'Português', workload: 180 },
           { id: 's10', name: 'Matemática', workload: 180 },
@@ -414,7 +524,7 @@ export const mockSchools: School[] = [
             maxDependencySubjects: 2,
           },
           {
-            id: 'cl2', // Added class for dependency testing
+            id: 'cl2',
             name: '1º Ano A',
             shift: 'Vespertino',
             gradeId: 'g1',
@@ -736,6 +846,14 @@ export const mockLessonPlans: LessonPlan[] = [
     status: 'approved',
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
+    attachments: [
+      {
+        id: 'att1',
+        name: 'Lista de Exercícios.pdf',
+        type: 'pdf',
+        url: '#',
+      },
+    ],
   },
 ]
 
@@ -806,5 +924,31 @@ export const mockInstitutionalContent: InstitutionalContent[] = [
     content:
       'A SEMED está estruturada em departamentos pedagógico, administrativo e financeiro. Contamos com uma equipe multidisciplinar focada no suporte às escolas e no desenvolvimento de políticas públicas educacionais efetivas.',
     updatedAt: new Date().toISOString(),
+  },
+]
+
+export const mockAlerts: Alert[] = [
+  {
+    id: 'al1',
+    title: 'Risco de Evasão',
+    message: 'Alice Souza faltou 5 dias consecutivos sem justificativa.',
+    type: 'dropout_risk',
+    severity: 'high',
+    date: new Date().toISOString(),
+    studentId: '1',
+    read: false,
+  },
+]
+
+export const mockAlertRules: AlertRule[] = [
+  {
+    id: 'ar1',
+    name: 'Alerta de Baixa Frequência',
+    type: 'dropout_risk',
+    condition: 'lt',
+    threshold: 75,
+    target: 'attendance',
+    roles: ['admin', 'supervisor', 'coordinator'],
+    active: true,
   },
 ]

@@ -10,6 +10,7 @@ import {
   School,
   ArrowRightLeft,
   Edit,
+  History,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
@@ -36,6 +37,7 @@ import useSchoolStore from '@/stores/useSchoolStore'
 import useAssessmentStore from '@/stores/useAssessmentStore'
 import useCourseStore from '@/stores/useCourseStore'
 import useProjectStore from '@/stores/useProjectStore'
+import useOccurrenceStore from '@/stores/useOccurrenceStore'
 import { useState } from 'react'
 import { StudentFormDialog } from './components/StudentFormDialog'
 import { EnrollmentFormDialog } from './components/EnrollmentFormDialog'
@@ -45,7 +47,9 @@ import { StudentInfoCard } from './components/StudentInfoCard'
 import { StudentPerformanceCard } from './components/StudentPerformanceCard'
 import { StudentAssessmentHistory } from './components/StudentAssessmentHistory'
 import { StudentAttendanceCard } from './components/StudentAttendanceCard'
+import { StudentLessonsTab } from './components/StudentLessonsTab'
 import { useToast } from '@/hooks/use-toast'
+import { format, parseISO } from 'date-fns'
 
 export default function StudentDetails() {
   const { id } = useParams<{ id: string }>()
@@ -63,6 +67,7 @@ export default function StudentDetails() {
   const { courses } = useCourseStore()
   const { projects } = useProjectStore()
   const { currentUser } = useUserStore()
+  const { getStudentOccurrences } = useOccurrenceStore()
   const { toast } = useToast()
 
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
@@ -115,6 +120,10 @@ export default function StudentDetails() {
     }
   }
   const subjects = gradeStructure?.subjects || []
+
+  const occurrences = getStudentOccurrences(student.id).sort(
+    (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime(),
+  )
 
   // Handlers
   const handleUpdate = (data: any) => {
@@ -214,7 +223,7 @@ export default function StudentDetails() {
       </div>
 
       <Tabs defaultValue="personal" className="w-full">
-        <TabsList className="grid w-full grid-cols-2 md:grid-cols-5 h-auto">
+        <TabsList className="grid w-full grid-cols-3 md:grid-cols-6 h-auto">
           <TabsTrigger value="personal" className="gap-2 py-2">
             <User className="h-4 w-4" />
             <span className="hidden md:inline">Dados Pessoais</span>
@@ -232,13 +241,18 @@ export default function StudentDetails() {
           </TabsTrigger>
           <TabsTrigger value="grades" className="gap-2 py-2">
             <GraduationCap className="h-4 w-4" />
-            <span className="hidden md:inline">Notas e Avaliações</span>
+            <span className="hidden md:inline">Notas</span>
             <span className="md:hidden">Notas</span>
           </TabsTrigger>
           <TabsTrigger value="attendance" className="gap-2 py-2">
             <CalendarDays className="h-4 w-4" />
-            <span className="hidden md:inline">Faltas</span>
+            <span className="hidden md:inline">Frequência/Ocor.</span>
             <span className="md:hidden">Freq.</span>
+          </TabsTrigger>
+          <TabsTrigger value="content" className="gap-2 py-2">
+            <FileText className="h-4 w-4" />
+            <span className="hidden md:inline">Conteúdo</span>
+            <span className="md:hidden">Cont.</span>
           </TabsTrigger>
         </TabsList>
 
@@ -404,8 +418,54 @@ export default function StudentDetails() {
             </div>
           </TabsContent>
 
-          <TabsContent value="attendance">
+          <TabsContent value="attendance" className="space-y-6">
             <StudentAttendanceCard studentId={student.id} />
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <History className="h-5 w-5 text-primary" />
+                  Ocorrências Registradas
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {occurrences.length === 0 ? (
+                  <p className="text-center py-4 text-muted-foreground">
+                    Nenhuma ocorrência registrada.
+                  </p>
+                ) : (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Data</TableHead>
+                        <TableHead>Tipo</TableHead>
+                        <TableHead>Descrição</TableHead>
+                        <TableHead>Registrado Por</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {occurrences.map((occ) => (
+                        <TableRow key={occ.id}>
+                          <TableCell className="whitespace-nowrap">
+                            {format(parseISO(occ.date), 'dd/MM/yyyy HH:mm')}
+                          </TableCell>
+                          <TableCell className="capitalize">
+                            {occ.type}
+                          </TableCell>
+                          <TableCell>{occ.description}</TableCell>
+                          <TableCell className="text-muted-foreground text-xs">
+                            {occ.recordedBy}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="content">
+            <StudentLessonsTab student={student} />
           </TabsContent>
         </div>
       </Tabs>

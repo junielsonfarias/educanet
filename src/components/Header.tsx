@@ -1,4 +1,4 @@
-import { Bell, Moon, Sun, Search, Menu } from 'lucide-react'
+import { Bell, Moon, Sun, Search } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
   DropdownMenu,
@@ -8,13 +8,30 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { Input } from '@/components/ui/input'
 import { SidebarTrigger } from '@/components/ui/sidebar'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { useLocation } from 'react-router-dom'
+import useAlertStore from '@/stores/useAlertStore'
+import { GlobalSearch } from './GlobalSearch'
+import { useState, useEffect } from 'react'
 
 export function Header() {
   const location = useLocation()
+  const navigate = useNavigate()
+  const { unreadCount } = useAlertStore()
+  const [searchOpen, setSearchOpen] = useState(false)
+
+  // Keyboard shortcut for search
+  useEffect(() => {
+    const down = (e: KeyboardEvent) => {
+      if (e.key === 'k' && (e.metaKey || e.ctrlKey)) {
+        e.preventDefault()
+        setSearchOpen((open) => !open)
+      }
+    }
+    document.addEventListener('keydown', down)
+    return () => document.removeEventListener('keydown', down)
+  }, [])
 
   const getPageTitle = (path: string) => {
     if (path.includes('dashboard')) return 'Visão Geral'
@@ -22,6 +39,7 @@ export function Header() {
     if (path.includes('alunos')) return 'Gestão de Alunos'
     if (path.includes('turmas')) return 'Gestão de Turmas'
     if (path.includes('configuracoes')) return 'Configurações'
+    if (path.includes('alertas')) return 'Central de Alertas'
     return 'Sistema de Gestão Escolar'
   }
 
@@ -37,17 +55,29 @@ export function Header() {
 
       <div className="ml-auto flex items-center gap-4">
         <div className="relative hidden md:block w-64">
-          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-          <Input
-            type="search"
-            placeholder="Buscar..."
-            className="w-full bg-background pl-8 md:w-[200px] lg:w-[300px]"
-          />
+          <Button
+            variant="outline"
+            className="w-full justify-start text-muted-foreground bg-background"
+            onClick={() => setSearchOpen(true)}
+          >
+            <Search className="mr-2 h-4 w-4" />
+            <span className="inline-flex">Buscar...</span>
+            <span className="ml-auto text-xs border bg-muted px-1 rounded">
+              ⌘K
+            </span>
+          </Button>
         </div>
 
-        <Button variant="ghost" size="icon" className="relative">
+        <Button
+          variant="ghost"
+          size="icon"
+          className="relative"
+          onClick={() => navigate('/alertas')}
+        >
           <Bell className="h-5 w-5" />
-          <span className="absolute top-2 right-2 h-2 w-2 rounded-full bg-destructive" />
+          {unreadCount > 0 && (
+            <span className="absolute top-2 right-2 h-2 w-2 rounded-full bg-destructive animate-pulse" />
+          )}
           <span className="sr-only">Notificações</span>
         </Button>
 
@@ -97,6 +127,8 @@ export function Header() {
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
+
+      <GlobalSearch open={searchOpen} onOpenChange={setSearchOpen} />
     </header>
   )
 }

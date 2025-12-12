@@ -14,6 +14,7 @@ import {
   BarChart,
   ClipboardList,
   PenTool,
+  Bell,
 } from 'lucide-react'
 import {
   Sidebar,
@@ -30,8 +31,10 @@ import {
 } from '@/components/ui/sidebar'
 import { Link, useLocation } from 'react-router-dom'
 import useUserStore from '@/stores/useUserStore'
+import useAlertStore from '@/stores/useAlertStore'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
 
 const menuItems = [
   {
@@ -43,6 +46,11 @@ const menuItems = [
     title: 'Painel Estratégico',
     url: '/dashboard/estrategico',
     icon: BarChart,
+  },
+  {
+    title: 'Alertas',
+    url: '/alertas',
+    icon: Bell,
   },
   {
     title: 'Escolas',
@@ -123,6 +131,7 @@ const reportsItems = [
 export function AppSidebar() {
   const { pathname } = useLocation()
   const { currentUser, logout } = useUserStore()
+  const { unreadCount } = useAlertStore()
 
   const isActive = (url: string) => pathname.startsWith(url)
 
@@ -149,9 +158,19 @@ export function AppSidebar() {
                     isActive={isActive(item.url)}
                     tooltip={item.title}
                   >
-                    <Link to={item.url}>
-                      <item.icon className="h-4 w-4" />
-                      <span>{item.title}</span>
+                    <Link to={item.url} className="flex justify-between">
+                      <div className="flex items-center gap-2">
+                        <item.icon className="h-4 w-4" />
+                        <span>{item.title}</span>
+                      </div>
+                      {item.title === 'Alertas' && unreadCount > 0 && (
+                        <Badge
+                          variant="destructive"
+                          className="h-5 px-1.5 text-[10px]"
+                        >
+                          {unreadCount}
+                        </Badge>
+                      )}
                     </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>

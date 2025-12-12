@@ -1,9 +1,17 @@
 import React, { createContext, useContext, useState, useEffect } from 'react'
-import { GeneralSettings, initialSettings } from '@/lib/mock-data'
+import {
+  GeneralSettings,
+  initialSettings,
+  DashboardLayout,
+  initialDashboardLayout,
+} from '@/lib/mock-data'
 
 interface SettingsContextType {
   settings: GeneralSettings
   updateSettings: (data: Partial<GeneralSettings>) => void
+  saveDashboardLayout: (layout: DashboardLayout) => void
+  loadDashboardLayout: (id: string) => void
+  activeLayout: DashboardLayout
 }
 
 const SettingsContext = createContext<SettingsContextType | null>(null)
@@ -19,7 +27,8 @@ export const SettingsProvider = ({
     const stored = localStorage.getItem('edu_settings')
     if (stored) {
       try {
-        setSettings(JSON.parse(stored))
+        const parsed = JSON.parse(stored)
+        setSettings({ ...initialSettings, ...parsed })
       } catch (error) {
         console.error('Failed to parse settings from local storage:', error)
       }
@@ -34,8 +43,45 @@ export const SettingsProvider = ({
     setSettings((prev) => ({ ...prev, ...data }))
   }
 
+  const saveDashboardLayout = (layout: DashboardLayout) => {
+    setSettings((prev) => {
+      const savedLayouts = prev.savedLayouts || []
+      const existingIndex = savedLayouts.findIndex((l) => l.id === layout.id)
+      let newLayouts = [...savedLayouts]
+
+      if (existingIndex >= 0) {
+        newLayouts[existingIndex] = layout
+      } else {
+        newLayouts.push(layout)
+      }
+
+      return {
+        ...prev,
+        dashboardLayout: layout, // Set as active
+        savedLayouts: newLayouts,
+      }
+    })
+  }
+
+  const loadDashboardLayout = (id: string) => {
+    const layout = settings.savedLayouts?.find((l) => l.id === id)
+    if (layout) {
+      updateSettings({ dashboardLayout: layout })
+    }
+  }
+
+  const activeLayout = settings.dashboardLayout || initialDashboardLayout
+
   return (
-    <SettingsContext.Provider value={{ settings, updateSettings }}>
+    <SettingsContext.Provider
+      value={{
+        settings,
+        updateSettings,
+        saveDashboardLayout,
+        loadDashboardLayout,
+        activeLayout,
+      }}
+    >
       {children}
     </SettingsContext.Provider>
   )
