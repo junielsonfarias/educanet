@@ -174,7 +174,7 @@ export default function DigitalClassDiary() {
         setJustifications({})
       }
     }
-  }, [classId, date, subjectId, getClassAttendance, classStudents])
+  }, [classId, date, subjectId, getClassAttendance, classStudents, toast])
 
   const togglePresence = (studentId: string) => {
     if (selectedStudents.includes(studentId)) {
