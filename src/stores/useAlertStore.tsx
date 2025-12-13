@@ -38,7 +38,7 @@ export const AlertProvider = ({ children }: { children: React.ReactNode }) => {
   const addAlert = (data: Omit<Alert, 'id' | 'read' | 'date'>) => {
     const newAlert: Alert = {
       ...data,
-      id: Math.random().toString(36).substr(2, 9),
+      id: Math.random().toString(36).substring(2, 11),
       date: new Date().toISOString(),
       read: false,
     }
@@ -58,7 +58,7 @@ export const AlertProvider = ({ children }: { children: React.ReactNode }) => {
   const addRule = (data: Omit<AlertRule, 'id'>) => {
     const newRule: AlertRule = {
       ...data,
-      id: Math.random().toString(36).substr(2, 9),
+      id: Math.random().toString(36).substring(2, 11),
     }
     setRules((prev) => [...prev, newRule])
   }

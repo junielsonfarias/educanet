@@ -88,14 +88,14 @@ export const StudentProvider = ({
   ) => {
     const enrollment: Enrollment = {
       ...initialEnrollment,
-      id: Math.random().toString(36).substr(2, 9),
+      id: Math.random().toString(36).substring(2, 11),
       status: 'Cursando',
       type: 'regular',
     }
 
     const newStudent: Student = {
       ...data,
-      id: Math.random().toString(36).substr(2, 9),
+      id: Math.random().toString(36).substring(2, 11),
       enrollments: [enrollment],
       projectIds: [],
       // Legacy support
@@ -150,7 +150,7 @@ export const StudentProvider = ({
         if (s.id === studentId) {
           const newEnrollment: Enrollment = {
             ...enrollmentData,
-            id: Math.random().toString(36).substr(2, 9),
+            id: Math.random().toString(36).substring(2, 11),
           }
           const currentEnrollments = s.enrollments || []
           return {

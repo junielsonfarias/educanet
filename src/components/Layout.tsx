@@ -2,6 +2,7 @@ import { Outlet, useLocation } from 'react-router-dom'
 import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar'
 import { AppSidebar } from './AppSidebar'
 import { Header } from './Header'
+import ProtectedRoute from './ProtectedRoute'
 
 export default function Layout() {
   const location = useLocation()
@@ -18,15 +19,18 @@ export default function Layout() {
     )
   }
 
+  // Rotas administrativas precisam de autenticação
   return (
-    <SidebarProvider>
-      <AppSidebar />
-      <SidebarInset>
-        <Header />
-        <div className="flex flex-1 flex-col gap-4 p-4 pt-0 md:p-8 md:pt-6 bg-secondary/30 min-h-[calc(100vh-4rem)]">
-          <Outlet />
-        </div>
-      </SidebarInset>
-    </SidebarProvider>
+    <ProtectedRoute>
+      <SidebarProvider>
+        <AppSidebar />
+        <SidebarInset>
+          <Header />
+          <div className="flex flex-1 flex-col gap-4 p-4 pt-0 md:p-8 md:pt-6 bg-secondary/30 min-h-[calc(100vh-4rem)]">
+            <Outlet />
+          </div>
+        </SidebarInset>
+      </SidebarProvider>
+    </ProtectedRoute>
   )
 }

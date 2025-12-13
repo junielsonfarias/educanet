@@ -31,6 +31,8 @@ import { Textarea } from '@/components/ui/textarea'
 import { Student } from '@/lib/mock-data'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import useSchoolStore from '@/stores/useSchoolStore'
+import { validateEnrollment } from '@/lib/enrollment-utils'
+import { useToast } from '@/hooks/use-toast'
 
 const studentSchema = z.object({
   // Personal Info
@@ -287,9 +289,29 @@ export function StudentFormDialog({
       const yearNumber = parseInt(yearName) || new Date().getFullYear()
 
       enrollmentData = {
-        year: yearNumber,
         schoolId: values.enrollmentSchoolId,
-        grade: selectedClass ? selectedClass.name : 'Turma Indefinida',
+        academicYearId: values.enrollmentYearId, // ID do ano letivo
+        classroomId: values.enrollmentClassId, // ID da turma
+        year: yearNumber, // Mantido para compatibilidade
+        grade: selectedClass ? selectedClass.name : 'Turma Indefinida', // Mantido para compatibilidade
+      }
+
+      // Validar relacionamentos antes de criar
+      if (enrollmentData) {
+        const validation = validateEnrollment(
+          {
+            id: 'temp',
+            ...enrollmentData,
+            type: 'regular',
+            status: 'Cursando',
+          },
+          schools,
+        )
+        if (!validation.valid) {
+          // Toast será mostrado pelo componente pai se necessário
+          // Por enquanto, apenas logamos o erro
+          console.error('Erro de validação de matrícula:', validation.errors)
+        }
       }
     }
 

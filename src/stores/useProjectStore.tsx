@@ -32,7 +32,7 @@ export const ProjectProvider = ({
   const addProject = (data: Omit<Project, 'id'>) => {
     const newProject: Project = {
       ...data,
-      id: Math.random().toString(36).substr(2, 9),
+      id: Math.random().toString(36).substring(2, 11),
     }
     setProjects((prev) => [...prev, newProject])
   }

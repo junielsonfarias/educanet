@@ -48,7 +48,7 @@ export const ReportProvider = ({ children }: { children: React.ReactNode }) => {
   ) => {
     const newReport: CustomReportConfig = {
       ...config,
-      id: Math.random().toString(36).substr(2, 9),
+      id: Math.random().toString(36).substring(2, 11),
       createdAt: new Date().toISOString(),
     }
     setSavedReports((prev) => [...prev, newReport])

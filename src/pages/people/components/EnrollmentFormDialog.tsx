@@ -29,6 +29,8 @@ import { Button } from '@/components/ui/button'
 import useSchoolStore from '@/stores/useSchoolStore'
 import useCourseStore from '@/stores/useCourseStore'
 import { useEffect } from 'react'
+import { validateEnrollment } from '@/lib/enrollment-utils'
+import { useToast } from '@/hooks/use-toast'
 
 const enrollmentSchema = z.object({
   schoolId: z.string().min(1, 'Escola é obrigatória'),
@@ -58,6 +60,7 @@ export function EnrollmentFormDialog({
 }: EnrollmentFormDialogProps) {
   const { schools } = useSchoolStore()
   const { courses } = useCourseStore()
+  const { toast } = useToast()
 
   const form = useForm<z.infer<typeof enrollmentSchema>>({
     resolver: zodResolver(enrollmentSchema),
@@ -123,10 +126,40 @@ export function EnrollmentFormDialog({
       gradeName = currentClass.gradeName
     }
 
-    onSubmit({
+    // Criar objeto de enrollment para validação
+    const enrollmentData = {
+      id: 'temp', // Temporário para validação
       schoolId: data.schoolId,
+      academicYearId: data.yearId,
+      classroomId: data.classId,
       year: yearNumber,
       grade: gradeName,
+      type: data.type as 'regular' | 'dependency',
+      status: data.status as
+        | 'Cursando'
+        | 'Aprovado'
+        | 'Reprovado'
+        | 'Transferido'
+        | 'Abandono',
+    }
+
+    // Validar relacionamentos antes de criar
+    const validation = validateEnrollment(enrollmentData, schools)
+    if (!validation.valid) {
+      toast({
+        title: 'Erro de Validação',
+        description: validation.errors.join('. '),
+        variant: 'destructive',
+      })
+      return
+    }
+
+    onSubmit({
+      schoolId: data.schoolId,
+      academicYearId: data.yearId, // ID do ano letivo
+      classroomId: data.classId, // ID da turma
+      year: yearNumber, // Mantido para compatibilidade
+      grade: gradeName, // Mantido para compatibilidade
       type: data.type,
       status: data.status,
     })

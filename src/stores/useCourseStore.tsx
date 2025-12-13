@@ -58,7 +58,7 @@ export const CourseProvider = ({ children }: { children: React.ReactNode }) => {
   const addCourse = (data: Omit<Course, 'id' | 'grades'>) => {
     const newCourse: Course = {
       ...data,
-      id: Math.random().toString(36).substr(2, 9),
+      id: Math.random().toString(36).substring(2, 11),
       grades: [],
     }
     setCourses((prev) => [...prev, newCourse])
@@ -78,7 +78,7 @@ export const CourseProvider = ({ children }: { children: React.ReactNode }) => {
               ...c.grades,
               {
                 ...data,
-                id: Math.random().toString(36).substr(2, 9),
+                id: Math.random().toString(36).substring(2, 11),
                 subjects: [],
               },
             ],
@@ -125,7 +125,7 @@ export const CourseProvider = ({ children }: { children: React.ReactNode }) => {
                   ...g,
                   subjects: [
                     ...g.subjects,
-                    { ...data, id: Math.random().toString(36).substr(2, 9) },
+                    { ...data, id: Math.random().toString(36).substring(2, 11) },
                   ],
                 }
               }
@@ -196,7 +196,7 @@ export const CourseProvider = ({ children }: { children: React.ReactNode }) => {
   const addEvaluationRule = (data: Omit<EvaluationRule, 'id'>) => {
     const newRule: EvaluationRule = {
       ...data,
-      id: Math.random().toString(36).substr(2, 9),
+      id: Math.random().toString(36).substring(2, 11),
     }
     setEvaluationRules((prev) => [...prev, newRule])
   }

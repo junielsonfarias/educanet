@@ -38,6 +38,10 @@ import useAssessmentStore from '@/stores/useAssessmentStore'
 import useCourseStore from '@/stores/useCourseStore'
 import useProjectStore from '@/stores/useProjectStore'
 import useOccurrenceStore from '@/stores/useOccurrenceStore'
+import {
+  getClassroomFromEnrollment,
+  getAcademicYearFromEnrollment,
+} from '@/lib/enrollment-utils'
 import { useState } from 'react'
 import { StudentFormDialog } from './components/StudentFormDialog'
 import { EnrollmentFormDialog } from './components/EnrollmentFormDialog'
@@ -90,32 +94,47 @@ export default function StudentDetails() {
     )
   }
 
-  // Current Info
+  // Current Info - usando funções utilitárias
   const activeEnrollment = student.enrollments.find(
     (e) => e.status === 'Cursando',
   )
   const currentSchool = schools.find((s) => s.id === activeEnrollment?.schoolId)
-  const currentYear = currentSchool?.academicYears.find(
-    (y) => y.name === activeEnrollment?.year.toString(),
-  )
+  const currentYear =
+    activeEnrollment && currentSchool
+      ? getAcademicYearFromEnrollment(activeEnrollment, schools)
+      : currentSchool?.academicYears.find(
+          (y) => y.name === activeEnrollment?.year.toString(),
+        )
 
   // Grade Structure for Assessments
   let gradeStructure: any = null
   let periods: any[] = currentYear?.periods || []
 
-  if (activeEnrollment && currentYear) {
-    const classroom = currentYear.classes.find(
-      (c) => c.name === activeEnrollment.grade,
-    )
-    for (const course of courses) {
-      const g = course.grades.find(
-        (gr) =>
-          gr.name === activeEnrollment.grade ||
-          (classroom && gr.id === classroom.gradeId),
-      )
-      if (g) {
-        gradeStructure = g
-        break
+  if (activeEnrollment && currentYear && currentSchool) {
+    // Usar função utilitária para buscar turma
+    const classroom = getClassroomFromEnrollment(activeEnrollment, schools)
+    
+    // Buscar grade usando gradeId da turma (prioritário)
+    if (classroom?.gradeId) {
+      for (const course of courses) {
+        const g = course.grades.find((gr) => gr.id === classroom.gradeId)
+        if (g) {
+          gradeStructure = g
+          break
+        }
+      }
+    }
+    
+    // Fallback: buscar por nome se não encontrou por ID
+    if (!gradeStructure) {
+      for (const course of courses) {
+        const g = course.grades.find(
+          (gr) => gr.name === activeEnrollment.grade,
+        )
+        if (g) {
+          gradeStructure = g
+          break
+        }
       }
     }
   }

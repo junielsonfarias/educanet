@@ -32,6 +32,7 @@ import useCourseStore from '@/stores/useCourseStore'
 import useStudentStore from '@/stores/useStudentStore'
 import useAssessmentStore from '@/stores/useAssessmentStore'
 import useTeacherStore from '@/stores/useTeacherStore'
+import { getStudentsByClassroom } from '@/lib/enrollment-utils'
 import { ExportActions } from '@/components/ExportActions'
 
 export default function GradeEntryReport() {
@@ -76,15 +77,16 @@ export default function GradeEntryReport() {
 
       if (!grade) return
 
-      // Students in this class
-      const classStudents = students.filter((s) => {
-        const enrollment = s.enrollments.find(
-          (e) =>
-            e.schoolId === activeSchool.id &&
-            e.year.toString() === activeYear.name &&
-            e.grade === cls.name &&
-            e.status === 'Cursando',
-        )
+      // Students in this class using utility function
+      const classStudents = getStudentsByClassroom(
+        students,
+        cls.id,
+        cls.name,
+        activeSchool.id,
+        activeYear.id,
+        activeYear.name,
+      ).filter((s) => {
+        const enrollment = s.enrollments.find((e) => e.status === 'Cursando')
         return !!enrollment
       })
 

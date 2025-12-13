@@ -58,6 +58,7 @@ import useStudentStore from '@/stores/useStudentStore'
 import useAttendanceStore from '@/stores/useAttendanceStore'
 import useOccurrenceStore from '@/stores/useOccurrenceStore'
 import useCourseStore from '@/stores/useCourseStore'
+import { getStudentsByClassroom } from '@/lib/enrollment-utils'
 
 const formSchema = z.object({
   schoolId: z.string().min(1, 'Escola é obrigatória'),
@@ -113,18 +114,16 @@ export default function DigitalClassDiary() {
   const subjects = classGrade?.subjects || []
 
   const classStudents = useMemo(() => {
-    if (!selectedClass || !selectedSchool) return []
-    return students
-      .filter((s) => {
-        const enrollment = s.enrollments.find((e) => e.status === 'Cursando')
-        return (
-          enrollment &&
-          enrollment.schoolId === selectedSchool.id &&
-          enrollment.grade === selectedClass.name
-        )
-      })
-      .sort((a, b) => a.name.localeCompare(b.name))
-  }, [students, selectedClass, selectedSchool])
+    if (!selectedClass || !selectedSchool || !activeYear) return []
+    return getStudentsByClassroom(
+      students,
+      selectedClass.id,
+      selectedClass.name,
+      selectedSchool.id,
+      activeYear.id,
+      activeYear.name,
+    ).sort((a, b) => a.name.localeCompare(b.name))
+  }, [students, selectedClass, selectedSchool, activeYear])
 
   const classOccurrences = useMemo(() => {
     if (!classId) return []

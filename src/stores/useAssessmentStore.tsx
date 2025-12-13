@@ -94,7 +94,7 @@ export const AssessmentProvider = ({
       const newAssessment: Assessment = {
         ...data,
         category, // ensure category is set
-        id: Math.random().toString(36).substr(2, 9),
+        id: Math.random().toString(36).substring(2, 11),
       }
       setAssessments((prev) => [...prev, newAssessment])
     }
@@ -126,7 +126,7 @@ export const AssessmentProvider = ({
   const addAssessmentType = (data: Omit<AssessmentType, 'id'>) => {
     const newType: AssessmentType = {
       ...data,
-      id: Math.random().toString(36).substr(2, 9),
+      id: Math.random().toString(36).substring(2, 11),
     }
     setAssessmentTypes((prev) => [...prev, newType])
   }

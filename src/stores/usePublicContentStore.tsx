@@ -69,7 +69,7 @@ export const PublicContentProvider = ({
   const addNews = (data: Omit<NewsPost, 'id' | 'active'>) => {
     const newPost: NewsPost = {
       ...data,
-      id: Math.random().toString(36).substr(2, 9),
+      id: Math.random().toString(36).substring(2, 11),
       active: true,
     }
     setNews((prev) => [newPost, ...prev])
@@ -88,7 +88,7 @@ export const PublicContentProvider = ({
   const addDocument = (data: Omit<PublicDocument, 'id' | 'active'>) => {
     const newDoc: PublicDocument = {
       ...data,
-      id: Math.random().toString(36).substr(2, 9),
+      id: Math.random().toString(36).substring(2, 11),
       active: true,
     }
     setDocuments((prev) => [newDoc, ...prev])

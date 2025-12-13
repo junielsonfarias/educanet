@@ -45,6 +45,10 @@ import useSchoolStore from '@/stores/useSchoolStore'
 import useCourseStore from '@/stores/useCourseStore'
 import useSettingsStore from '@/stores/useSettingsStore'
 import {
+  getClassroomFromEnrollment,
+  getAcademicYearFromEnrollment,
+} from '@/lib/enrollment-utils'
+import {
   calculateGrades,
   SubjectCalculationResult,
 } from '@/lib/grade-calculator'
@@ -107,34 +111,51 @@ export function StudentPerformanceCard({
     let academicYearStatus = 'active' // Default fallback
 
     for (const enrollment of enrollmentsInYear) {
-      // 1. Find school and academic year
+      // 1. Find school and academic year using utility function
       const school = schools.find((s) => s.id === enrollment.schoolId)
-      const academicYear = school?.academicYears.find(
-        (y) => y.name === yearStr || y.name.includes(yearStr),
-      )
+      const academicYear =
+        getAcademicYearFromEnrollment(enrollment, schools) ||
+        school?.academicYears.find(
+          (y) => y.name === yearStr || y.name.includes(yearStr),
+        )
 
       if (!academicYear) continue
       academicYearStatus = academicYear.status
 
-      // 2. Find classroom
-      const classroom = academicYear.classes.find(
-        (c) => c.name === enrollment.grade,
-      )
+      // 2. Find classroom using utility function
+      const classroom = getClassroomFromEnrollment(enrollment, schools)
 
-      // 3. Find course/grade/subjects
+      // 3. Find course/grade/subjects - priorizar gradeId da turma
       let gradeStructure: any = null
       let courseEvaluationRule: EvaluationRule | undefined = undefined
 
-      for (const course of courses) {
-        const g = course.grades.find(
-          (gr) => gr.id === classroom?.gradeId || gr.name === enrollment.grade,
-        )
-        if (g) {
-          gradeStructure = g
-          courseEvaluationRule = evaluationRules.find(
-            (r) => r.id === g.evaluationRuleId,
+      if (classroom?.gradeId) {
+        // Prioridade: usar gradeId da turma
+        for (const course of courses) {
+          const g = course.grades.find((gr) => gr.id === classroom.gradeId)
+          if (g) {
+            gradeStructure = g
+            courseEvaluationRule = evaluationRules.find(
+              (r) => r.id === g.evaluationRuleId,
+            )
+            break
+          }
+        }
+      }
+
+      // Fallback: buscar por nome se não encontrou por ID
+      if (!gradeStructure) {
+        for (const course of courses) {
+          const g = course.grades.find(
+            (gr) => gr.name === enrollment.grade,
           )
-          break
+          if (g) {
+            gradeStructure = g
+            courseEvaluationRule = evaluationRules.find(
+              (r) => r.id === g.evaluationRuleId,
+            )
+            break
+          }
         }
       }
 

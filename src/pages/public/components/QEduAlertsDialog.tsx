@@ -55,7 +55,7 @@ export function QEduAlertsDialog({
     if (!newValue) return
 
     const rule: AlertRule = {
-      id: Math.random().toString(36).substr(2, 9),
+      id: Math.random().toString(36).substring(2, 11),
       indicator: newIndicator,
       operator: newOperator,
       value: Number(newValue),

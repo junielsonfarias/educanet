@@ -33,7 +33,7 @@ export const OccurrenceProvider = ({
   const addOccurrence = (data: Omit<Occurrence, 'id' | 'createdAt'>) => {
     const newOccurrence: Occurrence = {
       ...data,
-      id: Math.random().toString(36).substr(2, 9),
+      id: Math.random().toString(36).substring(2, 11),
       createdAt: new Date().toISOString(),
     }
     setOccurrences((prev) => [...prev, newOccurrence])

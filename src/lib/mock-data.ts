@@ -736,8 +736,10 @@ export const initialUsers: User[] = [
 export interface Enrollment {
   id: string
   schoolId: string
-  grade: string
-  year: number
+  academicYearId?: string // ID do ano letivo (preferencial)
+  classroomId?: string // ID da turma (preferencial)
+  grade: string // Nome da turma/série (mantido para compatibilidade)
+  year: number // Ano numérico (mantido para compatibilidade)
   status: 'Cursando' | 'Aprovado' | 'Reprovado' | 'Transferido' | 'Abandono'
   type: 'regular' | 'dependency'
 }

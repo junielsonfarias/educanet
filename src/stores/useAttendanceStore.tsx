@@ -42,7 +42,7 @@ export const AttendanceProvider = ({
   const addAttendance = (record: Omit<AttendanceRecord, 'id'>) => {
     const newRecord: AttendanceRecord = {
       ...record,
-      id: Math.random().toString(36).substr(2, 9),
+      id: Math.random().toString(36).substring(2, 11),
     }
     setAttendanceRecords((prev) => [...prev, newRecord])
   }

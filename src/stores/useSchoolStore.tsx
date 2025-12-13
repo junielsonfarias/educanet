@@ -63,7 +63,7 @@ export const SchoolProvider = ({ children }: { children: React.ReactNode }) => {
   const addSchool = (schoolData: Omit<School, 'id' | 'academicYears'>) => {
     const newSchool: School = {
       ...schoolData,
-      id: Math.random().toString(36).substr(2, 9),
+      id: Math.random().toString(36).substring(2, 11),
       academicYears: [],
     }
     setSchools((prev) => [...prev, newSchool])
@@ -96,7 +96,7 @@ export const SchoolProvider = ({ children }: { children: React.ReactNode }) => {
           if (lastYear && lastYear.classes) {
             replicatedClasses = lastYear.classes.map((c) => ({
               ...c,
-              id: Math.random().toString(36).substr(2, 9),
+              id: Math.random().toString(36).substring(2, 11),
               studentCount: 0, // Reset student count
             }))
           }
@@ -104,7 +104,7 @@ export const SchoolProvider = ({ children }: { children: React.ReactNode }) => {
           const newYear: AcademicYear = {
             ...yearData,
             status: 'pending', // Default status
-            id: Math.random().toString(36).substr(2, 9),
+            id: Math.random().toString(36).substring(2, 11),
             classes: replicatedClasses,
           }
           const currentYears = Array.isArray(s.academicYears)
@@ -157,7 +157,7 @@ export const SchoolProvider = ({ children }: { children: React.ReactNode }) => {
                   ...y,
                   classes: [
                     ...currentClasses,
-                    { ...data, id: Math.random().toString(36).substr(2, 9) },
+                    { ...data, id: Math.random().toString(36).substring(2, 11) },
                   ],
                 }
               }

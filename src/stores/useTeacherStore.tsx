@@ -49,7 +49,7 @@ export const TeacherProvider = ({
   const addTeacher = (data: Omit<Teacher, 'id' | 'allocations'>) => {
     const newTeacher: Teacher = {
       ...data,
-      id: Math.random().toString(36).substr(2, 9),
+      id: Math.random().toString(36).substring(2, 11),
       allocations: [],
     }
     setTeachers((prev) => {
@@ -90,7 +90,7 @@ export const TeacherProvider = ({
             : []
           const newAllocation: TeacherAllocation = {
             ...data,
-            id: Math.random().toString(36).substr(2, 9),
+            id: Math.random().toString(36).substring(2, 11),
             createdAt: new Date().toISOString(),
           }
           return { ...t, allocations: [...currentAllocations, newAllocation] }

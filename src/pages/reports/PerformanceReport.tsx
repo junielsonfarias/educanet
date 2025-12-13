@@ -29,6 +29,7 @@ import useStudentStore from '@/stores/useStudentStore'
 import useAssessmentStore from '@/stores/useAssessmentStore'
 import { calculateGrades } from '@/lib/grade-calculator'
 import { ClassPerformanceOverview } from './components/ClassPerformanceOverview'
+import { getStudentsByClassroom } from '@/lib/enrollment-utils'
 
 export default function PerformanceReport() {
   const { schools } = useSchoolStore()
@@ -49,16 +50,15 @@ export default function PerformanceReport() {
     const data: any[] = []
 
     activeYear.classes.forEach((cls) => {
-      // Find students in this class
-      const classStudents = students.filter((s) => {
-        const enrollment = s.enrollments.find(
-          (e) =>
-            e.schoolId === activeSchool.id &&
-            e.year.toString() === activeYear.name && // Simple year match
-            e.grade === cls.name, // Simple class match
-        )
-        return !!enrollment
-      })
+      // Find students in this class using utility function
+      const classStudents = getStudentsByClassroom(
+        students,
+        cls.id,
+        cls.name,
+        activeSchool.id,
+        activeYear.id,
+        activeYear.name,
+      )
 
       // Find grade/course info
       const grade = courses

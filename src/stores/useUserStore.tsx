@@ -46,21 +46,11 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
 
   const login = async (email: string, password: string): Promise<boolean> => {
     // Basic mock authentication
+    // NOTA: Em produção, senhas devem ser hasheadas e comparadas com hash armazenado
+    // NOTA: Este é um sistema mock - NÃO usar em produção sem implementar segurança adequada
     const user = users.find((u) => u.email === email && u.password === password)
     if (user) {
       setCurrentUser(user)
-      return true
-    }
-    // Fallback for the hardcoded admin if not in list (safety net)
-    if (email === 'admin@escola.com' && password === 'admin') {
-      const demoAdmin: User = {
-        id: 'demo-admin',
-        name: 'Administrador Demo',
-        email: 'admin@escola.com',
-        role: 'admin',
-        createdAt: new Date().toISOString(),
-      }
-      setCurrentUser(demoAdmin)
       return true
     }
     return false
@@ -73,7 +63,7 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
   const addUser = (userData: Omit<User, 'id' | 'createdAt'>) => {
     const newUser: User = {
       ...userData,
-      id: Math.random().toString(36).substr(2, 9),
+      id: Math.random().toString(36).substring(2, 11),
       createdAt: new Date().toISOString(),
     }
     setUsers((prev) => [...prev, newUser])

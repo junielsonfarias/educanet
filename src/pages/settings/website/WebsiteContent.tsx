@@ -82,7 +82,7 @@ export default function WebsiteContent() {
   // --- Service Card Handlers ---
   const addServiceCard = () => {
     const newCard: ServiceCard = {
-      id: Math.random().toString(36).substr(2, 9),
+      id: Math.random().toString(36).substring(2, 11),
       title: 'Novo Serviço',
       description: 'Descrição do serviço',
       icon: 'Star',
@@ -119,7 +119,7 @@ export default function WebsiteContent() {
   // --- Quick Link Handlers ---
   const addQuickLink = () => {
     const newLink: QuickLink = {
-      id: Math.random().toString(36).substr(2, 9),
+      id: Math.random().toString(36).substring(2, 11),
       label: 'Novo Link',
       url: '#',
       active: true,
