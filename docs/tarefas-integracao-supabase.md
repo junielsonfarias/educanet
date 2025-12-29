@@ -1,0 +1,247 @@
+# Tarefas para Integração com Supabase
+
+## Objetivo
+Integrar o sistema EduGestão Municipal com o Supabase, preparando a infraestrutura para autenticação e banco de dados.
+
+---
+
+## Fase 1: Configuração Inicial do Supabase
+
+### ✅ Tarefa 1.1: Criar Projeto no Supabase
+- [ ] Acessar https://supabase.com e fazer login/criar conta
+- [ ] Criar novo projeto
+  - [ ] Definir nome do projeto: `educanet-municipal`
+  - [ ] Escolher senha do banco de dados (forte e segura)
+  - [ ] Selecionar região do servidor (preferencialmente South America - São Paulo)
+- [ ] Aguardar provisionamento do projeto (2-3 minutos)
+- [ ] Anotar credenciais fornecidas:
+  - [ ] Project URL
+  - [ ] API Key (anon/public)
+  - [ ] API Key (service_role - manter secreta)
+
+### ✅ Tarefa 1.2: Configurar Variáveis de Ambiente
+- [ ] Criar arquivo `.env.local` na raiz do projeto
+- [ ] Adicionar variáveis do Supabase:
+  ```env
+  VITE_SUPABASE_URL=your_project_url
+  VITE_SUPABASE_ANON_KEY=your_anon_key
+  ```
+- [ ] Verificar se `.env.local` está no `.gitignore`
+- [ ] Atualizar arquivo `.env.example` com exemplos das novas variáveis
+- [ ] Documentar as variáveis de ambiente necessárias
+
+### ✅ Tarefa 1.3: Instalar Dependências
+- [ ] Instalar o cliente Supabase:
+  ```bash
+  pnpm add @supabase/supabase-js
+  ```
+- [ ] Verificar versão instalada (deve ser >= 2.39.0)
+- [ ] Atualizar `package.json` se necessário
+
+---
+
+## Fase 2: Configuração do Cliente Supabase
+
+### ✅ Tarefa 2.1: Criar Arquivo de Configuração
+- [ ] Criar pasta `src/lib/supabase/`
+- [ ] Criar arquivo `src/lib/supabase/client.ts`
+- [ ] Implementar cliente Supabase:
+  ```typescript
+  import { createClient } from '@supabase/supabase-js'
+
+  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
+  const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
+
+  if (!supabaseUrl || !supabaseAnonKey) {
+    throw new Error('Missing Supabase environment variables')
+  }
+
+  export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+    auth: {
+      persistSession: true,
+      autoRefreshToken: true,
+      detectSessionInUrl: true
+    }
+  })
+  ```
+- [ ] Adicionar validação de variáveis de ambiente
+- [ ] Adicionar tratamento de erros
+
+### ✅ Tarefa 2.2: Criar Helpers do Supabase
+- [ ] Criar arquivo `src/lib/supabase/helpers.ts`
+- [ ] Implementar funções auxiliares:
+  - [ ] `checkConnection()` - Testar conexão com Supabase
+  - [ ] `handleSupabaseError()` - Tratar erros do Supabase
+  - [ ] `isSupabaseConfigured()` - Verificar se está configurado
+- [ ] Adicionar tipos TypeScript para respostas do Supabase
+
+### ✅ Tarefa 2.3: Criar Types do Supabase
+- [ ] Criar arquivo `src/lib/supabase/types.ts`
+- [ ] Gerar tipos do banco de dados (após criar schema):
+  ```bash
+  npx supabase gen types typescript --project-id "your-project-id" > src/lib/supabase/database.types.ts
+  ```
+- [ ] Criar interfaces para respostas de API
+- [ ] Criar tipos para erros customizados
+
+---
+
+## Fase 3: Testar Conexão com Supabase
+
+### ✅ Tarefa 3.1: Criar Página de Teste
+- [ ] Criar arquivo `src/pages/settings/SupabaseTest.tsx`
+- [ ] Implementar interface de teste:
+  - [ ] Botão "Testar Conexão"
+  - [ ] Display de status da conexão
+  - [ ] Display de informações do projeto
+  - [ ] Logs de teste
+- [ ] Adicionar componente de loading
+- [ ] Adicionar tratamento de erros visuais
+
+### ✅ Tarefa 3.2: Implementar Testes de Conexão
+- [ ] Criar função para testar autenticação anônima
+- [ ] Criar função para testar acesso ao banco
+- [ ] Criar função para verificar permissões
+- [ ] Implementar logs detalhados dos testes
+- [ ] Adicionar feedback visual para cada teste
+
+### ✅ Tarefa 3.3: Adicionar Rota de Teste
+- [ ] Atualizar `src/App.tsx` com rota de teste
+- [ ] Adicionar link no sidebar (apenas para admins)
+- [ ] Proteger rota com permissões (apenas desenvolvimento/admin)
+- [ ] Adicionar documentação sobre a página de teste
+
+---
+
+## Fase 4: Configurar Storage (Opcional nesta fase)
+
+### ✅ Tarefa 4.1: Criar Buckets no Supabase
+- [ ] Acessar Dashboard do Supabase > Storage
+- [ ] Criar bucket `avatars`:
+  - [ ] Definir como público
+  - [ ] Configurar políticas de acesso
+- [ ] Criar bucket `documents`:
+  - [ ] Definir como privado
+  - [ ] Configurar políticas de acesso
+- [ ] Criar bucket `photos`:
+  - [ ] Definir como público
+  - [ ] Configurar políticas de acesso
+
+### ✅ Tarefa 4.2: Configurar Políticas de Storage
+- [ ] Criar política de leitura pública para `avatars`
+- [ ] Criar política de upload autenticado para `avatars`
+- [ ] Criar políticas para `documents` (apenas usuários autenticados)
+- [ ] Criar políticas para `photos` (leitura pública, upload autenticado)
+- [ ] Testar políticas com diferentes cenários
+
+### ✅ Tarefa 4.3: Criar Helpers de Storage
+- [ ] Criar arquivo `src/lib/supabase/storage.ts`
+- [ ] Implementar função `uploadFile()`
+- [ ] Implementar função `deleteFile()`
+- [ ] Implementar função `getPublicUrl()`
+- [ ] Implementar função `getSignedUrl()`
+- [ ] Adicionar validações de tipo de arquivo
+- [ ] Adicionar validações de tamanho
+
+---
+
+## Fase 5: Configurar Edge Functions (Opcional)
+
+### ✅ Tarefa 5.1: Preparar Ambiente para Edge Functions
+- [ ] Instalar Supabase CLI:
+  ```bash
+  npm install -g supabase
+  ```
+- [ ] Fazer login no CLI:
+  ```bash
+  supabase login
+  ```
+- [ ] Vincular projeto local:
+  ```bash
+  supabase link --project-ref your-project-ref
+  ```
+
+### ✅ Tarefa 5.2: Criar Edge Function de Exemplo
+- [ ] Criar pasta `supabase/functions/hello/`
+- [ ] Criar função de exemplo para testar
+- [ ] Testar função localmente:
+  ```bash
+  supabase functions serve hello
+  ```
+- [ ] Fazer deploy da função:
+  ```bash
+  supabase functions deploy hello
+  ```
+- [ ] Testar função em produção
+
+---
+
+## Fase 6: Documentação e Validação
+
+### ✅ Tarefa 6.1: Documentar Configuração
+- [ ] Atualizar README.md com instruções de setup do Supabase
+- [ ] Criar guia de configuração de variáveis de ambiente
+- [ ] Documentar estrutura de pastas do Supabase
+- [ ] Criar guia de troubleshooting
+
+### ✅ Tarefa 6.2: Criar Checklist de Validação
+- [ ] Conexão com Supabase está funcionando
+- [ ] Variáveis de ambiente estão configuradas
+- [ ] Cliente Supabase está inicializado corretamente
+- [ ] Página de teste está acessível
+- [ ] Storage está configurado (se implementado)
+- [ ] Edge Functions estão funcionando (se implementado)
+
+### ✅ Tarefa 6.3: Preparar Ambiente para Próxima Fase
+- [ ] Revisar documentação do Supabase Auth
+- [ ] Planejar estrutura de autenticação
+- [ ] Identificar fluxos de autenticação necessários
+- [ ] Listar requisitos de segurança
+
+---
+
+## Notas Importantes
+
+### ⚠️ Segurança
+- Nunca commitar as chaves do Supabase no repositório
+- Usar sempre variáveis de ambiente
+- Manter `service_role` key absolutamente privada
+- Configurar Row Level Security (RLS) antes de ir para produção
+
+### 📝 Boas Práticas
+- Testar cada funcionalidade após implementação
+- Manter logs detalhados durante desenvolvimento
+- Documentar todas as decisões importantes
+- Fazer commits frequentes com mensagens descritivas
+
+### 🔗 Links Úteis
+- [Documentação Supabase](https://supabase.com/docs)
+- [Supabase JS Client](https://supabase.com/docs/reference/javascript/introduction)
+- [Guia de Edge Functions](https://supabase.com/docs/guides/functions)
+- [Guia de Storage](https://supabase.com/docs/guides/storage)
+
+---
+
+## Status Geral
+
+**Última atualização:** 29/12/2025
+
+### Resumo
+- [ ] Fase 1: Configuração Inicial (0/3 tarefas)
+- [ ] Fase 2: Configuração do Cliente (0/3 tarefas)
+- [ ] Fase 3: Testar Conexão (0/3 tarefas)
+- [ ] Fase 4: Configurar Storage - Opcional (0/3 tarefas)
+- [ ] Fase 5: Configurar Edge Functions - Opcional (0/2 tarefas)
+- [ ] Fase 6: Documentação (0/3 tarefas)
+
+**Progresso Total:** 0% (0/17 tarefas principais)
+
+---
+
+## Próximos Passos (Após Conclusão)
+
+Após completar todas as tarefas desta fase, seguir para:
+1. **Implementação de Autenticação** - Ver `docs/plano-integracao-supabase.md` Fase 5
+2. **Criação do Schema do Banco** - Ver `docs/plano-integracao-supabase.md` Fase 2
+3. **Migração de Dados** - Ver `docs/plano-integracao-supabase.md` Fase 6
+
