@@ -113,49 +113,49 @@ Implementar autenticação, banco de dados e integração completa do EduGestão
 ## Fase 2: Criação do Banco de Dados
 
 ### ✅ Tarefa 2.1: Criar Todos os ENUMs
-- [ ] Executar comandos CREATE TYPE do arquivo `banco.md`:
-  - [ ] `incident_severity_level`
-  - [ ] `incident_resolution_status`
-  - [ ] `student_incident_role`
-  - [ ] `disciplinary_action_type`
-  - [ ] `infrastructure_type`
-  - [ ] `person_type`
-  - [ ] `student_enrollment_status`
-  - [ ] `education_level`
-  - [ ] `class_enrollment_status`
-  - [ ] `evaluation_type`
-  - [ ] `attendance_status`
-  - [ ] `school_document_type`
-  - [ ] `communication_type`
-  - [ ] `protocol_status`
-  - [ ] `secretariat_request_type`
-  - [ ] `portal_content_type`
-  - [ ] `portal_publication_status`
-  - [ ] `academic_period_type`
-  - [ ] `relationship_type`
-  - [ ] `preferred_contact_method`
-  - [ ] `event_type`
-  - [ ] `event_audience`
-  - [ ] `event_status`
-  - [ ] `professional_development_type`
-  - [ ] `professional_development_status`
-  - [ ] `entity_type`
+- [x] Executar comandos CREATE TYPE do arquivo `banco.md`:
+  - [x] `incident_severity_level`
+  - [x] `incident_resolution_status`
+  - [x] `student_incident_role`
+  - [x] `disciplinary_action_type`
+  - [x] `infrastructure_type`
+  - [x] `person_type`
+  - [x] `student_enrollment_status`
+  - [x] `education_level`
+  - [x] `class_enrollment_status`
+  - [x] `evaluation_type`
+  - [x] `attendance_status`
+  - [x] `school_document_type`
+  - [x] `communication_type`
+  - [x] `protocol_status`
+  - [x] `secretariat_request_type`
+  - [x] `portal_content_type`
+  - [x] `portal_publication_status`
+  - [x] `academic_period_type`
+  - [x] `relationship_type`
+  - [x] `preferred_contact_method`
+  - [x] `event_type`
+  - [x] `event_audience`
+  - [x] `event_status`
+  - [x] `professional_development_type`
+  - [x] `professional_development_status`
+  - [x] `entity_type`
 
 ### ✅ Tarefa 2.2: Criar Tabelas Fundamentais (Grupo 1)
-- [ ] Criar tabela `people`:
-  - [ ] Executar CREATE TABLE do `banco.md`
-  - [ ] Adicionar índices
-  - [ ] Adicionar comentários
-- [ ] Criar tabela `schools`:
-  - [ ] Executar CREATE TABLE do `banco.md`
-  - [ ] Adicionar índices
-  - [ ] Adicionar comentários
-- [ ] Criar tabela `positions`:
-  - [ ] Executar CREATE TABLE do `banco.md`
-  - [ ] Adicionar índices
-- [ ] Criar tabela `departments`:
-  - [ ] Executar CREATE TABLE do `banco.md`
-  - [ ] Adicionar índices
+- [x] Criar tabela `people`:
+  - [x] Executar CREATE TABLE do `banco.md`
+  - [x] Adicionar índices
+  - [x] Adicionar comentários
+- [x] Criar tabela `schools`:
+  - [x] Executar CREATE TABLE do `banco.md`
+  - [x] Adicionar índices
+  - [x] Adicionar comentários
+- [x] Criar tabela `positions`:
+  - [x] Executar CREATE TABLE do `banco.md`
+  - [x] Adicionar índices
+- [x] Criar tabela `departments`:
+  - [x] Executar CREATE TABLE do `banco.md`
+  - [x] Adicionar índices
 
 ### ✅ Tarefa 2.3: Criar Tabelas de Perfis (Grupo 2)
 - [ ] Criar tabela `student_profiles`
@@ -206,10 +206,10 @@ Implementar autenticação, banco de dados e integração completa do EduGestão
 
 ### ✅ Tarefa 2.12: Criar Tabelas de Sistema (Grupo 11)
 - [ ] Criar tabela `system_settings`
-- [ ] Criar tabela `roles`
-- [ ] Criar tabela `permissions`
-- [ ] Criar tabela `role_permissions`
-- [ ] Criar tabela `user_roles`
+- [x] Criar tabela `roles`
+- [x] Criar tabela `permissions`
+- [x] Criar tabela `role_permissions`
+- [x] Criar tabela `user_roles`
 
 ### ✅ Tarefa 2.13: Criar Tabelas de Incidentes (Grupo 12)
 - [ ] Criar tabela `incident_types`
@@ -379,19 +379,19 @@ Implementar autenticação, banco de dados e integração completa do EduGestão
   - [ ] Verificar se turma tem vaga
 
 ### ✅ Tarefa 2.31: Inserir Dados de Referência
-- [ ] Inserir roles padrão:
-  - [ ] Admin
-  - [ ] Coordenador
-  - [ ] Diretor
-  - [ ] Secretário
-  - [ ] Professor
-  - [ ] Aluno
-  - [ ] Pai/Responsável
-- [ ] Inserir permissions básicas:
-  - [ ] CRUD para cada entidade principal
-- [ ] Associar permissions aos roles (`role_permissions`)
-- [ ] Inserir positions (cargos) padrão
-- [ ] Inserir departments padrão
+- [x] Inserir roles padrão:
+  - [x] Admin
+  - [x] Coordenador
+  - [x] Diretor
+  - [x] Secretário
+  - [x] Professor
+  - [x] Aluno
+  - [x] Pai/Responsável
+- [x] Inserir permissions básicas:
+  - [x] CRUD para cada entidade principal (60 permissions)
+- [x] Associar permissions aos roles (`role_permissions`)
+- [x] Inserir positions (cargos) padrão (10 cargos)
+- [x] Inserir departments padrão (7 departamentos)
 
 ### ✅ Tarefa 2.32: Validar Estrutura do Banco
 - [ ] Verificar todas as tabelas foram criadas
@@ -722,15 +722,29 @@ Implementar autenticação, banco de dados e integração completa do EduGestão
 - [x] Criar triggers
 - [ ] Testar autenticação (requer usuário de teste)
 
-### Fase 2: Banco de Dados (0/32 tarefas)
-- [ ] Criar ENUMs
-- [ ] Criar todas as tabelas (16 grupos)
+### Fase 2: Banco de Dados (3/32 tarefas) 🔄
+- [x] Criar ENUMs (26 tipos)
+- [x] Criar tabelas fundamentais (people, schools, positions, departments, roles, permissions)
+- [x] Inserir dados de referência (roles, permissions, positions, departments)
+- [ ] Criar tabelas de perfis (5 tabelas)
+- [ ] Criar tabelas de infraestrutura (1 tabela)
+- [ ] Criar tabelas acadêmicas (6 tabelas)
+- [ ] Criar tabelas de matrículas (4 tabelas)
+- [ ] Criar tabelas de aulas e avaliações (4 tabelas)
+- [ ] Criar tabelas de documentos (2 tabelas)
+- [ ] Criar tabelas de comunicação (2 tabelas)
+- [ ] Criar tabelas de secretaria (3 tabelas)
+- [ ] Criar tabelas de portal público (2 tabelas)
+- [ ] Criar tabela system_settings (1 tabela)
+- [ ] Criar tabelas de incidentes (4 tabelas)
+- [ ] Criar tabelas de eventos (2 tabelas)
+- [ ] Criar tabelas de desenvolvimento profissional (3 tabelas)
+- [ ] Criar tabela de anexos (1 tabela)
 - [ ] Adicionar Foreign Keys
 - [ ] Configurar RLS (9 grupos)
 - [ ] Criar triggers
 - [ ] Criar views
 - [ ] Criar funções
-- [ ] Inserir dados de referência
 - [ ] Validar estrutura
 
 ### Fase 3: Integração (0/38 tarefas)
@@ -745,7 +759,7 @@ Implementar autenticação, banco de dados e integração completa do EduGestão
 - [ ] Otimizações
 - [ ] Documentação
 
-**Progresso Total:** 9% (7/78 tarefas principais) ⚡
+**Progresso Total:** 13% (10/78 tarefas principais) ⚡🔥
 
 ---
 
