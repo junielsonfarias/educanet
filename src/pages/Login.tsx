@@ -12,41 +12,23 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card'
-import { useToast } from '@/hooks/use-toast'
-import useUserStore from '@/stores/useUserStore'
+import { useAuth } from '@/hooks/useAuth'
 
 export default function Login() {
-  const [isLoading, setIsLoading] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const navigate = useNavigate()
-  const { toast } = useToast()
-  const { login } = useUserStore()
+  const { login, loading } = useAuth()
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
-    setIsLoading(true)
 
-    // Simulate API call latency
-    setTimeout(async () => {
-      const success = await login(email, password)
-      setIsLoading(false)
+    const result = await login(email, password)
 
-      if (success) {
-        toast({
-          title: 'Login realizado com sucesso!',
-          description: 'Bem-vindo ao Sistema de Gestão Escolar.',
-        })
-        navigate('/dashboard')
-      } else {
-        toast({
-          variant: 'destructive',
-          title: 'Erro no login',
-          description: 'Credenciais inválidas. Verifique e-mail e senha.',
-        })
-      }
-    }, 1500)
+    if (result.success) {
+      navigate('/dashboard')
+    }
   }
 
   return (
@@ -160,9 +142,9 @@ export default function Login() {
                 <Button
                   className="w-full mt-2 h-11 bg-gradient-to-r from-primary to-blue-600 hover:from-blue-600 hover:to-primary text-white shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105 font-semibold"
                   type="submit"
-                  disabled={isLoading}
+                  disabled={loading}
                 >
-                  {isLoading ? (
+                  {loading ? (
                     <>
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                       Entrando...

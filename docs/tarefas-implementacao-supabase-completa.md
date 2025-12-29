@@ -15,8 +15,8 @@ Implementar autenticação, banco de dados e integração completa do EduGestão
 ## Fase 1: Autenticação com Supabase
 
 ### ✅ Tarefa 1.1: Configurar Tabela de Autenticação
-- [ ] Criar tabela `auth_users` no Supabase
-  - [ ] Campos:
+- [x] Criar tabela `auth_users` no Supabase
+  - [x] Campos:
     - `id` (UUID, PK, referência para auth.users)
     - `person_id` (INTEGER, FK -> people, UNIQUE)
     - `email` (TEXT, UNIQUE, NOT NULL)
@@ -24,64 +24,64 @@ Implementar autenticação, banco de dados e integração completa do EduGestão
     - `last_login` (TIMESTAMPTZ)
     - `created_at` (TIMESTAMPTZ)
     - `updated_at` (TIMESTAMPTZ)
-- [ ] Criar índices na tabela `auth_users`:
-  - [ ] `idx_auth_users_email` em `email`
-  - [ ] `idx_auth_users_person_id` em `person_id`
+- [x] Criar índices na tabela `auth_users`:
+  - [x] `idx_auth_users_email` em `email`
+  - [x] `idx_auth_users_person_id` em `person_id`
 
 ### ✅ Tarefa 1.2: Configurar Políticas RLS para Autenticação
-- [ ] Habilitar RLS na tabela `auth_users`
-- [ ] Criar política de leitura:
-  - [ ] Usuário autenticado pode ler seus próprios dados
-  - [ ] Administradores podem ler todos os dados
-- [ ] Criar política de atualização:
-  - [ ] Usuário pode atualizar apenas `last_login`
-  - [ ] Administradores podem atualizar todos os campos
+- [x] Habilitar RLS na tabela `auth_users`
+- [x] Criar política de leitura:
+  - [x] Usuário autenticado pode ler seus próprios dados
+  - [x] Administradores podem ler todos os dados
+- [x] Criar política de atualização:
+  - [x] Usuário pode atualizar apenas `last_login`
+  - [x] Administradores podem atualizar todos os campos
 
 ### ✅ Tarefa 1.3: Criar Serviço de Autenticação
-- [ ] Criar arquivo `src/lib/supabase/auth.ts`
-- [ ] Implementar função `signIn(email, password)`:
-  - [ ] Validar credenciais com Supabase Auth
-  - [ ] Buscar dados do usuário (person_id, role)
-  - [ ] Atualizar `last_login`
-  - [ ] Retornar dados completos do usuário
-- [ ] Implementar função `signOut()`:
-  - [ ] Fazer logout no Supabase
-  - [ ] Limpar sessão local
-- [ ] Implementar função `getCurrentUser()`:
-  - [ ] Verificar sessão ativa
-  - [ ] Retornar dados do usuário autenticado
-- [ ] Implementar função `resetPassword(email)`:
-  - [ ] Solicitar redefinição de senha via Supabase
+- [x] Criar arquivo `src/lib/supabase/auth.ts`
+- [x] Implementar função `signIn(email, password)`:
+  - [x] Validar credenciais com Supabase Auth
+  - [x] Buscar dados do usuário (person_id, role)
+  - [x] Atualizar `last_login`
+  - [x] Retornar dados completos do usuário
+- [x] Implementar função `signOut()`:
+  - [x] Fazer logout no Supabase
+  - [x] Limpar sessão local
+- [x] Implementar função `getCurrentUser()`:
+  - [x] Verificar sessão ativa
+  - [x] Retornar dados do usuário autenticado
+- [x] Implementar função `resetPassword(email)`:
+  - [x] Solicitar redefinição de senha via Supabase
 
 ### ✅ Tarefa 1.4: Atualizar Componente de Login
-- [ ] Modificar `src/pages/Login.tsx`:
-  - [ ] Remover autenticação mock
-  - [ ] Integrar com `signIn()` do Supabase
-  - [ ] Adicionar loading states
-  - [ ] Implementar tratamento de erros:
-    - [ ] Credenciais inválidas
-    - [ ] Usuário inativo
-    - [ ] Erro de conexão
-  - [ ] Adicionar link "Esqueci minha senha"
+- [x] Modificar `src/pages/Login.tsx`:
+  - [x] Remover autenticação mock
+  - [x] Integrar com `signIn()` do Supabase
+  - [x] Adicionar loading states
+  - [x] Implementar tratamento de erros:
+    - [x] Credenciais inválidas
+    - [x] Usuário inativo
+    - [x] Erro de conexão
+  - [x] Adicionar link "Esqueci minha senha"
 - [ ] Criar página de recuperação de senha (se necessário)
 
 ### ✅ Tarefa 1.5: Criar Hook de Autenticação
-- [ ] Criar `src/hooks/useAuth.ts`:
-  - [ ] Hook `useAuth()` com estado do usuário
-  - [ ] Funções: `login()`, `logout()`, `isAuthenticated()`
-  - [ ] Sincronização com Supabase session
-  - [ ] Listener de mudanças de sessão
+- [x] Criar `src/hooks/useAuth.ts`:
+  - [x] Hook `useAuth()` com estado do usuário
+  - [x] Funções: `login()`, `logout()`, `isAuthenticated()`
+  - [x] Sincronização com Supabase session
+  - [x] Listener de mudanças de sessão
 
 ### ✅ Tarefa 1.6: Atualizar Proteção de Rotas
-- [ ] Modificar `src/components/ProtectedRoute.tsx`:
-  - [ ] Usar autenticação do Supabase
-  - [ ] Verificar sessão ativa
-  - [ ] Redirecionar para login se não autenticado
-- [ ] Atualizar verificações de permissão:
-  - [ ] Integrar com roles do banco de dados
+- [x] Modificar `src/components/ProtectedRoute.tsx`:
+  - [x] Usar autenticação do Supabase
+  - [x] Verificar sessão ativa
+  - [x] Redirecionar para login se não autenticado
+- [x] Atualizar verificações de permissão:
+  - [x] Integrar com roles do banco de dados
 
 ### ✅ Tarefa 1.7: Criar Trigger para Novo Usuário
-- [ ] Criar function no Supabase:
+- [x] Criar function no Supabase:
   ```sql
   CREATE OR REPLACE FUNCTION public.handle_new_user()
   RETURNS trigger AS $$
@@ -92,7 +92,7 @@ Implementar autenticação, banco de dados e integração completa do EduGestão
   END;
   $$ LANGUAGE plpgsql SECURITY DEFINER;
   ```
-- [ ] Criar trigger:
+- [x] Criar trigger:
   ```sql
   CREATE TRIGGER on_auth_user_created
     AFTER INSERT ON auth.users
@@ -712,15 +712,15 @@ Implementar autenticação, banco de dados e integração completa do EduGestão
 
 ## 📊 Resumo de Progresso
 
-### Fase 1: Autenticação (0/8 tarefas)
-- [ ] Configurar tabela de autenticação
-- [ ] Configurar RLS para autenticação
-- [ ] Criar serviço de autenticação
-- [ ] Atualizar componente de login
-- [ ] Criar hook de autenticação
-- [ ] Atualizar proteção de rotas
-- [ ] Criar triggers
-- [ ] Testar autenticação
+### Fase 1: Autenticação (7/8 tarefas) ✅
+- [x] Configurar tabela de autenticação
+- [x] Configurar RLS para autenticação
+- [x] Criar serviço de autenticação
+- [x] Atualizar componente de login
+- [x] Criar hook de autenticação
+- [x] Atualizar proteção de rotas
+- [x] Criar triggers
+- [ ] Testar autenticação (requer usuário de teste)
 
 ### Fase 2: Banco de Dados (0/32 tarefas)
 - [ ] Criar ENUMs
@@ -745,7 +745,7 @@ Implementar autenticação, banco de dados e integração completa do EduGestão
 - [ ] Otimizações
 - [ ] Documentação
 
-**Progresso Total:** 0% (0/78 tarefas principais)
+**Progresso Total:** 9% (7/78 tarefas principais) ⚡
 
 ---
 
