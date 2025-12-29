@@ -63,6 +63,7 @@ import DocumentsManager from './pages/settings/website/DocumentsManager'
 import BackupRestore from './pages/settings/BackupRestore'
 import EducacensoExport from './pages/settings/EducacensoExport'
 import InconsistenciesReport from './pages/settings/InconsistenciesReport'
+import SupabaseTest from './pages/settings/SupabaseTest'
 import SchoolDocuments from './pages/documents/SchoolDocuments'
 import NotificationsManager from './pages/communication/NotificationsManager'
 import ProtocolsManager from './pages/secretariat/ProtocolsManager'
@@ -372,6 +373,10 @@ const App = () => (
                                       <Route
                                         path="/configuracoes/inconsistencias"
                                         element={<InconsistenciesReport />}
+                                      />
+                                      <Route
+                                        path="/configuracoes/supabase-test"
+                                        element={<SupabaseTest />}
                                       />
                                       {/* Website Management */}
                                       <Route

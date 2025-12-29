@@ -468,6 +468,24 @@ export function AppSidebar() {
                       </Link>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
+                  <SidebarMenuItem>
+                    <SidebarMenuButton
+                      asChild
+                      isActive={isActive('/configuracoes/supabase-test')}
+                      tooltip="Teste Supabase"
+                    >
+                      <Link to="/configuracoes/supabase-test" className="flex items-center gap-3 group/item">
+                        {isActive('/configuracoes/supabase-test') ? (
+                          <div className="p-1.5 rounded-md bg-gradient-to-br from-primary/20 to-blue-600/20">
+                            <Database className="h-5 w-5 text-primary" />
+                          </div>
+                        ) : (
+                          <Database className="h-5 w-5 text-muted-foreground group-hover/item:text-primary transition-colors" />
+                        )}
+                        <span>Teste Supabase</span>
+                      </Link>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
                 </>
               )}
             </SidebarMenu>
