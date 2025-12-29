@@ -28,7 +28,7 @@ interface StudentLessonsTabProps {
 export function StudentLessonsTab({ student }: StudentLessonsTabProps) {
   const { lessonPlans } = useLessonPlanStore()
   const { schools } = useSchoolStore()
-  const { courses } = useCourseStore()
+  const { etapasEnsino } = useCourseStore()
 
   // Find active enrollment
   const enrollment = student.enrollments.find((e) => e.status === 'Cursando')
@@ -46,7 +46,8 @@ export function StudentLessonsTab({ student }: StudentLessonsTabProps) {
   const academicYear = school?.academicYears.find(
     (y) => y.name === enrollment.year.toString(),
   )
-  const classroom = academicYear?.classes.find(
+    const turmas = academicYear?.turmas || []
+    const classroom = turmas.find(
     (c) => c.name === enrollment.grade,
   )
 
@@ -65,8 +66,8 @@ export function StudentLessonsTab({ student }: StudentLessonsTabProps) {
   const enrichedPlans = classPlans
     .map((plan) => {
       // Find subject name
-      const allGrades = courses.flatMap((c) => c.grades)
-      const allSubjects = allGrades.flatMap((g) => g.subjects)
+      const allSeriesAnos = etapasEnsino.flatMap((e) => e.seriesAnos)
+      const allSubjects = allSeriesAnos.flatMap((s) => s.subjects)
       const subject = allSubjects.find((s) => s.id === plan.subjectId)
 
       return {

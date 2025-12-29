@@ -90,7 +90,8 @@ export function EvaluationRuleFormDialog({
         recoveryStrategy: 'replace_if_higher',
       })
     }
-  }, [rule, form])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rule?.id])
 
   const onSubmit = (values: z.infer<typeof formSchema>) => {
     onSave({

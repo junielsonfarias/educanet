@@ -84,7 +84,7 @@ export function StudentPerformanceCard({
 }: StudentPerformanceCardProps) {
   const { assessments, assessmentTypes } = useAssessmentStore()
   const { schools } = useSchoolStore()
-  const { courses, evaluationRules } = useCourseStore()
+  const { etapasEnsino, evaluationRules } = useCourseStore()
   const { settings } = useSettingsStore()
   const [selectedYear, setSelectedYear] = useState<string>('')
   const [detailsDialog, setDetailsDialog] =
@@ -125,18 +125,18 @@ export function StudentPerformanceCard({
       // 2. Find classroom using utility function
       const classroom = getClassroomFromEnrollment(enrollment, schools)
 
-      // 3. Find course/grade/subjects - priorizar gradeId da turma
+      // 3. Find etapaEnsino/serieAno/subjects - priorizar serieAnoId da turma
       let gradeStructure: any = null
       let courseEvaluationRule: EvaluationRule | undefined = undefined
 
-      if (classroom?.gradeId) {
-        // Prioridade: usar gradeId da turma
-        for (const course of courses) {
-          const g = course.grades.find((gr) => gr.id === classroom.gradeId)
-          if (g) {
-            gradeStructure = g
-            courseEvaluationRule = evaluationRules.find(
-              (r) => r.id === g.evaluationRuleId,
+      if (classroom?.serieAnoId) {
+        const serieAnoId = classroom.serieAnoId
+        for (const etapaEnsino of etapasEnsino || []) {
+          const s = (etapaEnsino.seriesAnos || []).find((sr) => sr.id === serieAnoId)
+          if (s) {
+            gradeStructure = s
+            courseEvaluationRule = (evaluationRules || []).find(
+              (r) => r.id === s.evaluationRuleId,
             )
             break
           }
@@ -145,14 +145,14 @@ export function StudentPerformanceCard({
 
       // Fallback: buscar por nome se não encontrou por ID
       if (!gradeStructure) {
-        for (const course of courses) {
-          const g = course.grades.find(
-            (gr) => gr.name === enrollment.grade,
+        for (const etapaEnsino of etapasEnsino || []) {
+          const s = (etapaEnsino.seriesAnos || []).find(
+            (sr) => sr.name === enrollment.grade,
           )
-          if (g) {
-            gradeStructure = g
-            courseEvaluationRule = evaluationRules.find(
-              (r) => r.id === g.evaluationRuleId,
+          if (s) {
+            gradeStructure = s
+            courseEvaluationRule = (evaluationRules || []).find(
+              (r) => r.id === s.evaluationRuleId,
             )
             break
           }
@@ -164,7 +164,7 @@ export function StudentPerformanceCard({
       const periods = academicYear.periods || []
 
       // 4. Calculate
-      const results = gradeStructure.subjects.map((subject: any) => {
+      const results = (gradeStructure.subjects || []).map((subject: any) => {
         const subjectAssessments = assessments.filter(
           (a) =>
             a.studentId === student.id &&

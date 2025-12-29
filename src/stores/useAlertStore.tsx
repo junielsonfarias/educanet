@@ -1,5 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react'
 import { Alert, AlertRule, mockAlerts, mockAlertRules } from '@/lib/mock-data'
+import { sanitizeStoreData } from '@/lib/data-sanitizer'
+import { handleError } from '@/lib/error-handling'
 
 interface AlertContextType {
   alerts: Alert[]
@@ -20,11 +22,28 @@ export const AlertProvider = ({ children }: { children: React.ReactNode }) => {
   const [rules, setRules] = useState<AlertRule[]>(mockAlertRules)
 
   useEffect(() => {
-    const storedAlerts = localStorage.getItem('edu_alerts')
-    if (storedAlerts) setAlerts(JSON.parse(storedAlerts))
+    try {
+      const storedAlerts = localStorage.getItem('edu_alerts')
+      if (storedAlerts) {
+        const parsed = JSON.parse(storedAlerts)
+        const sanitized = sanitizeStoreData<Alert>(parsed, {})
+        setAlerts(sanitized.length > 0 ? sanitized : mockAlerts)
+      }
 
-    const storedRules = localStorage.getItem('edu_alert_rules')
-    if (storedRules) setRules(JSON.parse(storedRules))
+      const storedRules = localStorage.getItem('edu_alert_rules')
+      if (storedRules) {
+        const parsed = JSON.parse(storedRules)
+        const sanitized = sanitizeStoreData<AlertRule>(parsed, {})
+        setRules(sanitized.length > 0 ? sanitized : mockAlertRules)
+      }
+    } catch (error) {
+      handleError(error as Error, {
+        showToast: false,
+        context: { action: 'loadAlerts', source: 'localStorage' },
+      })
+      setAlerts(mockAlerts)
+      setRules(mockAlertRules)
+    }
   }, [])
 
   useEffect(() => {

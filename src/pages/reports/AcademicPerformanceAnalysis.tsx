@@ -55,13 +55,14 @@ import useAssessmentStore from '@/stores/useAssessmentStore'
 import useCourseStore from '@/stores/useCourseStore'
 import { calculateGrades } from '@/lib/grade-calculator'
 import { ExportActions } from '@/components/ExportActions'
+import { SafeChart } from '@/components/charts/SafeChart'
 
 export default function AcademicPerformanceAnalysis() {
   const navigate = useNavigate()
   const { students } = useStudentStore()
   const { schools } = useSchoolStore()
   const { assessments, assessmentTypes } = useAssessmentStore()
-  const { courses, evaluationRules } = useCourseStore()
+  const { etapasEnsino, evaluationRules } = useCourseStore()
 
   const [selectedSchool, setSelectedSchool] = useState<string>('all')
 
@@ -84,8 +85,8 @@ export default function AcademicPerformanceAnalysis() {
     // Students at Risk (Failing 2+ subjects)
     const atRiskStudents: any[] = []
 
-    students.forEach((student) => {
-      const enrollment = student.enrollments.find(
+    (students || []).forEach((student) => {
+      const enrollment = (student.enrollments || []).find(
         (e) =>
           e.status === 'Cursando' ||
           e.status === 'Aprovado' ||
@@ -97,28 +98,29 @@ export default function AcademicPerformanceAnalysis() {
       if (selectedSchool !== 'all' && enrollment.schoolId !== selectedSchool)
         return
 
-      const school = schools.find((s) => s.id === enrollment.schoolId)
-      const year = school?.academicYears.find(
+      const school = (schools || []).find((s) => s.id === enrollment.schoolId)
+      const year = (school?.academicYears || []).find(
         (y) => y.name === enrollment.year.toString(),
       )
-      const cls = year?.classes.find((c) => c.name === enrollment.grade)
+      const turmas = year?.turmas || year?.classes || []
+      const cls = turmas.find((c) => c.name === enrollment.grade)
 
       if (!year || !cls) return
 
-      // Course/Grade Info
-      const course = courses.find((c) =>
-        c.grades.some((g) => g.id === cls.gradeId),
+      // EtapaEnsino/SerieAno Info
+      const etapaEnsino = (etapasEnsino || []).find((e) =>
+        (e.seriesAnos || []).some((s) => s.id === (cls.serieAnoId || cls.gradeId)),
       )
-      const grade = course?.grades.find((g) => g.id === cls.gradeId)
-      const rule = evaluationRules.find((r) => r.id === grade?.evaluationRuleId)
+      const serieAno = (etapaEnsino?.seriesAnos || []).find((s) => s.id === (cls.serieAnoId || cls.gradeId))
+      const rule = (evaluationRules || []).find((r) => r.id === serieAno?.evaluationRuleId)
 
-      if (!grade || !rule) return
+      if (!serieAno || !rule) return
 
       let studentFailCount = 0
       let studentAvgSum = 0
       let studentSubjectCount = 0
 
-      grade.subjects.forEach((subject) => {
+      (serieAno.subjects || []).forEach((subject) => {
         const subAssessments = assessments.filter(
           (a) =>
             a.studentId === student.id &&
@@ -148,10 +150,10 @@ export default function AcademicPerformanceAnalysis() {
         else subjectStats[subject.name].fail++
 
         // Update Level Stats
-        if (!levelStats[grade.name])
-          levelStats[grade.name] = { sum: 0, count: 0 }
-        levelStats[grade.name].sum += calc.finalGrade
-        levelStats[grade.name].count++
+        if (!levelStats[serieAno.name])
+          levelStats[serieAno.name] = { sum: 0, count: 0 }
+        levelStats[serieAno.name].sum += calc.finalGrade
+        levelStats[serieAno.name].count++
 
         // Student Stats
         studentAvgSum += calc.finalGrade
@@ -206,7 +208,7 @@ export default function AcademicPerformanceAnalysis() {
   }, [
     students,
     schools,
-    courses,
+    etapasEnsino,
     assessments,
     assessmentTypes,
     evaluationRules,
@@ -381,7 +383,15 @@ export default function AcademicPerformanceAnalysis() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="h-[300px] flex items-center justify-center">
+            <SafeChart
+              data={pieData}
+              minHeight={300}
+              validateData={(data) =>
+                Array.isArray(data) &&
+                data.length > 0 &&
+                data[0]?.value !== undefined
+              }
+            >
               <ResponsiveContainer width="100%" height="100%">
                 <RePieChart>
                   <Pie
@@ -392,14 +402,14 @@ export default function AcademicPerformanceAnalysis() {
                     dataKey="value"
                   >
                     {pieData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.fill} />
+                      <Cell key={`cell-${entry.name || index}`} fill={entry.fill} />
                     ))}
                   </Pie>
                   <ChartTooltip />
                   <ChartLegend content={<ChartLegendContent />} />
                 </RePieChart>
               </ResponsiveContainer>
-            </div>
+            </SafeChart>
           </CardContent>
         </Card>
       </div>

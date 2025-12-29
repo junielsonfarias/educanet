@@ -43,7 +43,7 @@ export default function EvaluationAnalysis() {
   const { students } = useStudentStore()
   const { schools } = useSchoolStore()
   const { assessments, assessmentTypes } = useAssessmentStore()
-  const { courses } = useCourseStore()
+  const { etapasEnsino } = useCourseStore()
   const { toast } = useToast()
 
   const [yearFilter, setYearFilter] = useState<string>('')
@@ -54,21 +54,22 @@ export default function EvaluationAnalysis() {
 
   // Unique Years
   const uniqueYears = Array.from(
-    new Set(schools.flatMap((s) => s.academicYears.map((y) => y.name))),
+    new Set((schools || []).flatMap((s) => (s.academicYears || []).map((y) => y.name))),
   ).sort((a, b) => b.localeCompare(a))
 
   // Unique Grades based on selected school or all
   const availableGrades = useMemo(() => {
-    let relevantSchools = schools
+    let relevantSchools = schools || []
     if (schoolFilter !== 'all') {
-      relevantSchools = schools.filter((s) => s.id === schoolFilter)
+      relevantSchools = (schools || []).filter((s) => s.id === schoolFilter)
     }
     const grades = new Set<string>()
     relevantSchools.forEach((s) => {
-      s.academicYears.forEach((y) => {
+      (s.academicYears || []).forEach((y) => {
         if (!yearFilter || y.name === yearFilter) {
-          y.classes.forEach((c) => {
-            if (c.gradeName) grades.add(c.gradeName)
+          const turmas = y.turmas || []
+          turmas.forEach((c) => {
+            if (c.serieAnoName) grades.add(c.serieAnoName)
           })
         }
       })
@@ -82,9 +83,9 @@ export default function EvaluationAnalysis() {
 
     const result = []
 
-    for (const student of students) {
+    for (const student of students || []) {
       // Find relevant enrollments
-      const enrollments = student.enrollments.filter((e) => {
+      const enrollments = (student.enrollments || []).filter((e) => {
         // Year Filter
         if (e.year.toString() !== yearFilter) return false
         // School Filter
@@ -93,14 +94,15 @@ export default function EvaluationAnalysis() {
         // Note: 'e.grade' is the Class Name, but we want to filter by Grade Name (e.g. 5º Ano)
         // We need to look up the class to get the grade name, or rely on naming convention if consistent
         // Better: look up school -> year -> class
-        const school = schools.find((s) => s.id === e.schoolId)
-        const year = school?.academicYears.find(
+        const school = (schools || []).find((s) => s.id === e.schoolId)
+        const year = (school?.academicYears || []).find(
           (y) => y.name === e.year.toString(),
         )
-        const cls = year?.classes.find((c) => c.name === e.grade)
+        const turmas = year?.turmas || []
+        const cls = turmas.find((c) => c.name === e.grade)
 
         if (gradeFilter !== 'all') {
-          if (cls?.gradeName !== gradeFilter) return false
+          if (cls?.serieAnoName !== gradeFilter) return false
         }
 
         return true
@@ -112,11 +114,12 @@ export default function EvaluationAnalysis() {
         // If Type Filter is ALL: Average of all FINAL subject grades (Standard Report Card Avg)
         // If Type Filter is SPECIFIC: Average of raw assessments of that type across all subjects
 
-        const school = schools.find((s) => s.id === enrollment.schoolId)
-        const year = school?.academicYears.find(
+        const school = (schools || []).find((s) => s.id === enrollment.schoolId)
+        const year = (school?.academicYears || []).find(
           (y) => y.name === enrollment.year.toString(),
         )
-        const cls = year?.classes.find((c) => c.name === enrollment.grade)
+        const turmas = year?.turmas || []
+        const cls = turmas.find((c) => c.name === enrollment.grade)
 
         if (!year || !cls) continue
 
@@ -126,14 +129,14 @@ export default function EvaluationAnalysis() {
         let failingSubjects = 0
 
         // Find course structure
-        const course = courses.find((c) =>
-          c.grades.some((g) => g.id === cls.gradeId),
+        const etapaEnsino = (etapasEnsino || []).find((e) =>
+          (e.seriesAnos || []).some((s) => s.id === (cls.serieAnoId || cls.gradeId)),
         )
-        const gradeStructure = course?.grades.find((g) => g.id === cls.gradeId)
+        const gradeStructure = (etapaEnsino?.seriesAnos || []).find((s) => s.id === (cls.serieAnoId || cls.gradeId))
 
         if (!gradeStructure) continue
 
-        gradeStructure.subjects.forEach((subject) => {
+        (gradeStructure.subjects || []).forEach((subject) => {
           subjectsCount++
           if (typeFilter === 'all') {
             // Calculate final grade for subject
@@ -188,7 +191,7 @@ export default function EvaluationAnalysis() {
           studentName: student.name,
           registration: student.registration,
           schoolName: school.name,
-          gradeName: cls.gradeName,
+          gradeName: cls.serieAnoName || cls.gradeName || '',
           className: cls.name,
           averageScore: average,
           failingSubjects,
@@ -207,7 +210,7 @@ export default function EvaluationAnalysis() {
     students,
     assessments,
     schools,
-    courses,
+    etapasEnsino,
     yearFilter,
     schoolFilter,
     gradeFilter,

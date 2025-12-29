@@ -40,6 +40,7 @@ import { DocumentFormDialog } from './components/DocumentFormDialog'
 import { PublicDocument } from '@/lib/mock-data'
 import { useToast } from '@/hooks/use-toast'
 import { format, parseISO } from 'date-fns'
+import { RequirePermission } from '@/components/RequirePermission'
 
 export default function DocumentsManager() {
   const { documents, addDocument, updateDocument, deleteDocument } =
@@ -116,9 +117,17 @@ export default function DocumentsManager() {
             Gerencie o portal de transparência e documentos oficiais.
           </p>
         </div>
-        <Button onClick={openCreateDialog}>
-          <Plus className="mr-2 h-4 w-4" /> Publicar Documento
-        </Button>
+        <RequirePermission permission="create:document">
+          <Button 
+            onClick={openCreateDialog}
+            className="bg-gradient-to-r from-primary via-blue-600 to-primary bg-size-200 bg-pos-0 hover:bg-pos-100 text-white shadow-lg hover:shadow-xl transition-all duration-500 transform hover:scale-105 font-semibold"
+          >
+            <div className="p-1 rounded-md bg-white/20 mr-2">
+              <Plus className="h-5 w-5" />
+            </div>
+            Publicar Documento
+          </Button>
+        </RequirePermission>
       </div>
 
       <Card>
@@ -201,21 +210,25 @@ export default function DocumentsManager() {
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-2">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => openEditDialog(doc)}
-                          >
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="text-destructive hover:bg-destructive/10"
-                            onClick={() => setDeleteId(doc.id)}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
+                          <RequirePermission permission="edit:document">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => openEditDialog(doc)}
+                            >
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                          </RequirePermission>
+                          <RequirePermission permission="delete:document">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="text-destructive hover:bg-destructive/10"
+                              onClick={() => setDeleteId(doc.id)}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </RequirePermission>
                         </div>
                       </TableCell>
                     </TableRow>

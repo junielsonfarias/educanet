@@ -18,7 +18,7 @@ export default function TeacherAllocationReport() {
   const navigate = useNavigate()
   const { teachers } = useTeacherStore()
   const { schools } = useSchoolStore()
-  const { courses } = useCourseStore()
+  const { etapasEnsino } = useCourseStore()
 
   const reportData = teachers.flatMap((teacher) =>
     teacher.allocations.map((alloc) => {
@@ -26,11 +26,12 @@ export default function TeacherAllocationReport() {
       const year = school?.academicYears.find(
         (y) => y.id === alloc.academicYearId,
       )
-      const classroom = year?.classes.find((c) => c.id === alloc.classroomId)
+      const turmas = year?.turmas || []
+      const classroom = turmas.find((c) => c.id === alloc.classroomId)
 
       // Find subject name
-      const allGrades = courses.flatMap((c) => c.grades)
-      const allSubjects = allGrades.flatMap((g) => g.subjects)
+      const allSeriesAnos = etapasEnsino.flatMap((e) => e.seriesAnos)
+      const allSubjects = allSeriesAnos.flatMap((s) => s.subjects)
       const subject = allSubjects.find((s) => s.id === alloc.subjectId)
 
       return {

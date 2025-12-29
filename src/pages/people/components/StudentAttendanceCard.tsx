@@ -30,7 +30,7 @@ export function StudentAttendanceCard({
 }: StudentAttendanceCardProps) {
   const { getStudentAttendance } = useAttendanceStore()
   const { schools } = useSchoolStore()
-  const { courses } = useCourseStore()
+  const { etapasEnsino } = useCourseStore()
 
   const attendanceRecords = getStudentAttendance(studentId)
 
@@ -48,8 +48,8 @@ export function StudentAttendanceCard({
       .map((record) => {
         const school = schools.find((s) => s.id === record.schoolId)
         // Find subject
-        const allGrades = courses.flatMap((c) => c.grades)
-        const allSubjects = allGrades.flatMap((g) => g.subjects)
+        const allSeriesAnos = etapasEnsino.flatMap((e) => e.seriesAnos)
+        const allSubjects = allSeriesAnos.flatMap((s) => s.subjects)
         const subject = allSubjects.find((s) => s.id === record.subjectId)
 
         return {
@@ -59,7 +59,7 @@ export function StudentAttendanceCard({
         }
       })
       .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-  }, [attendanceRecords, schools, courses])
+  }, [attendanceRecords, schools, etapasEnsino])
 
   return (
     <div className="space-y-6">

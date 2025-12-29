@@ -7,6 +7,8 @@ import {
   mockPublicDocuments,
   mockInstitutionalContent,
 } from '@/lib/mock-data'
+import { sanitizeStoreData } from '@/lib/data-sanitizer'
+import { handleError } from '@/lib/error-handling'
 
 interface PublicContentContextType {
   news: NewsPost[]
@@ -36,30 +38,67 @@ export const PublicContentProvider = ({
 }: {
   children: React.ReactNode
 }) => {
-  const [news, setNews] = useState<NewsPost[]>(mockNews)
-  const [documents, setDocuments] =
-    useState<PublicDocument[]>(mockPublicDocuments)
+  const [news, setNews] = useState<NewsPost[]>(() => {
+    try {
+      const stored = localStorage.getItem('edu_news')
+      if (stored) {
+        const parsed = JSON.parse(stored)
+        const sanitized = sanitizeStoreData<NewsPost>(parsed, {})
+        return sanitized.length > 0 ? sanitized : mockNews
+      }
+    } catch (error) {
+      handleError(error as Error, {
+        showToast: false,
+        context: { action: 'loadPublicContent', source: 'localStorage' },
+      })
+    }
+    return mockNews
+  })
+  
+  const [documents, setDocuments] = useState<PublicDocument[]>(() => {
+    try {
+      const stored = localStorage.getItem('edu_public_documents')
+      if (stored) {
+        const parsed = JSON.parse(stored)
+        const sanitized = sanitizeStoreData<PublicDocument>(parsed, {})
+        return sanitized.length > 0 ? sanitized : mockPublicDocuments
+      }
+    } catch (error) {
+      handleError(error as Error, {
+        showToast: false,
+        context: { action: 'loadPublicContent', source: 'localStorage' },
+      })
+    }
+    return mockPublicDocuments
+  })
+  
   const [institutionalContent, setInstitutionalContent] = useState<
     InstitutionalContent[]
-  >(mockInstitutionalContent)
+  >(() => {
+    try {
+      const stored = localStorage.getItem('edu_content')
+      if (stored) {
+        const parsed = JSON.parse(stored)
+        const sanitized = sanitizeStoreData<InstitutionalContent>(parsed, {})
+        return sanitized.length > 0 ? sanitized : mockInstitutionalContent
+      }
+    } catch (error) {
+      handleError(error as Error, {
+        showToast: false,
+        context: { action: 'loadPublicContent', source: 'localStorage' },
+      })
+    }
+    return mockInstitutionalContent
+  })
 
-  useEffect(() => {
-    const storedNews = localStorage.getItem('edu_news')
-    if (storedNews) setNews(JSON.parse(storedNews))
-
-    const storedDocs = localStorage.getItem('edu_documents')
-    if (storedDocs) setDocuments(JSON.parse(storedDocs))
-
-    const storedContent = localStorage.getItem('edu_content')
-    if (storedContent) setInstitutionalContent(JSON.parse(storedContent))
-  }, [])
+  // Initial load is handled by lazy initialization in useState above
 
   useEffect(() => {
     localStorage.setItem('edu_news', JSON.stringify(news))
   }, [news])
 
   useEffect(() => {
-    localStorage.setItem('edu_documents', JSON.stringify(documents))
+    localStorage.setItem('edu_public_documents', JSON.stringify(documents))
   }, [documents])
 
   useEffect(() => {

@@ -33,6 +33,7 @@ import { School } from '@/lib/mock-data'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Upload, X } from 'lucide-react'
 import { fileToBase64 } from '@/lib/file-utils'
+import { validateSchoolINEPCode, validateCNPJ } from '@/lib/validations'
 
 const educationTypesList = [
   'Educação Infantil',
@@ -47,10 +48,20 @@ const educationTypesList = [
 const schoolSchema = z.object({
   name: z.string().min(3, 'Nome deve ter pelo menos 3 caracteres'),
   code: z.string().min(2, 'Código deve ter pelo menos 2 caracteres'),
-  inepCode: z.string().optional(),
+  inepCode: z
+    .string()
+    .optional()
+    .refine(
+      (val) => !val || validateSchoolINEPCode(val).valid,
+      (val) => ({
+        message: validateSchoolINEPCode(val || '').error || 'Código INEP inválido',
+      }),
+    ),
   director: z.string().min(3, 'Nome do diretor é obrigatório'),
   address: z.string().min(5, 'Endereço é obrigatório'),
   phone: z.string().min(8, 'Telefone inválido'),
+  email: z.string().email('E-mail inválido').optional().or(z.literal('')),
+  website: z.string().url('URL inválida').optional().or(z.literal('')),
   status: z.enum(['active', 'inactive']),
   logo: z.string().optional(),
   administrativeDependency: z
@@ -59,13 +70,22 @@ const schoolSchema = z.object({
   locationType: z.enum(['Urbana', 'Rural']).optional(),
   polo: z.string().optional(),
   educationTypes: z.array(z.string()).optional(),
-  infrastructure: z.object({
-    classrooms: z.coerce.number().min(0),
-    accessible: z.boolean(),
-    internet: z.boolean(),
-    library: z.boolean(),
-    lab: z.boolean(),
-  }),
+  coordinates: z.object({
+    lat: z.number().optional(),
+    lng: z.number().optional(),
+  }).optional(),
+  maxCapacity: z.coerce.number().min(0).optional(),
+  operatingHours: z.string().optional(),
+  // Infraestrutura completa do Censo Escolar (aceita estrutura completa ou simplificada)
+  infrastructure: z.any(),
+  administrativeRooms: z.object({
+    secretariat: z.coerce.number().min(0).optional(),
+    direction: z.coerce.number().min(0).optional(),
+    coordination: z.coerce.number().min(0).optional(),
+    storage: z.coerce.number().min(0).optional(),
+    teachersRoom: z.coerce.number().min(0).optional(),
+    meetingRoom: z.coerce.number().min(0).optional(),
+  }).optional(),
 })
 
 interface SchoolFormDialogProps {
@@ -93,18 +113,67 @@ export function SchoolFormDialog({
       director: '',
       address: '',
       phone: '',
+      email: '',
+      website: '',
       status: 'active',
       logo: '',
       administrativeDependency: 'Municipal',
       locationType: 'Urbana',
       polo: '',
       educationTypes: [],
+      coordinates: {
+        lat: undefined,
+        lng: undefined,
+      },
+      maxCapacity: 0,
+      operatingHours: '',
       infrastructure: {
-        classrooms: 0,
-        accessible: false,
-        internet: false,
-        library: false,
-        lab: false,
+        classrooms: {
+          total: 0,
+          regular: 0,
+          accessible: 0,
+          capacity: 0,
+        },
+        specialRooms: {
+          lab: 0,
+          library: 0,
+          computer: 0,
+          science: 0,
+          art: 0,
+        },
+        bathrooms: {
+          total: 0,
+          accessible: 0,
+        },
+        dependencies: {
+          kitchen: false,
+          cafeteria: false,
+          court: false,
+          playground: false,
+        },
+        utilities: {
+          water: 'public',
+          energy: 'public',
+          sewage: 'public',
+          internet: {
+            type: 'none',
+            speed: undefined,
+          },
+        },
+        equipment: {
+          computers: 0,
+          projectors: 0,
+          tvs: 0,
+          printers: 0,
+        },
+      },
+      administrativeRooms: {
+        secretariat: 0,
+        direction: 0,
+        coordination: 0,
+        storage: 0,
+        teachersRoom: 0,
+        meetingRoom: 0,
       },
     },
   })
@@ -119,6 +188,8 @@ export function SchoolFormDialog({
           director: initialData.director,
           address: initialData.address,
           phone: initialData.phone,
+          email: (initialData as any).email || '',
+          website: (initialData as any).website || '',
           status: initialData.status,
           logo: initialData.logo || '',
           administrativeDependency:
@@ -126,12 +197,67 @@ export function SchoolFormDialog({
           locationType: initialData.locationType || 'Urbana',
           polo: initialData.polo || '',
           educationTypes: initialData.educationTypes || [],
-          infrastructure: initialData.infrastructure || {
-            classrooms: 0,
-            accessible: false,
-            internet: false,
-            library: false,
-            lab: false,
+          coordinates: initialData.coordinates || {
+            lat: undefined,
+            lng: undefined,
+          },
+          maxCapacity: (initialData as any).maxCapacity || 0,
+          operatingHours: (initialData as any).operatingHours || '',
+          infrastructure: (() => {
+            const infra = initialData.infrastructure
+            if (infra && typeof infra === 'object' && 'classrooms' in infra && typeof infra.classrooms === 'object') {
+              return infra as any
+            }
+            // Converter estrutura antiga para nova
+            const old = infra as any
+            return {
+              classrooms: {
+                total: old?.classrooms || 0,
+                regular: old?.classrooms || 0,
+                accessible: old?.accessible ? 1 : 0,
+                capacity: 0,
+              },
+              specialRooms: {
+                lab: old?.lab ? 1 : 0,
+                library: old?.library ? 1 : 0,
+                computer: 0,
+                science: 0,
+                art: 0,
+              },
+              bathrooms: {
+                total: 0,
+                accessible: 0,
+              },
+              dependencies: {
+                kitchen: false,
+                cafeteria: false,
+                court: false,
+                playground: false,
+              },
+              utilities: {
+                water: 'public',
+                energy: 'public',
+                sewage: 'public',
+                internet: {
+                  type: old?.internet ? 'fiber' : 'none',
+                  speed: old?.internet ? 100 : undefined,
+                },
+              },
+              equipment: {
+                computers: 0,
+                projectors: 0,
+                tvs: 0,
+                printers: 0,
+              },
+            }
+          })(),
+          administrativeRooms: initialData.administrativeRooms || {
+            secretariat: 0,
+            direction: 0,
+            coordination: 0,
+            storage: 0,
+            teachersRoom: 0,
+            meetingRoom: 0,
           },
         })
         setLogoPreview(initialData.logo || null)
@@ -160,7 +286,8 @@ export function SchoolFormDialog({
         setLogoPreview(null)
       }
     }
-  }, [open, initialData, form])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, initialData?.id])
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -182,7 +309,58 @@ export function SchoolFormDialog({
   }
 
   const handleSubmit = (data: z.infer<typeof schoolSchema>) => {
-    onSubmit(data)
+    // Normalizar estrutura de infraestrutura para formato completo
+    let normalizedInfrastructure = data.infrastructure
+    
+    // Se for estrutura simplificada, converter para completa
+    if (typeof data.infrastructure === 'object' && !('classrooms' in data.infrastructure) || typeof data.infrastructure.classrooms === 'number') {
+      const simple = data.infrastructure as any
+      normalizedInfrastructure = {
+        classrooms: {
+          total: simple.classrooms || 0,
+          regular: simple.classrooms || 0,
+          accessible: simple.accessible ? 1 : 0,
+          capacity: 0,
+        },
+        specialRooms: {
+          lab: simple.lab ? 1 : 0,
+          library: simple.library ? 1 : 0,
+          computer: 0,
+          science: 0,
+          art: 0,
+        },
+        bathrooms: {
+          total: 0,
+          accessible: 0,
+        },
+        dependencies: {
+          kitchen: false,
+          cafeteria: false,
+          court: false,
+          playground: false,
+        },
+        utilities: {
+          water: 'public',
+          energy: 'public',
+          sewage: 'public',
+          internet: {
+            type: simple.internet ? 'fiber' : 'none',
+            speed: simple.internet ? 100 : undefined,
+          },
+        },
+        equipment: {
+          computers: 0,
+          projectors: 0,
+          tvs: 0,
+          printers: 0,
+        },
+      }
+    }
+
+    onSubmit({
+      ...data,
+      infrastructure: normalizedInfrastructure,
+    })
     onOpenChange(false)
   }
 
@@ -206,9 +384,10 @@ export function SchoolFormDialog({
             className="space-y-4"
           >
             <Tabs defaultValue="general">
-              <TabsList className="grid w-full grid-cols-2">
+              <TabsList className="grid w-full grid-cols-3">
                 <TabsTrigger value="general">Dados Gerais</TabsTrigger>
                 <TabsTrigger value="census">Censo Escolar / INEP</TabsTrigger>
+                <TabsTrigger value="infrastructure">Infraestrutura</TabsTrigger>
               </TabsList>
 
               <TabsContent value="general" className="space-y-4 py-4">
@@ -345,12 +524,114 @@ export function SchoolFormDialog({
                   />
                   <FormField
                     control={form.control}
-                    name="address"
+                    name="email"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Endereço</FormLabel>
+                        <FormLabel>E-mail Institucional</FormLabel>
                         <FormControl>
-                          <Input placeholder="Logradouro, número" {...field} />
+                          <Input type="email" placeholder="escola@edu.gov.br" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+
+                <FormField
+                  control={form.control}
+                  name="address"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Endereço</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Logradouro, número" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="website"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Site da Escola (opcional)</FormLabel>
+                        <FormControl>
+                          <Input type="url" placeholder="https://escola.edu.gov.br" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="operatingHours"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Horário de Funcionamento</FormLabel>
+                        <FormControl>
+                          <Input placeholder="Ex: 07:00 às 17:00" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="coordinates.lat"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Latitude (GPS)</FormLabel>
+                        <FormControl>
+                          <Input
+                            type="number"
+                            step="any"
+                            placeholder="Ex: -23.5505"
+                            {...field}
+                            onChange={(e) => field.onChange(parseFloat(e.target.value) || undefined)}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="coordinates.lng"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Longitude (GPS)</FormLabel>
+                        <FormControl>
+                          <Input
+                            type="number"
+                            step="any"
+                            placeholder="Ex: -46.6333"
+                            {...field}
+                            onChange={(e) => field.onChange(parseFloat(e.target.value) || undefined)}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="maxCapacity"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Capacidade Máxima (alunos)</FormLabel>
+                        <FormControl>
+                          <Input
+                            type="number"
+                            placeholder="0"
+                            {...field}
+                            onChange={(e) => field.onChange(parseInt(e.target.value) || 0)}
+                          />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -495,99 +776,616 @@ export function SchoolFormDialog({
                     )}
                   />
                 </div>
+              </TabsContent>
 
-                <div className="space-y-3 border rounded-md p-4">
-                  <h4 className="font-medium text-sm">Infraestrutura</h4>
+              <TabsContent value="infrastructure" className="space-y-4 py-4">
+                <div className="space-y-6 max-h-[600px] overflow-y-auto">
+                  {/* Salas de Aula */}
+                  <div className="border rounded-lg p-4 space-y-4">
+                    <h4 className="font-semibold">Salas de Aula</h4>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <FormField
+                        control={form.control}
+                        name="infrastructure.classrooms"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Total de Salas de Aula</FormLabel>
+                            <FormControl>
+                              <Input
+                                type="number"
+                                placeholder="0"
+                                {...field}
+                                value={typeof field.value === 'object' ? field.value?.total || 0 : field.value || 0}
+                                onChange={(e) => {
+                                  const val = parseInt(e.target.value) || 0
+                                  if (typeof field.value === 'object') {
+                                    field.onChange({ ...field.value, total: val })
+                                  } else {
+                                    field.onChange(val)
+                                  }
+                                }}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="infrastructure.classrooms"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Salas Acessíveis</FormLabel>
+                            <FormControl>
+                              <Input
+                                type="number"
+                                placeholder="0"
+                                value={typeof field.value === 'object' ? field.value?.accessible || 0 : 0}
+                                onChange={(e) => {
+                                  const val = parseInt(e.target.value) || 0
+                                  if (typeof field.value === 'object') {
+                                    field.onChange({ ...field.value, accessible: val })
+                                  } else {
+                                    field.onChange({ total: field.value || 0, accessible: val })
+                                  }
+                                }}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                  </div>
 
-                  <FormField
-                    control={form.control}
-                    name="infrastructure.classrooms"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Número de Salas de Aula</FormLabel>
-                        <FormControl>
-                          <Input type="number" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
+                  {/* Salas Administrativas */}
+                  <div className="border rounded-lg p-4 space-y-4">
+                    <h4 className="font-semibold">Salas Administrativas</h4>
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                      <FormField
+                        control={form.control}
+                        name="administrativeRooms.secretariat"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Secretaria</FormLabel>
+                            <FormControl>
+                              <Input
+                                type="number"
+                                placeholder="0"
+                                {...field}
+                                onChange={(e) => field.onChange(parseInt(e.target.value) || 0)}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="administrativeRooms.direction"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Diretoria</FormLabel>
+                            <FormControl>
+                              <Input
+                                type="number"
+                                placeholder="0"
+                                {...field}
+                                onChange={(e) => field.onChange(parseInt(e.target.value) || 0)}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="administrativeRooms.coordination"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Coordenação</FormLabel>
+                            <FormControl>
+                              <Input
+                                type="number"
+                                placeholder="0"
+                                {...field}
+                                onChange={(e) => field.onChange(parseInt(e.target.value) || 0)}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="administrativeRooms.teachersRoom"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Sala dos Professores</FormLabel>
+                            <FormControl>
+                              <Input
+                                type="number"
+                                placeholder="0"
+                                {...field}
+                                onChange={(e) => field.onChange(parseInt(e.target.value) || 0)}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="administrativeRooms.storage"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Almoxarifado</FormLabel>
+                            <FormControl>
+                              <Input
+                                type="number"
+                                placeholder="0"
+                                {...field}
+                                onChange={(e) => field.onChange(parseInt(e.target.value) || 0)}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="administrativeRooms.meetingRoom"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Sala de Reuniões</FormLabel>
+                            <FormControl>
+                              <Input
+                                type="number"
+                                placeholder="0"
+                                {...field}
+                                onChange={(e) => field.onChange(parseInt(e.target.value) || 0)}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                  </div>
 
-                  <div className="grid grid-cols-2 gap-4 mt-2">
-                    <FormField
-                      control={form.control}
-                      name="infrastructure.accessible"
-                      render={({ field }) => (
-                        <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4">
-                          <FormControl>
-                            <Checkbox
-                              checked={field.value}
-                              onCheckedChange={field.onChange}
-                            />
-                          </FormControl>
-                          <div className="space-y-1 leading-none">
-                            <FormLabel>Acessibilidade</FormLabel>
-                            <FormDescription>
-                              Recursos disponíveis?
-                            </FormDescription>
-                          </div>
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={form.control}
-                      name="infrastructure.internet"
-                      render={({ field }) => (
-                        <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4">
-                          <FormControl>
-                            <Checkbox
-                              checked={field.value}
-                              onCheckedChange={field.onChange}
-                            />
-                          </FormControl>
-                          <div className="space-y-1 leading-none">
-                            <FormLabel>Acesso à Internet</FormLabel>
-                            <FormDescription>
-                              Banda larga disponível?
-                            </FormDescription>
-                          </div>
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={form.control}
-                      name="infrastructure.library"
-                      render={({ field }) => (
-                        <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4">
-                          <FormControl>
-                            <Checkbox
-                              checked={field.value}
-                              onCheckedChange={field.onChange}
-                            />
-                          </FormControl>
-                          <div className="space-y-1 leading-none">
-                            <FormLabel>Biblioteca</FormLabel>
-                          </div>
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={form.control}
-                      name="infrastructure.lab"
-                      render={({ field }) => (
-                        <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4">
-                          <FormControl>
-                            <Checkbox
-                              checked={field.value}
-                              onCheckedChange={field.onChange}
-                            />
-                          </FormControl>
-                          <div className="space-y-1 leading-none">
+                  {/* Salas Especiais */}
+                  <div className="border rounded-lg p-4 space-y-4">
+                    <h4 className="font-semibold">Salas Especiais</h4>
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                      <FormField
+                        control={form.control}
+                        name="infrastructure.specialRooms.lab"
+                        render={({ field }) => (
+                          <FormItem>
                             <FormLabel>Laboratório de Informática</FormLabel>
-                          </div>
-                        </FormItem>
-                      )}
-                    />
+                            <FormControl>
+                              <Input
+                                type="number"
+                                placeholder="0"
+                                {...field}
+                                value={field.value || 0}
+                                onChange={(e) => field.onChange(parseInt(e.target.value) || 0)}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="infrastructure.specialRooms.library"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Biblioteca</FormLabel>
+                            <FormControl>
+                              <Input
+                                type="number"
+                                placeholder="0"
+                                {...field}
+                                value={field.value || 0}
+                                onChange={(e) => field.onChange(parseInt(e.target.value) || 0)}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="infrastructure.specialRooms.computer"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Sala de Informática</FormLabel>
+                            <FormControl>
+                              <Input
+                                type="number"
+                                placeholder="0"
+                                {...field}
+                                value={field.value || 0}
+                                onChange={(e) => field.onChange(parseInt(e.target.value) || 0)}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="infrastructure.specialRooms.science"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Laboratório de Ciências</FormLabel>
+                            <FormControl>
+                              <Input
+                                type="number"
+                                placeholder="0"
+                                {...field}
+                                value={field.value || 0}
+                                onChange={(e) => field.onChange(parseInt(e.target.value) || 0)}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="infrastructure.specialRooms.art"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Sala de Artes</FormLabel>
+                            <FormControl>
+                              <Input
+                                type="number"
+                                placeholder="0"
+                                {...field}
+                                value={field.value || 0}
+                                onChange={(e) => field.onChange(parseInt(e.target.value) || 0)}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Banheiros */}
+                  <div className="border rounded-lg p-4 space-y-4">
+                    <h4 className="font-semibold">Banheiros</h4>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <FormField
+                        control={form.control}
+                        name="infrastructure.bathrooms.total"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Total de Banheiros</FormLabel>
+                            <FormControl>
+                              <Input
+                                type="number"
+                                placeholder="0"
+                                {...field}
+                                value={field.value || 0}
+                                onChange={(e) => field.onChange(parseInt(e.target.value) || 0)}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="infrastructure.bathrooms.accessible"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Banheiros Acessíveis</FormLabel>
+                            <FormControl>
+                              <Input
+                                type="number"
+                                placeholder="0"
+                                {...field}
+                                value={field.value || 0}
+                                onChange={(e) => field.onChange(parseInt(e.target.value) || 0)}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Dependências */}
+                  <div className="border rounded-lg p-4 space-y-4">
+                    <h4 className="font-semibold">Dependências</h4>
+                    <div className="grid grid-cols-2 gap-4">
+                      <FormField
+                        control={form.control}
+                        name="infrastructure.dependencies.kitchen"
+                        render={({ field }) => (
+                          <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4">
+                            <FormControl>
+                              <Checkbox
+                                checked={field.value || false}
+                                onCheckedChange={field.onChange}
+                              />
+                            </FormControl>
+                            <div className="space-y-1 leading-none">
+                              <FormLabel>Cozinha</FormLabel>
+                            </div>
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="infrastructure.dependencies.cafeteria"
+                        render={({ field }) => (
+                          <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4">
+                            <FormControl>
+                              <Checkbox
+                                checked={field.value || false}
+                                onCheckedChange={field.onChange}
+                              />
+                            </FormControl>
+                            <div className="space-y-1 leading-none">
+                              <FormLabel>Refeitório</FormLabel>
+                            </div>
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="infrastructure.dependencies.court"
+                        render={({ field }) => (
+                          <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4">
+                            <FormControl>
+                              <Checkbox
+                                checked={field.value || false}
+                                onCheckedChange={field.onChange}
+                              />
+                            </FormControl>
+                            <div className="space-y-1 leading-none">
+                              <FormLabel>Quadra Esportiva</FormLabel>
+                            </div>
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="infrastructure.dependencies.playground"
+                        render={({ field }) => (
+                          <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4">
+                            <FormControl>
+                              <Checkbox
+                                checked={field.value || false}
+                                onCheckedChange={field.onChange}
+                              />
+                            </FormControl>
+                            <div className="space-y-1 leading-none">
+                              <FormLabel>Parque Infantil</FormLabel>
+                            </div>
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Utilidades */}
+                  <div className="border rounded-lg p-4 space-y-4">
+                    <h4 className="font-semibold">Utilidades</h4>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <FormField
+                        control={form.control}
+                        name="infrastructure.utilities.water"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Abastecimento de Água</FormLabel>
+                            <Select
+                              onValueChange={field.onChange}
+                              defaultValue={field.value}
+                            >
+                              <FormControl>
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Selecione" />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                <SelectItem value="public">Rede Pública</SelectItem>
+                                <SelectItem value="well">Poço Artesiano</SelectItem>
+                                <SelectItem value="cistern">Cisterna</SelectItem>
+                                <SelectItem value="none">Não possui</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="infrastructure.utilities.energy"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Energia Elétrica</FormLabel>
+                            <Select
+                              onValueChange={field.onChange}
+                              defaultValue={field.value}
+                            >
+                              <FormControl>
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Selecione" />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                <SelectItem value="public">Rede Pública</SelectItem>
+                                <SelectItem value="generator">Gerador</SelectItem>
+                                <SelectItem value="none">Não possui</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="infrastructure.utilities.sewage"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Esgoto</FormLabel>
+                            <Select
+                              onValueChange={field.onChange}
+                              defaultValue={field.value}
+                            >
+                              <FormControl>
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Selecione" />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                <SelectItem value="public">Rede Pública</SelectItem>
+                                <SelectItem value="septic">Fossa Séptica</SelectItem>
+                                <SelectItem value="none">Não possui</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <FormField
+                        control={form.control}
+                        name="infrastructure.utilities.internet.type"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Tipo de Internet</FormLabel>
+                            <Select
+                              onValueChange={field.onChange}
+                              defaultValue={field.value}
+                            >
+                              <FormControl>
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Selecione" />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                <SelectItem value="fiber">Fibra Óptica</SelectItem>
+                                <SelectItem value="radio">Rádio</SelectItem>
+                                <SelectItem value="satellite">Satélite</SelectItem>
+                                <SelectItem value="none">Não possui</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="infrastructure.utilities.internet.speed"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Velocidade (Mbps)</FormLabel>
+                            <FormControl>
+                              <Input
+                                type="number"
+                                placeholder="0"
+                                {...field}
+                                value={field.value || ''}
+                                onChange={(e) => field.onChange(parseInt(e.target.value) || undefined)}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Equipamentos */}
+                  <div className="border rounded-lg p-4 space-y-4">
+                    <h4 className="font-semibold">Equipamentos</h4>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                      <FormField
+                        control={form.control}
+                        name="infrastructure.equipment.computers"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Computadores</FormLabel>
+                            <FormControl>
+                              <Input
+                                type="number"
+                                placeholder="0"
+                                {...field}
+                                value={field.value || 0}
+                                onChange={(e) => field.onChange(parseInt(e.target.value) || 0)}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="infrastructure.equipment.projectors"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Projetores</FormLabel>
+                            <FormControl>
+                              <Input
+                                type="number"
+                                placeholder="0"
+                                {...field}
+                                value={field.value || 0}
+                                onChange={(e) => field.onChange(parseInt(e.target.value) || 0)}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="infrastructure.equipment.tvs"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Televisões</FormLabel>
+                            <FormControl>
+                              <Input
+                                type="number"
+                                placeholder="0"
+                                {...field}
+                                value={field.value || 0}
+                                onChange={(e) => field.onChange(parseInt(e.target.value) || 0)}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="infrastructure.equipment.printers"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Impressoras</FormLabel>
+                            <FormControl>
+                              <Input
+                                type="number"
+                                placeholder="0"
+                                {...field}
+                                value={field.value || 0}
+                                onChange={(e) => field.onChange(parseInt(e.target.value) || 0)}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
                   </div>
                 </div>
               </TabsContent>

@@ -1,6 +1,8 @@
 import React, { createContext, useContext, useState, useEffect } from 'react'
 import { Student, mockStudents, Enrollment } from '@/lib/mock-data'
 import { differenceInYears } from 'date-fns'
+import { handleError } from '@/lib/error-handling'
+import { sanitizeStoreData } from '@/lib/data-sanitizer'
 
 interface StudentContextType {
   students: Student[]
@@ -35,14 +37,11 @@ export const StudentProvider = ({
     if (stored) {
       try {
         const parsed = JSON.parse(stored)
-        if (Array.isArray(parsed)) {
-          // Robust data sanitization to ensure arrays and objects exist
-          const sanitized = parsed.map((s: any) => ({
-            ...s,
-            enrollments: Array.isArray(s.enrollments) ? s.enrollments : [],
-            projectIds: Array.isArray(s.projectIds) ? s.projectIds : [],
-            // Ensure nested objects exist to prevent crashes
-            address: s.address || {
+        // Sanitizar dados usando utilitário centralizado
+        const sanitized = sanitizeStoreData<Student>(parsed, {
+          arrayFields: ['enrollments', 'projectIds'],
+          objectFields: {
+            address: {
               street: '',
               number: '',
               neighborhood: '',
@@ -50,27 +49,28 @@ export const StudentProvider = ({
               state: '',
               zipCode: '',
             },
-            contacts: s.contacts || {
+            contacts: {
               phone: '',
               email: '',
             },
-            social: s.social || {
+            social: {
               bolsaFamilia: false,
               nis: '',
             },
-            transport: s.transport || {
+            transport: {
               uses: false,
             },
-            health: s.health || {
+            health: {
               hasSpecialNeeds: false,
             },
-          }))
-          setStudents(sanitized)
-        } else {
-          setStudents(mockStudents)
-        }
+          },
+        })
+        setStudents(sanitized.length > 0 ? sanitized : mockStudents)
       } catch (e) {
-        console.error('Failed to load students from localStorage', e)
+        handleError(e as Error, {
+          showToast: false,
+          context: { action: 'loadStudents', source: 'localStorage' },
+        })
         setStudents(mockStudents)
       }
     } else {

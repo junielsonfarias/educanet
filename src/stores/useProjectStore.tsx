@@ -1,5 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react'
 import { Project, mockProjects } from '@/lib/mock-data'
+import { sanitizeStoreData } from '@/lib/data-sanitizer'
+import { handleError } from '@/lib/error-handling'
 
 interface ProjectContextType {
   projects: Project[]
@@ -17,11 +19,21 @@ export const ProjectProvider = ({
   const [projects, setProjects] = useState<Project[]>(mockProjects)
 
   useEffect(() => {
-    const stored = localStorage.getItem('edu_projects')
-    if (stored) {
-      setProjects(JSON.parse(stored))
-    } else {
-      localStorage.setItem('edu_projects', JSON.stringify(mockProjects))
+    try {
+      const stored = localStorage.getItem('edu_projects')
+      if (stored) {
+        const parsed = JSON.parse(stored)
+        const sanitized = sanitizeStoreData<Project>(parsed, {})
+        setProjects(sanitized.length > 0 ? sanitized : mockProjects)
+      } else {
+        localStorage.setItem('edu_projects', JSON.stringify(mockProjects))
+      }
+    } catch (error) {
+      handleError(error as Error, {
+        showToast: false,
+        context: { action: 'loadProjects', source: 'localStorage' },
+      })
+      setProjects(mockProjects)
     }
   }, [])
 

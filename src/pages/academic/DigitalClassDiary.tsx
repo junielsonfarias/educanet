@@ -72,7 +72,7 @@ export default function DigitalClassDiary() {
   const { students } = useStudentStore()
   const { addAttendance, getClassAttendance } = useAttendanceStore()
   const { addOccurrence, getClassOccurrences } = useOccurrenceStore()
-  const { courses } = useCourseStore()
+  const { etapasEnsino } = useCourseStore()
   const { toast } = useToast()
 
   const [selectedStudents, setSelectedStudents] = useState<string[]>([]) // IDs of PRESENT students
@@ -104,14 +104,14 @@ export default function DigitalClassDiary() {
   const activeYear = selectedSchool?.academicYears.find(
     (y) => y.status === 'active',
   )
-  const classes = activeYear?.classes || []
-  const selectedClass = classes.find((c) => c.id === classId)
+  const turmas = activeYear?.turmas || activeYear?.classes || []
+  const selectedClass = turmas.find((c) => c.id === classId)
 
   // Find subjects for class
-  const classGrade = courses
-    .flatMap((c) => c.grades)
-    .find((g) => g.id === selectedClass?.gradeId)
-  const subjects = classGrade?.subjects || []
+  const classSerieAno = etapasEnsino
+    .flatMap((e) => e.seriesAnos)
+    .find((s) => s.id === (selectedClass?.serieAnoId || selectedClass?.gradeId))
+  const subjects = classSerieAno?.subjects || []
 
   const classStudents = useMemo(() => {
     if (!selectedClass || !selectedSchool || !activeYear) return []
@@ -309,7 +309,7 @@ export default function DigitalClassDiary() {
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        {classes.map((c) => (
+                        {turmas.map((c) => (
                           <SelectItem key={c.id} value={c.id}>
                             {c.name}
                           </SelectItem>

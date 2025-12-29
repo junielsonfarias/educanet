@@ -5,6 +5,7 @@ Este diretório contém toda a documentação da evolução do projeto, incluind
 - Etapas de desenvolvimento
 - Orientações de próximos passos
 - Checklist de tarefas
+- Análise comparativa com sistemas do mercado
 
 ## Estrutura
 
@@ -13,4 +14,9 @@ Este diretório contém toda a documentação da evolução do projeto, incluind
 - `desenvolvimento.md` - Histórico de desenvolvimento e evolução
 - `proximos-passos.md` - Roadmap e próximas ações planejadas
 - `checklist.md` - Lista de tarefas com status de conclusão
+- `comparativo-gep-educanet.md` - Análise comparativa com o sistema GEP (Ergon Sistemas)
+- `funcionalidades-prioritarias.md` - Funcionalidades prioritárias para implementação
+- `implementacao-funcionalidades-prioritarias.md` - Progresso de implementação
+- `analise-relacionamentos-modulos.md` - Análise de relacionamentos entre módulos
+- `correcoes-implementadas.md` - Correções implementadas no sistema
 

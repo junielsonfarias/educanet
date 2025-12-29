@@ -1,4 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react'
+import { handleError } from '@/lib/error-handling'
+import { sanitizeStoreData } from '@/lib/data-sanitizer'
 
 export interface CustomReportConfig {
   id: string
@@ -32,9 +34,20 @@ export const ReportProvider = ({ children }: { children: React.ReactNode }) => {
     const stored = localStorage.getItem('edu_custom_reports')
     if (stored) {
       try {
-        setSavedReports(JSON.parse(stored))
+        const parsed = JSON.parse(stored)
+        const sanitized = sanitizeStoreData<CustomReportConfig>(parsed, {
+          arrayFields: ['fields'],
+          objectFields: {
+            filters: {},
+          },
+        })
+        setSavedReports(sanitized)
       } catch (e) {
-        console.error('Failed to parse custom reports', e)
+        handleError(e as Error, {
+          showToast: false,
+          context: { action: 'loadReports', source: 'localStorage' },
+        })
+        setSavedReports([])
       }
     }
   }, [])

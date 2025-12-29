@@ -38,7 +38,7 @@ import { ExportActions } from '@/components/ExportActions'
 export default function GradeEntryReport() {
   const navigate = useNavigate()
   const { schools } = useSchoolStore()
-  const { courses } = useCourseStore()
+  const { etapasEnsino } = useCourseStore()
   const { students } = useStudentStore()
   const { assessments } = useAssessmentStore()
   const { teachers } = useTeacherStore()
@@ -68,14 +68,15 @@ export default function GradeEntryReport() {
 
     const data: any[] = []
 
-    activeYear.classes.forEach((cls) => {
-      // Find course/grade info
-      const course = courses.find((c) =>
-        c.grades.some((g) => g.id === cls.gradeId),
+    const turmas = activeYear.turmas || activeYear.classes || []
+    turmas.forEach((cls) => {
+      // Find etapaEnsino/serieAno info
+      const etapaEnsino = etapasEnsino.find((e) =>
+        e.seriesAnos.some((s) => s.id === (cls.serieAnoId || cls.gradeId)),
       )
-      const grade = course?.grades.find((g) => g.id === cls.gradeId)
+      const serieAno = etapaEnsino?.seriesAnos.find((s) => s.id === (cls.serieAnoId || cls.gradeId))
 
-      if (!grade) return
+      if (!serieAno) return
 
       // Students in this class using utility function
       const classStudents = getStudentsByClassroom(
@@ -92,7 +93,7 @@ export default function GradeEntryReport() {
 
       const totalStudents = classStudents.length
 
-      grade.subjects.forEach((subject) => {
+      serieAno.subjects.forEach((subject) => {
         const periodsToCheck =
           selectedPeriod === 'all'
             ? periods

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import {
   Calendar,
   Users,
@@ -61,13 +61,13 @@ import {
 export default function ClassesList() {
   const { schools, addClassroom, updateClassroom, deleteClassroom } =
     useSchoolStore()
-  const { courses } = useCourseStore()
+  const { etapasEnsino } = useCourseStore()
   const { currentUser } = useUserStore()
-  const { students } = useStudentStore()
-  const { assessments } = useAssessmentStore()
-  const { attendanceRecords } = useAttendanceStore()
-  const { occurrences } = useOccurrenceStore()
-  const { teachers } = useTeacherStore()
+  const { students, updateStudent } = useStudentStore()
+  const { assessments, removeAssessment } = useAssessmentStore()
+  const { attendanceRecords, removeAttendanceRecord } = useAttendanceStore()
+  const { occurrences, removeOccurrence } = useOccurrenceStore()
+  const { teachers, updateTeacher } = useTeacherStore()
   const { toast } = useToast()
 
   // Filters
@@ -86,12 +86,13 @@ export default function ClassesList() {
     classId: string
   } | null>(null)
 
-  // Flatten all classes
+  // Flatten all classes (suporta tanto 'turmas' quanto 'classes' para compatibilidade)
   const allClasses = (schools || []).flatMap((school) => {
     if (!school || !Array.isArray(school.academicYears)) return []
     return school.academicYears.flatMap((year) => {
-      if (!year || !Array.isArray(year.classes)) return []
-      return year.classes.map((cls) => ({
+      const turmas = year.turmas || year.classes || []
+      if (!year || !Array.isArray(turmas)) return []
+      return turmas.map((cls) => ({
         ...cls,
         schoolName: school.name,
         schoolId: school.id,
@@ -101,9 +102,30 @@ export default function ClassesList() {
     })
   })
 
-  // Unique lists for filters
-  const uniqueYears = Array.from(new Set(allClasses.map((c) => c.yearName)))
-  const uniqueGrades = Array.from(new Set(allClasses.map((c) => c.gradeName)))
+  // Unique lists for filters (filtrar valores undefined/null e garantir strings)
+  // Memoizado para evitar recriações desnecessárias que podem causar problemas no Select
+  const uniqueYears = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          allClasses
+            .map((c) => c.yearName)
+            .filter((y): y is string => Boolean(y) && typeof y === 'string'),
+        ),
+      ).sort(),
+    [allClasses],
+  )
+  const uniqueGrades = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          allClasses
+            .map((c) => c.gradeName || c.serieAnoName)
+            .filter((g): g is string => Boolean(g) && typeof g === 'string'),
+        ),
+      ).sort(),
+    [allClasses],
+  )
 
   // Filtering
   const filteredClasses = allClasses.filter((cls) => {
@@ -112,7 +134,10 @@ export default function ClassesList() {
       .includes(searchTerm.toLowerCase())
     const matchesSchool =
       schoolFilter === 'all' || cls.schoolId === schoolFilter
-    const matchesGrade = gradeFilter === 'all' || cls.gradeName === gradeFilter
+    const matchesGrade =
+      gradeFilter === 'all' ||
+      cls.gradeName === gradeFilter ||
+      cls.serieAnoName === gradeFilter
     const matchesShift = shiftFilter === 'all' || cls.shift === shiftFilter
     const matchesYear = yearFilter === 'all' || cls.yearName === yearFilter
 
@@ -227,6 +252,63 @@ export default function ClassesList() {
         },
       )
 
+      // Remover dados relacionados dos stores
+
+      // 1. Atualizar status de matrículas
+      students.forEach((student) => {
+        const enrollmentsToUpdate = student.enrollments.filter(
+          (e) =>
+            e.classroomId === deleteData.classId ||
+            (e.schoolId === deleteData.schoolId &&
+              e.academicYearId === deleteData.yearId &&
+              !e.classroomId),
+        )
+        if (enrollmentsToUpdate.length > 0) {
+          enrollmentsToUpdate.forEach((enrollment) => {
+            enrollment.status = 'Transferido'
+          })
+          updateStudent(student.id, { enrollments: student.enrollments })
+        }
+      })
+
+      // 2. Remover assessments
+      assessments
+        .filter((a) => a.classroomId === deleteData.classId)
+        .forEach((a) => {
+          removeAssessment(a.id)
+        })
+
+      // 3. Remover attendance records
+      attendanceRecords
+        .filter((r) => r.classroomId === deleteData.classId)
+        .forEach((r) => {
+          removeAttRecord(r.id)
+        })
+
+      // 4. Remover occurrences
+      occurrences
+        .filter((o) => o.classroomId === deleteData.classId)
+        .forEach((o) => {
+          removeOcc(o.id)
+        })
+
+      // 5. Remover teacher allocations
+      teachers.forEach((teacher) => {
+        const allocationsToRemove = teacher.allocations.filter(
+          (a) =>
+            a.classroomId === deleteData.classId &&
+            a.schoolId === deleteData.schoolId &&
+            a.academicYearId === deleteData.yearId,
+        )
+        if (allocationsToRemove.length > 0) {
+          updateTeacher(teacher.id, {
+            allocations: teacher.allocations.filter(
+              (a) => !allocationsToRemove.some((ar) => ar.id === a.id),
+            ),
+          })
+        }
+      })
+
       // Deletar a turma
       deleteClassroom(
         deleteData.schoolId,
@@ -234,13 +316,9 @@ export default function ClassesList() {
         deleteData.classId,
       )
 
-      // Nota: A limpeza real dos dados (assessments, attendance, etc) deveria ser feita
-      // nos respectivos stores, mas como não temos acesso direto, apenas documentamos
-      // que isso precisa ser feito. Por enquanto, apenas atualizamos os enrollments.
-
       toast({
         title: 'Turma Removida',
-        description: `A turma foi excluída. ${cleanupResult.enrollmentsUpdated} matrícula(s) atualizada(s).`,
+        description: `A turma foi excluída. ${cleanupResult.enrollmentsUpdated} matrícula(s) atualizada(s), ${cleanupResult.assessmentsRemoved} avaliação(ões) removida(s), ${cleanupResult.attendanceRecordsRemoved} registro(s) de frequência removido(s), ${cleanupResult.occurrencesRemoved} ocorrência(s) removida(s).`,
       })
       setDeleteData(null)
     }
@@ -268,8 +346,14 @@ export default function ClassesList() {
           </p>
         </div>
         {canCreate && (
-          <Button onClick={openCreateDialog}>
-            <Plus className="mr-2 h-4 w-4" /> Nova Turma
+          <Button 
+            onClick={openCreateDialog}
+            className="bg-gradient-to-r from-purple-500 via-purple-600 to-purple-500 bg-size-200 bg-pos-0 hover:bg-pos-100 text-white shadow-lg hover:shadow-xl transition-all duration-500 transform hover:scale-105 font-semibold"
+          >
+            <div className="p-1 rounded-md bg-white/20 mr-2">
+              <Plus className="h-5 w-5" />
+            </div>
+            Nova Turma
           </Button>
         )}
       </div>
@@ -317,8 +401,8 @@ export default function ClassesList() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Todos os Anos</SelectItem>
-                {uniqueYears.map((year) => (
-                  <SelectItem key={year} value={year as string}>
+                {uniqueYears.map((year, index) => (
+                  <SelectItem key={`year-${year}-${index}`} value={year}>
                     {year}
                   </SelectItem>
                 ))}
@@ -330,8 +414,8 @@ export default function ClassesList() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Todas as Séries</SelectItem>
-                {uniqueGrades.map((g) => (
-                  <SelectItem key={g} value={g as string}>
+                {uniqueGrades.map((g, index) => (
+                  <SelectItem key={`grade-${g}-${index}`} value={g}>
                     {g}
                   </SelectItem>
                 ))}
@@ -364,15 +448,19 @@ export default function ClassesList() {
           {filteredClasses.map((cls) => (
             <Card
               key={`${cls.schoolId}-${cls.id}`}
-              className="hover:border-primary/50 transition-colors group relative"
+              className="relative overflow-hidden bg-gradient-to-br from-white via-purple-50/30 to-white border-purple-200/50 hover:border-purple-400 hover:shadow-xl transition-all duration-300 group hover:scale-[1.02]"
             >
-              <CardHeader className="pb-2">
+              <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-purple-500/10 to-transparent rounded-full blur-2xl opacity-0 group-hover:opacity-100 transition-opacity" />
+              <CardHeader className="pb-2 relative z-10">
                 <div className="flex justify-between items-start">
                   <div className="space-y-1">
-                    <CardTitle className="text-xl group-hover:text-primary transition-colors flex items-center gap-2">
+                    <CardTitle className="text-xl group-hover:text-purple-600 transition-colors flex items-center gap-2">
+                      <div className="p-1.5 rounded-md bg-gradient-to-br from-purple-100 to-purple-200">
+                        <Users className="h-4 w-4 text-purple-600" />
+                      </div>
                       {cls.name}
                       {cls.isMultiGrade && (
-                        <Badge variant="outline" className="text-[10px] h-5">
+                        <Badge className="text-[10px] h-5 bg-gradient-to-r from-purple-500/20 to-purple-600/20 text-purple-700 border-purple-300">
                           Multi
                         </Badge>
                       )}
@@ -417,38 +505,40 @@ export default function ClassesList() {
                   )}
                 </div>
               </CardHeader>
-              <CardContent>
+              <CardContent className="relative z-10">
                 <div className="space-y-4">
                   <div className="grid grid-cols-2 gap-2 text-sm">
-                    <div className="flex flex-col">
+                    <div className="flex flex-col p-2 rounded-md bg-purple-50/50">
                       <span className="text-muted-foreground text-xs">
                         Série
                       </span>
-                      <span className="font-medium">{cls.gradeName}</span>
+                      <span className="font-medium text-purple-700">{cls.gradeName}</span>
                     </div>
-                    <div className="flex flex-col">
+                    <div className="flex flex-col p-2 rounded-md bg-purple-50/50">
                       <span className="text-muted-foreground text-xs">
                         Turno
                       </span>
-                      <span className="font-medium">{cls.shift}</span>
+                      <span className="font-medium text-purple-700">{cls.shift}</span>
                     </div>
-                    <div className="flex flex-col">
+                    <div className="flex flex-col p-2 rounded-md bg-purple-50/50">
                       <span className="text-muted-foreground text-xs">
                         Ano Letivo
                       </span>
-                      <span className="font-medium">{cls.yearName}</span>
+                      <span className="font-medium text-purple-700">{cls.yearName}</span>
                     </div>
-                    <div className="flex flex-col">
+                    <div className="flex flex-col p-2 rounded-md bg-purple-50/50">
                       <span className="text-muted-foreground text-xs">
                         Sigla
                       </span>
-                      <span className="font-medium">{cls.acronym || '-'}</span>
+                      <span className="font-medium text-purple-700">{cls.acronym || '-'}</span>
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-2 text-sm pt-2 border-t">
-                    <Users className="h-4 w-4 text-muted-foreground" />
-                    <span>{cls.studentCount || 0} Alunos</span>
+                  <div className="flex items-center gap-2 text-sm pt-2 border-t border-purple-200/50">
+                    <div className="p-1.5 rounded-md bg-gradient-to-br from-purple-100 to-purple-200">
+                      <Users className="h-4 w-4 text-purple-600" />
+                    </div>
+                    <span className="font-medium">{cls.studentCount || 0} Alunos</span>
                     {cls.minStudents && (
                       <span className="text-xs text-muted-foreground ml-auto">
                         Min: {cls.minStudents}
@@ -466,7 +556,7 @@ export default function ClassesList() {
         open={isDialogOpen}
         onOpenChange={setIsDialogOpen}
         onSubmit={editingClass ? handleUpdate : handleCreate}
-        courses={courses}
+        etapasEnsino={etapasEnsino}
         schools={availableSchools}
         initialData={editingClass}
       />

@@ -24,6 +24,7 @@ import {
 } from '@/components/ui/chart'
 import { LineChart, Line, CartesianGrid, XAxis, YAxis } from 'recharts'
 import { TrendingDown } from 'lucide-react'
+import { SafeChart } from '@/components/charts/SafeChart'
 import {
   availableMunicipalities,
   mockReferenceData,
@@ -174,52 +175,63 @@ export function QEduComparison({
         )}
 
         <div className="h-[500px] w-full border rounded-lg p-4 bg-white/50">
-          <ChartContainer config={chartConfig} className="h-full w-full">
-            <LineChart data={chartData}>
-              <CartesianGrid strokeDasharray="3 3" vertical={false} />
-              <XAxis dataKey="year" />
-              <YAxis domain={[0, 10]} />
-              <ChartTooltip content={<ChartTooltipContent />} />
-              <ChartLegend content={<ChartLegendContent />} />
-              <Line
-                type="monotone"
-                dataKey="Atual"
-                stroke="var(--color-Atual)"
-                strokeWidth={3}
-                dot={{ r: 6 }}
-              />
-              <Line
-                type="monotone"
-                dataKey="Nacional"
-                stroke="var(--color-Nacional)"
-                strokeWidth={2}
-                strokeDasharray="5 5"
-                dot={false}
-              />
-              <Line
-                type="monotone"
-                dataKey="Estadual"
-                stroke="var(--color-Estadual)"
-                strokeWidth={2}
-                strokeDasharray="3 3"
-                dot={false}
-              />
-              {comparisonEntities.map((id, idx) => {
-                const m = availableMunicipalities.find((mun) => mun.id === id)
-                const name = m?.name || id
-                return (
-                  <Line
-                    key={id}
-                    type="monotone"
-                    dataKey={name}
-                    stroke={`hsl(${idx * 40 + 200}, 70%, 50%)`}
-                    strokeWidth={2}
-                    dot={{ r: 4 }}
-                  />
-                )
-              })}
-            </LineChart>
-          </ChartContainer>
+          <SafeChart
+            data={chartData}
+            minHeight={500}
+            validateData={(data) =>
+              Array.isArray(data) &&
+              data.length > 0 &&
+              data[0]?.year !== undefined
+            }
+            emptyClassName="h-full"
+          >
+            <ChartContainer config={chartConfig} className="h-full w-full">
+              <LineChart data={chartData}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                <XAxis dataKey="year" />
+                <YAxis domain={[0, 10]} />
+                <ChartTooltip content={<ChartTooltipContent />} />
+                <ChartLegend content={<ChartLegendContent />} />
+                <Line
+                  type="monotone"
+                  dataKey="Atual"
+                  stroke="var(--color-Atual)"
+                  strokeWidth={3}
+                  dot={{ r: 6 }}
+                />
+                <Line
+                  type="monotone"
+                  dataKey="Nacional"
+                  stroke="var(--color-Nacional)"
+                  strokeWidth={2}
+                  strokeDasharray="5 5"
+                  dot={false}
+                />
+                <Line
+                  type="monotone"
+                  dataKey="Estadual"
+                  stroke="var(--color-Estadual)"
+                  strokeWidth={2}
+                  strokeDasharray="3 3"
+                  dot={false}
+                />
+                {comparisonEntities.map((id, idx) => {
+                  const m = availableMunicipalities.find((mun) => mun.id === id)
+                  const name = m?.name || id
+                  return (
+                    <Line
+                      key={id}
+                      type="monotone"
+                      dataKey={name}
+                      stroke={`hsl(${idx * 40 + 200}, 70%, 50%)`}
+                      strokeWidth={2}
+                      dot={{ r: 4 }}
+                    />
+                  )
+                })}
+              </LineChart>
+            </ChartContainer>
+          </SafeChart>
         </div>
         <div className="text-xs text-muted-foreground text-center">
           * Médias Nacional e Estadual são valores de referência aproximados

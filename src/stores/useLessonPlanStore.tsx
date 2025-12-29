@@ -1,5 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react'
 import { LessonPlan, mockLessonPlans } from '@/lib/mock-data'
+import { sanitizeStoreData } from '@/lib/data-sanitizer'
+import { handleError } from '@/lib/error-handling'
 
 interface LessonPlanContextType {
   lessonPlans: LessonPlan[]
@@ -22,11 +24,23 @@ export const LessonPlanProvider = ({
   const [lessonPlans, setLessonPlans] = useState<LessonPlan[]>(mockLessonPlans)
 
   useEffect(() => {
-    const stored = localStorage.getItem('edu_lesson_plans')
-    if (stored) {
-      setLessonPlans(JSON.parse(stored))
-    } else {
-      localStorage.setItem('edu_lesson_plans', JSON.stringify(mockLessonPlans))
+    try {
+      const stored = localStorage.getItem('edu_lesson_plans')
+      if (stored) {
+        const parsed = JSON.parse(stored)
+        const sanitized = sanitizeStoreData<LessonPlan>(parsed, {
+          arrayFields: ['objectives', 'activities', 'resources'],
+        })
+        setLessonPlans(sanitized.length > 0 ? sanitized : mockLessonPlans)
+      } else {
+        localStorage.setItem('edu_lesson_plans', JSON.stringify(mockLessonPlans))
+      }
+    } catch (error) {
+      handleError(error as Error, {
+        showToast: false,
+        context: { action: 'loadLessonPlans', source: 'localStorage' },
+      })
+      setLessonPlans(mockLessonPlans)
     }
   }, [])
 

@@ -31,7 +31,7 @@ export function TeacherAllocationDialog({
   onSubmit,
 }: TeacherAllocationDialogProps) {
   const { schools } = useSchoolStore()
-  const { courses } = useCourseStore()
+  const { etapasEnsino } = useCourseStore()
 
   const [schoolId, setSchoolId] = useState('')
   const [yearId, setYearId] = useState('')
@@ -41,13 +41,14 @@ export function TeacherAllocationDialog({
   const selectedYear = selectedSchool?.academicYears.find(
     (y) => y.id === yearId,
   )
-  const selectedClass = selectedYear?.classes.find((c) => c.id === classroomId)
+  const turmas = selectedYear?.turmas || []
+  const selectedClass = turmas.find((c) => c.id === classroomId)
 
-  // Find subject options based on the class grade
-  // Flatten all grades to find the one matching the class gradeId
-  const allGrades = courses.flatMap((c) => c.grades)
-  const classGrade = allGrades.find((g) => g.id === selectedClass?.gradeId)
-  const subjects = classGrade?.subjects || []
+  // Find subject options based on the class serieAno
+  // Flatten all seriesAnos to find the one matching the class serieAnoId
+  const allSeriesAnos = etapasEnsino.flatMap((e) => e.seriesAnos)
+  const classSerieAno = allSeriesAnos.find((s) => s.id === selectedClass?.serieAnoId)
+  const subjects = classSerieAno?.subjects || []
 
   const [subjectId, setSubjectId] = useState('')
 
@@ -124,7 +125,7 @@ export function TeacherAllocationDialog({
                 <SelectValue placeholder="Selecione a turma" />
               </SelectTrigger>
               <SelectContent>
-                {selectedYear?.classes.map((cls) => (
+                {turmas.map((cls) => (
                   <SelectItem key={cls.id} value={cls.id}>
                     {cls.name}
                   </SelectItem>

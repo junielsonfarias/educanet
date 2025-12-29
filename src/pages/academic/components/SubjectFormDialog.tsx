@@ -63,7 +63,8 @@ export function SubjectFormDialog({
         })
       }
     }
-  }, [open, initialData, form])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, initialData?.id])
 
   const handleSubmit = (data: z.infer<typeof subjectSchema>) => {
     onSubmit(data)

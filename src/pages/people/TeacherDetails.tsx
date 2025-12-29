@@ -48,7 +48,7 @@ export default function TeacherDetails() {
   const { getTeacher, updateTeacher, deleteTeacher, addAllocation } =
     useTeacherStore()
   const { getSchool } = useSchoolStore()
-  const { courses } = useCourseStore()
+  const { etapasEnsino } = useCourseStore()
   const { toast } = useToast()
 
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
@@ -123,14 +123,15 @@ export default function TeacherDetails() {
     const year = school?.academicYears?.find(
       (y) => y.id === allocation.academicYearId,
     )
-    const classroom = year?.classes?.find(
+    const turmas = year?.turmas || []
+    const classroom = turmas.find(
       (c) => c.id === allocation.classroomId,
     )
 
-    // Flatten grades to find subject
-    const safeCourses = Array.isArray(courses) ? courses : []
-    const allGrades = safeCourses.flatMap((c) => c.grades || [])
-    const allSubjects = allGrades.flatMap((g) => g.subjects || [])
+    // Flatten seriesAnos to find subject
+    const safeEtapasEnsino = Array.isArray(etapasEnsino) ? etapasEnsino : []
+    const allSeriesAnos = safeEtapasEnsino.flatMap((e) => e.seriesAnos || [])
+    const allSubjects = allSeriesAnos.flatMap((s) => s.subjects || [])
     const subject = allSubjects.find((s) => s.id === allocation.subjectId)
 
     return {

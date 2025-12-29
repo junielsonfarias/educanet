@@ -16,6 +16,14 @@ import {
   PenTool,
   Bell,
   Database,
+  Mail,
+  FileCheck,
+  Clock,
+  CalendarCheck,
+  ArrowRight,
+  UserCog,
+  Download,
+  AlertTriangle,
 } from 'lucide-react'
 import {
   Sidebar,
@@ -76,11 +84,26 @@ const peopleItems = [
     url: '/pessoas/professores',
     icon: GraduationCap,
   },
+  {
+    title: 'Documentos Escolares',
+    url: '/documentos',
+    icon: FileText,
+  },
+  {
+    title: 'Transferências',
+    url: '/pessoas/transferencias',
+    icon: ArrowRight,
+  },
+  {
+    title: 'Funcionários',
+    url: '/pessoas/funcionarios',
+    icon: UserCog,
+  },
 ]
 
 const academicItems = [
   {
-    title: 'Cursos e Séries',
+    title: 'Etapas de Ensino e Séries',
     url: '/academico/cursos',
     icon: BookOpen,
   },
@@ -98,6 +121,11 @@ const academicItems = [
     title: 'Planejamento de Aulas',
     url: '/academico/planejamento',
     icon: PenTool,
+  },
+  {
+    title: 'Conselho de Classe',
+    url: '/academico/conselho-classe',
+    icon: Users,
   },
   {
     title: 'Lançamento de Notas',
@@ -126,6 +154,32 @@ const reportsItems = [
     title: 'Relatórios Educacionais',
     url: '/relatorios',
     icon: PieChart,
+  },
+]
+
+const communicationItems = [
+  {
+    title: 'Notificações',
+    url: '/comunicacao',
+    icon: Mail,
+  },
+]
+
+const secretariatItems = [
+  {
+    title: 'Protocolos',
+    url: '/secretaria/protocolos',
+    icon: FileCheck,
+  },
+  {
+    title: 'Fila de Atendimento',
+    url: '/secretaria/fila',
+    icon: Clock,
+  },
+  {
+    title: 'Agendamentos',
+    url: '/secretaria/agendamentos',
+    icon: CalendarCheck,
   },
 ]
 
@@ -159,15 +213,21 @@ export function AppSidebar() {
                     isActive={isActive(item.url)}
                     tooltip={item.title}
                   >
-                    <Link to={item.url} className="flex justify-between">
-                      <div className="flex items-center gap-2">
-                        <item.icon className="h-4 w-4" />
+                    <Link to={item.url} className="flex justify-between group/item">
+                      <div className="flex items-center gap-3">
+                        {isActive(item.url) ? (
+                          <div className="p-1.5 rounded-md bg-gradient-to-br from-primary/20 to-blue-600/20">
+                            <item.icon className="h-5 w-5 text-primary" />
+                          </div>
+                        ) : (
+                          <item.icon className="h-5 w-5 text-muted-foreground group-hover/item:text-primary transition-colors" />
+                        )}
                         <span>{item.title}</span>
                       </div>
                       {item.title === 'Alertas' && unreadCount > 0 && (
                         <Badge
                           variant="destructive"
-                          className="h-5 px-1.5 text-[10px]"
+                          className="h-5 px-1.5 text-[10px] animate-pulse"
                         >
                           {unreadCount}
                         </Badge>
@@ -181,7 +241,7 @@ export function AppSidebar() {
         </SidebarGroup>
 
         <SidebarGroup>
-          <SidebarGroupLabel>Pessoas</SidebarGroupLabel>
+          <SidebarGroupLabel className="text-blue-600 font-semibold">Pessoas</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
               {peopleItems.map((item) => (
@@ -191,8 +251,14 @@ export function AppSidebar() {
                     isActive={isActive(item.url)}
                     tooltip={item.title}
                   >
-                    <Link to={item.url}>
-                      <item.icon className="h-4 w-4" />
+                    <Link to={item.url} className="flex items-center gap-3 group/item">
+                      {isActive(item.url) ? (
+                        <div className="p-1.5 rounded-md bg-gradient-to-br from-blue-500/20 to-blue-600/20">
+                          <item.icon className="h-5 w-5 text-blue-600" />
+                        </div>
+                      ) : (
+                        <item.icon className="h-5 w-5 text-muted-foreground group-hover/item:text-blue-600 transition-colors" />
+                      )}
                       <span>{item.title}</span>
                     </Link>
                   </SidebarMenuButton>
@@ -203,7 +269,7 @@ export function AppSidebar() {
         </SidebarGroup>
 
         <SidebarGroup>
-          <SidebarGroupLabel>Acadêmico</SidebarGroupLabel>
+          <SidebarGroupLabel className="text-purple-600 font-semibold">Acadêmico</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
               {academicItems.map((item) => (
@@ -213,8 +279,14 @@ export function AppSidebar() {
                     isActive={isActive(item.url)}
                     tooltip={item.title}
                   >
-                    <Link to={item.url}>
-                      <item.icon className="h-4 w-4" />
+                    <Link to={item.url} className="flex items-center gap-3 group/item">
+                      {isActive(item.url) ? (
+                        <div className="p-1.5 rounded-md bg-gradient-to-br from-purple-500/20 to-purple-600/20">
+                          <item.icon className="h-5 w-5 text-purple-600" />
+                        </div>
+                      ) : (
+                        <item.icon className="h-5 w-5 text-muted-foreground group-hover/item:text-purple-600 transition-colors" />
+                      )}
                       <span>{item.title}</span>
                     </Link>
                   </SidebarMenuButton>
@@ -235,8 +307,14 @@ export function AppSidebar() {
                     isActive={isActive('/configuracoes/site/conteudo')}
                     tooltip="Conteúdo"
                   >
-                    <Link to="/configuracoes/site/conteudo">
-                      <Globe className="h-4 w-4" />
+                    <Link to="/configuracoes/site/conteudo" className="flex items-center gap-3 group/item">
+                      {isActive('/configuracoes/site/conteudo') ? (
+                        <div className="p-1.5 rounded-md bg-gradient-to-br from-primary/20 to-blue-600/20">
+                          <Globe className="h-5 w-5 text-primary" />
+                        </div>
+                      ) : (
+                        <Globe className="h-5 w-5 text-muted-foreground group-hover/item:text-primary transition-colors" />
+                      )}
                       <span>Conteúdo & Info</span>
                     </Link>
                   </SidebarMenuButton>
@@ -247,8 +325,14 @@ export function AppSidebar() {
                     isActive={isActive('/configuracoes/site/noticias')}
                     tooltip="Notícias"
                   >
-                    <Link to="/configuracoes/site/noticias">
-                      <Newspaper className="h-4 w-4" />
+                    <Link to="/configuracoes/site/noticias" className="flex items-center gap-3 group/item">
+                      {isActive('/configuracoes/site/noticias') ? (
+                        <div className="p-1.5 rounded-md bg-gradient-to-br from-primary/20 to-blue-600/20">
+                          <Newspaper className="h-5 w-5 text-primary" />
+                        </div>
+                      ) : (
+                        <Newspaper className="h-5 w-5 text-muted-foreground group-hover/item:text-primary transition-colors" />
+                      )}
                       <span>Notícias</span>
                     </Link>
                   </SidebarMenuButton>
@@ -259,8 +343,14 @@ export function AppSidebar() {
                     isActive={isActive('/configuracoes/site/documentos')}
                     tooltip="Documentos"
                   >
-                    <Link to="/configuracoes/site/documentos">
-                      <FileText className="h-4 w-4" />
+                    <Link to="/configuracoes/site/documentos" className="flex items-center gap-3 group/item">
+                      {isActive('/configuracoes/site/documentos') ? (
+                        <div className="p-1.5 rounded-md bg-gradient-to-br from-primary/20 to-blue-600/20">
+                          <FileText className="h-5 w-5 text-primary" />
+                        </div>
+                      ) : (
+                        <FileText className="h-5 w-5 text-muted-foreground group-hover/item:text-primary transition-colors" />
+                      )}
                       <span>Documentos</span>
                     </Link>
                   </SidebarMenuButton>
@@ -281,8 +371,14 @@ export function AppSidebar() {
                     isActive={isActive(item.url)}
                     tooltip={item.title}
                   >
-                    <Link to={item.url}>
-                      <item.icon className="h-4 w-4" />
+                    <Link to={item.url} className="flex items-center gap-3 group/item">
+                      {isActive(item.url) ? (
+                        <div className="p-1.5 rounded-md bg-gradient-to-br from-blue-500/20 to-blue-600/20">
+                          <item.icon className="h-5 w-5 text-blue-600" />
+                        </div>
+                      ) : (
+                        <item.icon className="h-5 w-5 text-muted-foreground group-hover/item:text-blue-600 transition-colors" />
+                      )}
                       <span>{item.title}</span>
                     </Link>
                   </SidebarMenuButton>
@@ -294,30 +390,142 @@ export function AppSidebar() {
                   isActive={
                     isActive('/configuracoes') &&
                     !isActive('/configuracoes/site') &&
-                    !isActive('/configuracoes/backup')
+                    !isActive('/configuracoes/backup') &&
+                    !isActive('/configuracoes/educacenso') &&
+                    !isActive('/configuracoes/inconsistencias')
                   }
                   tooltip="Configurações"
                 >
-                  <Link to="/configuracoes">
-                    <Settings className="h-4 w-4" />
+                  <Link to="/configuracoes" className="flex items-center gap-3 group/item">
+                    {isActive('/configuracoes') &&
+                    !isActive('/configuracoes/site') &&
+                    !isActive('/configuracoes/backup') &&
+                    !isActive('/configuracoes/educacenso') &&
+                    !isActive('/configuracoes/inconsistencias') ? (
+                      <div className="p-1.5 rounded-md bg-gradient-to-br from-primary/20 to-blue-600/20">
+                        <Settings className="h-5 w-5 text-primary" />
+                      </div>
+                    ) : (
+                      <Settings className="h-5 w-5 text-muted-foreground group-hover/item:text-primary transition-colors" />
+                    )}
                     <span>Configurações</span>
                   </Link>
                 </SidebarMenuButton>
               </SidebarMenuItem>
               {currentUser?.role === 'admin' && (
-                <SidebarMenuItem>
+                <>
+                  <SidebarMenuItem>
+                    <SidebarMenuButton
+                      asChild
+                      isActive={isActive('/configuracoes/educacenso')}
+                      tooltip="Exportação Educacenso"
+                    >
+                      <Link to="/configuracoes/educacenso" className="flex items-center gap-3 group/item">
+                        {isActive('/configuracoes/educacenso') ? (
+                          <div className="p-1.5 rounded-md bg-gradient-to-br from-primary/20 to-blue-600/20">
+                            <Download className="h-5 w-5 text-primary" />
+                          </div>
+                        ) : (
+                          <Download className="h-5 w-5 text-muted-foreground group-hover/item:text-primary transition-colors" />
+                        )}
+                        <span>Exportar Educacenso</span>
+                      </Link>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                  <SidebarMenuItem>
+                    <SidebarMenuButton
+                      asChild
+                      isActive={isActive('/configuracoes/inconsistencias')}
+                      tooltip="Relatório de Inconsistências"
+                    >
+                      <Link to="/configuracoes/inconsistencias" className="flex items-center gap-3 group/item">
+                        {isActive('/configuracoes/inconsistencias') ? (
+                          <div className="p-1.5 rounded-md bg-gradient-to-br from-orange-500/20 to-red-600/20">
+                            <AlertTriangle className="h-5 w-5 text-orange-600" />
+                          </div>
+                        ) : (
+                          <AlertTriangle className="h-5 w-5 text-muted-foreground group-hover/item:text-orange-600 transition-colors" />
+                        )}
+                        <span>Inconsistências</span>
+                      </Link>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                  <SidebarMenuItem>
+                    <SidebarMenuButton
+                      asChild
+                      isActive={isActive('/configuracoes/backup')}
+                      tooltip="Backup e Restauração"
+                    >
+                      <Link to="/configuracoes/backup" className="flex items-center gap-3 group/item">
+                        {isActive('/configuracoes/backup') ? (
+                          <div className="p-1.5 rounded-md bg-gradient-to-br from-primary/20 to-blue-600/20">
+                            <Database className="h-5 w-5 text-primary" />
+                          </div>
+                        ) : (
+                          <Database className="h-5 w-5 text-muted-foreground group-hover/item:text-primary transition-colors" />
+                        )}
+                        <span>Backup de Dados</span>
+                      </Link>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                </>
+              )}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+
+        <SidebarGroup>
+          <SidebarGroupLabel className="text-indigo-600 font-semibold">Comunicação</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {communicationItems.map((item) => (
+                <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton
                     asChild
-                    isActive={isActive('/configuracoes/backup')}
-                    tooltip="Backup e Restauração"
+                    isActive={isActive(item.url)}
+                    tooltip={item.title}
                   >
-                    <Link to="/configuracoes/backup">
-                      <Database className="h-4 w-4" />
-                      <span>Backup de Dados</span>
+                    <Link to={item.url} className="flex items-center gap-3 group/item">
+                      {isActive(item.url) ? (
+                        <div className="p-1.5 rounded-md bg-gradient-to-br from-indigo-500/20 to-indigo-600/20">
+                          <item.icon className="h-5 w-5 text-indigo-600" />
+                        </div>
+                      ) : (
+                        <item.icon className="h-5 w-5 text-muted-foreground group-hover/item:text-indigo-600 transition-colors" />
+                      )}
+                      <span>{item.title}</span>
                     </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
-              )}
+              ))}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+
+        <SidebarGroup>
+          <SidebarGroupLabel className="text-indigo-600 font-semibold">Secretaria</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {secretariatItems.map((item) => (
+                <SidebarMenuItem key={item.title}>
+                  <SidebarMenuButton
+                    asChild
+                    isActive={isActive(item.url)}
+                    tooltip={item.title}
+                  >
+                    <Link to={item.url} className="flex items-center gap-3 group/item">
+                      {isActive(item.url) ? (
+                        <div className="p-1.5 rounded-md bg-gradient-to-br from-indigo-500/20 to-indigo-600/20">
+                          <item.icon className="h-5 w-5 text-indigo-600" />
+                        </div>
+                      ) : (
+                        <item.icon className="h-5 w-5 text-muted-foreground group-hover/item:text-indigo-600 transition-colors" />
+                      )}
+                      <span>{item.title}</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
@@ -344,7 +552,7 @@ export function AppSidebar() {
           className="w-full justify-start text-muted-foreground hover:text-foreground"
           onClick={logout}
         >
-          <LogOut className="mr-2 h-4 w-4" /> Sair
+          <LogOut className="mr-2 h-5 w-5" /> Sair
         </Button>
       </SidebarFooter>
       <SidebarRail />

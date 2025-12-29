@@ -50,7 +50,7 @@ export function AssessmentTypeFormDialog({
   onSubmit,
   initialData,
 }: AssessmentTypeFormDialogProps) {
-  const { courses } = useCourseStore()
+  const { etapasEnsino } = useCourseStore()
 
   const form = useForm<z.infer<typeof typeSchema>>({
     resolver: zodResolver(typeSchema),
@@ -80,7 +80,8 @@ export function AssessmentTypeFormDialog({
         })
       }
     }
-  }, [open, initialData, form])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, initialData?.id])
 
   const handleSubmit = (data: z.infer<typeof typeSchema>) => {
     onSubmit(data)
@@ -170,50 +171,50 @@ export function AssessmentTypeFormDialog({
                   <FormLabel>Séries Aplicáveis</FormLabel>
                   <ScrollArea className="h-[200px] w-full rounded-md border p-4 bg-muted/10">
                     <div className="space-y-4">
-                      {courses.map((course) => (
-                        <div key={course.id}>
+                      {etapasEnsino.map((etapa) => (
+                        <div key={etapa.id}>
                           <h4 className="mb-2 text-sm font-semibold leading-none tracking-tight text-primary">
-                            {course.name}
+                            {etapa.name}
                           </h4>
                           <div className="grid grid-cols-1 gap-2 pl-2 border-l-2 border-primary/20 ml-1">
-                            {course.grades.length === 0 ? (
+                            {etapa.seriesAnos.length === 0 ? (
                               <p className="text-xs text-muted-foreground pl-2">
                                 Nenhuma série cadastrada.
                               </p>
                             ) : (
-                              course.grades.map((grade) => (
+                              etapa.seriesAnos.map((serieAno) => (
                                 <FormField
-                                  key={grade.id}
+                                  key={serieAno.id}
                                   control={form.control}
                                   name="applicableGradeIds"
                                   render={({ field }) => {
                                     return (
                                       <FormItem
-                                        key={grade.id}
+                                        key={serieAno.id}
                                         className="flex flex-row items-start space-x-3 space-y-0"
                                       >
                                         <FormControl>
                                           <Checkbox
                                             checked={field.value?.includes(
-                                              grade.id,
+                                              serieAno.id,
                                             )}
                                             onCheckedChange={(checked) => {
                                               return checked
                                                 ? field.onChange([
                                                     ...field.value,
-                                                    grade.id,
+                                                    serieAno.id,
                                                   ])
                                                 : field.onChange(
                                                     field.value?.filter(
                                                       (value) =>
-                                                        value !== grade.id,
+                                                        value !== serieAno.id,
                                                     ),
                                                   )
                                             }}
                                           />
                                         </FormControl>
                                         <Label className="font-normal cursor-pointer">
-                                          {grade.name}
+                                          {serieAno.name}
                                         </Label>
                                       </FormItem>
                                     )

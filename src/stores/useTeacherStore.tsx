@@ -1,5 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react'
 import { Teacher, mockTeachers, TeacherAllocation } from '@/lib/mock-data'
+import { handleError } from '@/lib/error-handling'
+import { sanitizeStoreData } from '@/lib/data-sanitizer'
 
 interface TeacherContextType {
   teachers: Teacher[]
@@ -27,17 +29,17 @@ export const TeacherProvider = ({
     if (stored) {
       try {
         const parsed = JSON.parse(stored)
-        // Ensure parsed data is an array
-        if (Array.isArray(parsed)) {
-          // Sanitize data: ensure every teacher object has allocations array
-          const sanitized = parsed.map((t: any) => ({
-            ...t,
-            allocations: Array.isArray(t.allocations) ? t.allocations : [],
-          }))
-          setTeachers(sanitized)
-        }
+        // Sanitizar dados usando utilitário centralizado
+        const sanitized = sanitizeStoreData<Teacher>(parsed, {
+          arrayFields: ['allocations'],
+        })
+        setTeachers(sanitized.length > 0 ? sanitized : mockTeachers)
       } catch (error) {
-        console.error('Failed to parse teachers from local storage:', error)
+        handleError(error as Error, {
+          showToast: false,
+          context: { action: 'loadTeachers', source: 'localStorage' },
+        })
+        setTeachers(mockTeachers)
       }
     }
   }, [])

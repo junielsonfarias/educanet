@@ -33,7 +33,10 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Switch } from '@/components/ui/switch'
-import { ServiceCard, QuickLink } from '@/lib/mock-data'
+import { ServiceCard, QuickLink, HeroSectionConfig, HeroSlide } from '@/lib/mock-data'
+import { Upload, X, Image as ImageIcon } from 'lucide-react'
+import { fileToBase64 } from '@/lib/file-utils'
+import { useRef } from 'react'
 
 export default function WebsiteContent() {
   const { getContent, updateInstitutionalContent } = usePublicContentStore()
@@ -56,11 +59,27 @@ export default function WebsiteContent() {
   // Local state for management
   const [serviceCards, setServiceCards] = useState<ServiceCard[]>([])
   const [quickLinks, setQuickLinks] = useState<QuickLink[]>([])
+  const [heroSection, setHeroSection] = useState<HeroSectionConfig>(
+    settings.heroSection || {
+      badgeText: 'Educação Municipal',
+      title: '',
+      description: '',
+      primaryButtonText: 'Consulta de Boletim',
+      primaryButtonLink: '/publico/boletim',
+      secondaryButtonText: 'Documentos Oficiais',
+      secondaryButtonLink: '/publico/documentos',
+      slides: [],
+      enableCarousel: false,
+      autoPlay: true,
+      autoPlayInterval: 5,
+    }
+  )
 
   // Load from store on mount
   useEffect(() => {
     if (settings.serviceCards) setServiceCards(settings.serviceCards)
     if (settings.quickLinks) setQuickLinks(settings.quickLinks)
+    if (settings.heroSection) setHeroSection(settings.heroSection)
   }, [settings])
 
   const handleSaveInfo = () => {
@@ -157,8 +176,11 @@ export default function WebsiteContent() {
         </p>
       </div>
 
-      <Tabs defaultValue="info" className="w-full">
+      <Tabs defaultValue="hero" className="w-full">
         <TabsList className="flex flex-wrap h-auto">
+          <TabsTrigger value="hero" className="gap-2">
+            <ImageIcon className="h-4 w-4" /> Hero Section
+          </TabsTrigger>
           <TabsTrigger value="info" className="gap-2">
             <Info className="h-4 w-4" /> Informações
           </TabsTrigger>
@@ -172,6 +194,381 @@ export default function WebsiteContent() {
             <Link2 className="h-4 w-4" /> Links Rápidos
           </TabsTrigger>
         </TabsList>
+
+        {/* Hero Section Tab */}
+        <TabsContent value="hero" className="mt-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Hero Section - Página Inicial</CardTitle>
+              <CardDescription>
+                Personalize o banner principal da página inicial com texto e imagens em carrossel.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              {/* Configurações Gerais */}
+              <div className="space-y-4">
+                <h3 className="font-semibold text-lg">Conteúdo do Hero</h3>
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label htmlFor="hero-badge">Texto do Badge</Label>
+                    <Input
+                      id="hero-badge"
+                      value={heroSection.badgeText || ''}
+                      onChange={(e) =>
+                        setHeroSection((prev) => ({ ...prev, badgeText: e.target.value }))
+                      }
+                      placeholder="Educação Municipal"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="hero-title">Título Principal</Label>
+                    <Input
+                      id="hero-title"
+                      value={heroSection.title || ''}
+                      onChange={(e) =>
+                        setHeroSection((prev) => ({ ...prev, title: e.target.value }))
+                      }
+                      placeholder="Deixe vazio para usar o nome da Secretaria"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Se vazio, será usado: {settings.educationSecretaryName}
+                    </p>
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="hero-description">Descrição</Label>
+                  <Textarea
+                    id="hero-description"
+                    value={heroSection.description || ''}
+                    onChange={(e) =>
+                      setHeroSection((prev) => ({ ...prev, description: e.target.value }))
+                    }
+                    placeholder="Bem-vindo ao portal oficial..."
+                    className="min-h-[100px]"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Se vazio, será usado o texto padrão com o nome do município
+                  </p>
+                </div>
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label htmlFor="hero-primary-button">Botão Primário - Texto</Label>
+                    <Input
+                      id="hero-primary-button"
+                      value={heroSection.primaryButtonText || ''}
+                      onChange={(e) =>
+                        setHeroSection((prev) => ({ ...prev, primaryButtonText: e.target.value }))
+                      }
+                      placeholder="Consulta de Boletim"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="hero-primary-link">Botão Primário - Link</Label>
+                    <Input
+                      id="hero-primary-link"
+                      value={heroSection.primaryButtonLink || ''}
+                      onChange={(e) =>
+                        setHeroSection((prev) => ({ ...prev, primaryButtonLink: e.target.value }))
+                      }
+                      placeholder="/publico/boletim"
+                    />
+                  </div>
+                </div>
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label htmlFor="hero-secondary-button">Botão Secundário - Texto</Label>
+                    <Input
+                      id="hero-secondary-button"
+                      value={heroSection.secondaryButtonText || ''}
+                      onChange={(e) =>
+                        setHeroSection((prev) => ({ ...prev, secondaryButtonText: e.target.value }))
+                      }
+                      placeholder="Documentos Oficiais"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="hero-secondary-link">Botão Secundário - Link</Label>
+                    <Input
+                      id="hero-secondary-link"
+                      value={heroSection.secondaryButtonLink || ''}
+                      onChange={(e) =>
+                        setHeroSection((prev) => ({ ...prev, secondaryButtonLink: e.target.value }))
+                      }
+                      placeholder="/publico/documentos"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Configurações do Carrossel */}
+              <div className="space-y-4 border-t pt-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="font-semibold text-lg">Carrossel de Imagens</h3>
+                    <p className="text-sm text-muted-foreground">
+                      Adicione múltiplas imagens para criar um carrossel no Hero Section
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Switch
+                      checked={heroSection.enableCarousel}
+                      onCheckedChange={(checked) =>
+                        setHeroSection((prev) => ({ ...prev, enableCarousel: checked }))
+                      }
+                    />
+                    <Label>Habilitar Carrossel</Label>
+                  </div>
+                </div>
+
+                {heroSection.enableCarousel && (
+                  <div className="space-y-4">
+                    <div className="flex items-center gap-2">
+                      <Switch
+                        checked={heroSection.autoPlay}
+                        onCheckedChange={(checked) =>
+                          setHeroSection((prev) => ({ ...prev, autoPlay: checked }))
+                        }
+                      />
+                      <Label>Reprodução Automática</Label>
+                    </div>
+                    {heroSection.autoPlay && (
+                      <div className="space-y-2">
+                        <Label htmlFor="auto-play-interval">Intervalo (segundos)</Label>
+                        <Input
+                          id="auto-play-interval"
+                          type="number"
+                          min="3"
+                          max="10"
+                          value={heroSection.autoPlayInterval || 5}
+                          onChange={(e) =>
+                            setHeroSection((prev) => ({
+                              ...prev,
+                              autoPlayInterval: parseInt(e.target.value) || 5,
+                            }))
+                          }
+                          className="w-32"
+                        />
+                      </div>
+                    )}
+
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between">
+                        <Label>Slides do Carrossel</Label>
+                        <Button
+                          size="sm"
+                          onClick={() => {
+                            const newSlide: HeroSlide = {
+                              id: Math.random().toString(36).substring(2, 11),
+                              imageUrl: '',
+                              title: '',
+                              subtitle: '',
+                              description: '',
+                              buttonText: '',
+                              buttonLink: '',
+                              order: heroSection.slides.length + 1,
+                              active: true,
+                            }
+                            setHeroSection((prev) => ({
+                              ...prev,
+                              slides: [...prev.slides, newSlide],
+                            }))
+                          }}
+                        >
+                          <Plus className="mr-2 h-4 w-4" /> Adicionar Slide
+                        </Button>
+                      </div>
+
+                      <div className="space-y-4">
+                        {heroSection.slides.map((slide, index) => (
+                          <Card key={slide.id} className="p-4">
+                            <div className="space-y-4">
+                              <div className="flex items-center justify-between">
+                                <Label className="text-base font-semibold">
+                                  Slide {index + 1}
+                                </Label>
+                                <div className="flex items-center gap-2">
+                                  <Switch
+                                    checked={slide.active}
+                                    onCheckedChange={(checked) => {
+                                      const updated = heroSection.slides.map((s) =>
+                                        s.id === slide.id ? { ...s, active: checked } : s
+                                      )
+                                      setHeroSection((prev) => ({ ...prev, slides: updated }))
+                                    }}
+                                  />
+                                  <Label>Ativo</Label>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="text-destructive hover:bg-destructive/10"
+                                    onClick={() => {
+                                      const updated = heroSection.slides.filter(
+                                        (s) => s.id !== slide.id
+                                      )
+                                      setHeroSection((prev) => ({ ...prev, slides: updated }))
+                                    }}
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                  </Button>
+                                </div>
+                              </div>
+
+                              <div className="grid gap-4 md:grid-cols-2">
+                                <div className="space-y-2">
+                                  <Label>Imagem do Slide</Label>
+                                  <div className="flex items-center gap-2">
+                                    <Input
+                                      value={slide.imageUrl}
+                                      onChange={(e) => {
+                                        const updated = heroSection.slides.map((s) =>
+                                          s.id === slide.id
+                                            ? { ...s, imageUrl: e.target.value }
+                                            : s
+                                        )
+                                        setHeroSection((prev) => ({ ...prev, slides: updated }))
+                                      }}
+                                      placeholder="URL da imagem ou base64"
+                                    />
+                                    <SlideImageUpload
+                                      onUpload={(base64) => {
+                                        const updated = heroSection.slides.map((s) =>
+                                          s.id === slide.id ? { ...s, imageUrl: base64 } : s
+                                        )
+                                        setHeroSection((prev) => ({ ...prev, slides: updated }))
+                                      }}
+                                    />
+                                  </div>
+                                  {slide.imageUrl && (
+                                    <div className="mt-2 rounded-lg overflow-hidden border">
+                                      <img
+                                        src={slide.imageUrl}
+                                        alt="Preview"
+                                        className="w-full h-32 object-cover"
+                                      />
+                                    </div>
+                                  )}
+                                </div>
+                                <div className="space-y-2">
+                                  <Label>Ordem</Label>
+                                  <Input
+                                    type="number"
+                                    value={slide.order}
+                                    onChange={(e) => {
+                                      const updated = heroSection.slides.map((s) =>
+                                        s.id === slide.id
+                                          ? { ...s, order: parseInt(e.target.value) || 0 }
+                                          : s
+                                      )
+                                      setHeroSection((prev) => ({ ...prev, slides: updated }))
+                                    }}
+                                    className="w-24"
+                                  />
+                                </div>
+                              </div>
+
+                              <div className="grid gap-4 md:grid-cols-2">
+                                <div className="space-y-2">
+                                  <Label>Título do Slide (opcional)</Label>
+                                  <Input
+                                    value={slide.title || ''}
+                                    onChange={(e) => {
+                                      const updated = heroSection.slides.map((s) =>
+                                        s.id === slide.id ? { ...s, title: e.target.value } : s
+                                      )
+                                      setHeroSection((prev) => ({ ...prev, slides: updated }))
+                                    }}
+                                    placeholder="Título personalizado"
+                                  />
+                                </div>
+                                <div className="space-y-2">
+                                  <Label>Subtítulo (opcional)</Label>
+                                  <Input
+                                    value={slide.subtitle || ''}
+                                    onChange={(e) => {
+                                      const updated = heroSection.slides.map((s) =>
+                                        s.id === slide.id ? { ...s, subtitle: e.target.value } : s
+                                      )
+                                      setHeroSection((prev) => ({ ...prev, slides: updated }))
+                                    }}
+                                    placeholder="Subtítulo"
+                                  />
+                                </div>
+                              </div>
+
+                              <div className="space-y-2">
+                                <Label>Descrição (opcional)</Label>
+                                <Textarea
+                                  value={slide.description || ''}
+                                  onChange={(e) => {
+                                    const updated = heroSection.slides.map((s) =>
+                                      s.id === slide.id
+                                        ? { ...s, description: e.target.value }
+                                        : s
+                                    )
+                                    setHeroSection((prev) => ({ ...prev, slides: updated }))
+                                  }}
+                                  placeholder="Descrição do slide"
+                                  className="min-h-[80px]"
+                                />
+                              </div>
+
+                              <div className="grid gap-4 md:grid-cols-2">
+                                <div className="space-y-2">
+                                  <Label>Texto do Botão (opcional)</Label>
+                                  <Input
+                                    value={slide.buttonText || ''}
+                                    onChange={(e) => {
+                                      const updated = heroSection.slides.map((s) =>
+                                        s.id === slide.id
+                                          ? { ...s, buttonText: e.target.value }
+                                          : s
+                                      )
+                                      setHeroSection((prev) => ({ ...prev, slides: updated }))
+                                    }}
+                                    placeholder="Saiba mais"
+                                  />
+                                </div>
+                                <div className="space-y-2">
+                                  <Label>Link do Botão (opcional)</Label>
+                                  <Input
+                                    value={slide.buttonLink || ''}
+                                    onChange={(e) => {
+                                      const updated = heroSection.slides.map((s) =>
+                                        s.id === slide.id
+                                          ? { ...s, buttonLink: e.target.value }
+                                          : s
+                                      )
+                                      setHeroSection((prev) => ({ ...prev, slides: updated }))
+                                    }}
+                                    placeholder="/publico/..."
+                                  />
+                                </div>
+                              </div>
+                            </div>
+                          </Card>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div className="flex justify-end pt-4 border-t">
+                <Button
+                  onClick={() => {
+                    updateSettings({ heroSection })
+                    toast({
+                      title: 'Hero Section atualizado',
+                      description: 'As configurações do Hero Section foram salvas com sucesso.',
+                    })
+                  }}
+                >
+                  <Save className="mr-2 h-4 w-4" /> Salvar Hero Section
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
 
         {/* Existing Info Tab */}
         <TabsContent value="info" className="mt-6">
@@ -452,5 +849,51 @@ export default function WebsiteContent() {
         </TabsContent>
       </Tabs>
     </div>
+  )
+}
+
+// Componente auxiliar para upload de imagem do slide
+function SlideImageUpload({ onUpload }: { onUpload: (base64: string) => void }) {
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const { toast } = useToast()
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file) {
+      try {
+        const base64 = await fileToBase64(file)
+        onUpload(base64)
+        toast({
+          title: 'Imagem carregada',
+          description: 'A imagem foi processada com sucesso.',
+        })
+      } catch (error) {
+        toast({
+          variant: 'destructive',
+          title: 'Erro no carregamento',
+          description: 'Não foi possível processar a imagem.',
+        })
+      }
+    }
+  }
+
+  return (
+    <>
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        onClick={() => fileInputRef.current?.click()}
+      >
+        <Upload className="h-4 w-4" />
+      </Button>
+      <input
+        type="file"
+        ref={fileInputRef}
+        className="hidden"
+        accept="image/*"
+        onChange={handleFileChange}
+      />
+    </>
   )
 }

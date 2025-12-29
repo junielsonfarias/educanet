@@ -30,6 +30,7 @@ import useCourseStore from '@/stores/useCourseStore'
 import { AssessmentTypeFormDialog } from './components/AssessmentTypeFormDialog'
 import { useToast } from '@/hooks/use-toast'
 import { AssessmentType } from '@/lib/mock-data'
+import { RequirePermission } from '@/components/RequirePermission'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -48,7 +49,7 @@ export default function AssessmentTypesList() {
     updateAssessmentType,
     deleteAssessmentType,
   } = useAssessmentStore()
-  const { courses } = useCourseStore()
+  const { etapasEnsino } = useCourseStore()
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [editingType, setEditingType] = useState<AssessmentType | null>(null)
   const [deleteId, setDeleteId] = useState<string | null>(null)
@@ -96,10 +97,10 @@ export default function AssessmentTypesList() {
   }
 
   const getGradeNames = (gradeIds: string[]) => {
-    const allGrades = courses.flatMap((c) =>
-      c.grades.map((g) => ({ ...g, courseName: c.name })),
+    const allSeriesAnos = etapasEnsino.flatMap((e) =>
+      e.seriesAnos.map((s) => ({ ...s, etapaEnsinoName: e.name })),
     )
-    const names = gradeIds.map((id) => allGrades.find((g) => g.id === id)?.name)
+    const names = gradeIds.map((id) => allSeriesAnos.find((s) => s.id === id)?.name)
     return names.filter(Boolean).join(', ')
   }
 
@@ -118,10 +119,14 @@ export default function AssessmentTypesList() {
             Gerencie os tipos de atividades avaliativas e suas regras.
           </p>
         </div>
-        <Button onClick={openCreateDialog} className="w-full sm:w-auto">
-          <Plus className="mr-2 h-4 w-4" />
-          Novo Tipo
-        </Button>
+        <RequirePermission permission="create:assessment">
+          <Button onClick={openCreateDialog} className="w-full sm:w-auto">
+            <div className="p-1 rounded-md bg-white/20 mr-2">
+              <Plus className="h-5 w-5" />
+            </div>
+            Novo Tipo
+          </Button>
+        </RequirePermission>
       </div>
 
       <Card>
@@ -162,10 +167,15 @@ export default function AssessmentTypesList() {
               </TableHeader>
               <TableBody>
                 {filteredTypes.map((type) => (
-                  <TableRow key={type.id}>
+                  <TableRow 
+                    key={type.id}
+                    className="border-l-4 border-l-transparent hover:border-l-purple-500 hover:bg-gradient-to-r hover:from-purple-50/50 hover:to-transparent transition-all duration-200"
+                  >
                     <TableCell className="font-medium">
                       <div className="flex items-center gap-2">
-                        <GraduationCap className="h-4 w-4 text-primary" />
+                        <div className="p-1 rounded-md bg-gradient-to-br from-purple-100 to-purple-200">
+                          <GraduationCap className="h-4 w-4 text-purple-600" />
+                        </div>
                         {type.name}
                       </div>
                     </TableCell>
@@ -187,21 +197,25 @@ export default function AssessmentTypesList() {
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-2">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => openEditDialog(type)}
-                        >
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="text-destructive hover:text-destructive hover:bg-destructive/10"
-                          onClick={() => setDeleteId(type.id)}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
+                        <RequirePermission permission="edit:assessment">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => openEditDialog(type)}
+                          >
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                        </RequirePermission>
+                        <RequirePermission permission="delete:assessment">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                            onClick={() => setDeleteId(type.id)}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </RequirePermission>
                       </div>
                     </TableCell>
                   </TableRow>

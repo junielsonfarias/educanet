@@ -20,6 +20,7 @@ import { Badge } from '@/components/ui/badge'
 import useCourseStore from '@/stores/useCourseStore'
 import { EvaluationRule } from '@/lib/mock-data'
 import { EvaluationRuleFormDialog } from './components/EvaluationRuleFormDialog'
+import { RequirePermission } from '@/components/RequirePermission'
 
 export default function EvaluationRulesList() {
   const { evaluationRules, addEvaluationRule, updateEvaluationRule } =
@@ -56,15 +57,29 @@ export default function EvaluationRulesList() {
             Gerencie as fórmulas de cálculo de notas e critérios de aprovação.
           </p>
         </div>
-        <Button onClick={handleAdd}>
-          <Plus className="mr-2 h-4 w-4" /> Nova Regra
-        </Button>
+        <RequirePermission permission="create:course">
+          <Button 
+            onClick={handleAdd}
+            className="bg-gradient-to-r from-purple-500 via-purple-600 to-purple-500 bg-size-200 bg-pos-0 hover:bg-pos-100 text-white shadow-lg hover:shadow-xl transition-all duration-500 transform hover:scale-105 font-semibold"
+          >
+            <div className="p-1 rounded-md bg-white/20 mr-2">
+              <Plus className="h-5 w-5" />
+            </div>
+            Nova Regra
+          </Button>
+        </RequirePermission>
       </div>
 
       <div className="grid gap-6">
-        <Card>
-          <CardHeader>
-            <CardTitle>Regras Configuradas</CardTitle>
+        <Card className="relative overflow-hidden bg-gradient-to-br from-white via-purple-50/20 to-white border-purple-200/50 hover:shadow-lg transition-all duration-300 group">
+          <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-purple-500/10 to-transparent rounded-full blur-2xl opacity-0 group-hover:opacity-100 transition-opacity" />
+          <CardHeader className="relative z-10">
+            <CardTitle className="flex items-center gap-2">
+              <div className="p-2 rounded-lg bg-gradient-to-br from-purple-100 to-purple-200">
+                <Calculator className="h-5 w-5 text-purple-600" />
+              </div>
+              Regras Configuradas
+            </CardTitle>
             <CardDescription>
               Lista de todas as regras de avaliação disponíveis para uso nos
               cursos.
@@ -83,7 +98,10 @@ export default function EvaluationRulesList() {
               </TableHeader>
               <TableBody>
                 {evaluationRules.map((rule) => (
-                  <TableRow key={rule.id}>
+                  <TableRow 
+                    key={rule.id}
+                    className="border-l-4 border-l-transparent hover:border-l-purple-500 hover:bg-gradient-to-r hover:from-purple-50/50 hover:to-transparent transition-all duration-200"
+                  >
                     <TableCell className="font-medium">
                       <div className="flex flex-col">
                         <span>{rule.name}</span>
@@ -118,13 +136,15 @@ export default function EvaluationRulesList() {
                       )}
                     </TableCell>
                     <TableCell className="text-right">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleEdit(rule)}
-                      >
-                        <Pencil className="h-4 w-4 mr-2" /> Editar
-                      </Button>
+                      <RequirePermission permission="edit:course">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleEdit(rule)}
+                        >
+                          <Pencil className="h-4 w-4 mr-2" /> Editar
+                        </Button>
+                      </RequirePermission>
                     </TableCell>
                   </TableRow>
                 ))}

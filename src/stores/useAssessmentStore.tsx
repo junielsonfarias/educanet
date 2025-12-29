@@ -5,12 +5,15 @@ import {
   AssessmentType,
   mockAssessmentTypes,
 } from '@/lib/mock-data'
+import { handleError } from '@/lib/error-handling'
+import { sanitizeStoreData } from '@/lib/data-sanitizer'
 
 interface AssessmentContextType {
   assessments: Assessment[]
   assessmentTypes: AssessmentType[]
   addAssessment: (assessment: Omit<Assessment, 'id'>) => void
   updateAssessment: (id: string, data: Partial<Assessment>) => void
+  removeAssessment: (id: string) => void
   getStudentAssessments: (studentId: string) => Assessment[]
   getAssessmentsByClass: (
     classId: string,
@@ -34,21 +37,36 @@ export const AssessmentProvider = ({
     useState<AssessmentType[]>(mockAssessmentTypes)
 
   useEffect(() => {
-    const stored = localStorage.getItem('edu_assessments')
-    if (stored) {
-      setAssessments(JSON.parse(stored))
-    } else {
-      localStorage.setItem('edu_assessments', JSON.stringify(mockAssessments))
-    }
+    try {
+      const stored = localStorage.getItem('edu_assessments')
+      if (stored) {
+        const parsed = JSON.parse(stored)
+        const sanitized = sanitizeStoreData<Assessment>(parsed, {})
+        setAssessments(sanitized.length > 0 ? sanitized : mockAssessments)
+      } else {
+        localStorage.setItem('edu_assessments', JSON.stringify(mockAssessments))
+      }
 
-    const storedTypes = localStorage.getItem('edu_assessment_types')
-    if (storedTypes) {
-      setAssessmentTypes(JSON.parse(storedTypes))
-    } else {
-      localStorage.setItem(
-        'edu_assessment_types',
-        JSON.stringify(mockAssessmentTypes),
-      )
+      const storedTypes = localStorage.getItem('edu_assessment_types')
+      if (storedTypes) {
+        const parsed = JSON.parse(storedTypes)
+        const sanitized = sanitizeStoreData<AssessmentType>(parsed, {
+          arrayFields: ['serieAnoIds'],
+        })
+        setAssessmentTypes(sanitized.length > 0 ? sanitized : mockAssessmentTypes)
+      } else {
+        localStorage.setItem(
+          'edu_assessment_types',
+          JSON.stringify(mockAssessmentTypes),
+        )
+      }
+    } catch (error) {
+      handleError(error as Error, {
+        showToast: false,
+        context: { action: 'loadAssessments', source: 'localStorage' },
+      })
+      setAssessments(mockAssessments)
+      setAssessmentTypes(mockAssessmentTypes)
     }
   }, [])
 
@@ -106,6 +124,10 @@ export const AssessmentProvider = ({
     )
   }
 
+  const removeAssessment = (id: string) => {
+    setAssessments((prev) => prev.filter((a) => a.id !== id))
+  }
+
   const getStudentAssessments = (studentId: string) => {
     return assessments.filter((a) => a.studentId === studentId)
   }
@@ -148,6 +170,7 @@ export const AssessmentProvider = ({
         assessmentTypes,
         addAssessment,
         updateAssessment,
+        removeAssessment,
         getStudentAssessments,
         getAssessmentsByClass,
         addAssessmentType,

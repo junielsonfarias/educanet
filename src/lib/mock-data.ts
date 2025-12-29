@@ -1,5 +1,37 @@
 import { addDays, format } from 'date-fns'
 
+// Importar dados expandidos se disponíveis
+let expandedMockEtapasEnsino: EtapaEnsino[] = []
+let expandedMockAssessmentTypes: AssessmentType[] = []
+let expandedMockSchools: School[] = []
+let expandedMockTeachers: Teacher[] = []
+let expandedMockStudents: Student[] = []
+let expandedMockAssessments: Assessment[] = []
+let expandedMockAttendance: AttendanceRecord[] = []
+let expandedMockOccurrences: Occurrence[] = []
+let expandedMockStaff: Staff[] = []
+let expandedMockNews: NewsPost[] = []
+let expandedMockPublicDocuments: PublicDocument[] = []
+let expandedMockInstitutionalContent: InstitutionalContent[] = []
+
+try {
+  const expanded = require('./mock-data-expanded')
+  expandedMockEtapasEnsino = expanded.expandedMockEtapasEnsino || []
+  expandedMockAssessmentTypes = expanded.expandedMockAssessmentTypes || []
+  expandedMockSchools = expanded.expandedMockSchools || []
+  expandedMockTeachers = expanded.expandedMockTeachers || []
+  expandedMockStudents = expanded.expandedMockStudents || []
+  expandedMockAssessments = expanded.expandedMockAssessments || []
+  expandedMockAttendance = expanded.expandedMockAttendance || []
+  expandedMockOccurrences = expanded.expandedMockOccurrences || []
+  expandedMockStaff = expanded.expandedMockStaff || []
+  expandedMockNews = expanded.expandedMockNews || []
+  expandedMockPublicDocuments = expanded.expandedMockPublicDocuments || []
+  expandedMockInstitutionalContent = expanded.expandedMockInstitutionalContent || []
+} catch (e) {
+  // Dados expandidos não disponíveis, usar dados básicos
+}
+
 export interface Period {
   id: string
   name: string
@@ -7,12 +39,18 @@ export interface Period {
   endDate: string
 }
 
-export interface Classroom {
+/**
+ * Turma - Grupo de alunos que compartilham o mesmo espaço físico e temporal
+ * Alinhado ao Censo Escolar (Educacenso)
+ */
+export interface Turma {
   id: string
   name: string
   shift: 'Matutino' | 'Vespertino' | 'Noturno' | 'Integral'
-  gradeId: string
-  gradeName?: string
+  serieAnoId: string // Referência a SerieAno (antes gradeId)
+  serieAnoName?: string // Nome da série/ano (antes gradeName)
+  etapaEnsinoId: string // NOVO: Referência direta à Etapa de Ensino (obrigatório para Censo)
+  etapaEnsinoName?: string // Nome da etapa de ensino
   studentCount?: number
   acronym?: string
   operatingHours?: string
@@ -20,16 +58,110 @@ export interface Classroom {
   operatingDays?: string[]
   isMultiGrade?: boolean
   maxDependencySubjects?: number
+  maxCapacity?: number // Capacidade máxima de alunos
+  regentTeacherId?: string // ID do professor regente
+  educationModality?: string // Modalidade de ensino (Regular, EJA, Especial, etc.)
+  // Campos adicionais do Censo Escolar
+  tipoAtendimento?: string // Ex: "Regular", "AEE", "Hospitalar"
+  tipoMediacaoDidaticoPedagogico?: string // Ex: "Presencial", "EAD"
+  tipoRegime?: string // Ex: "Seriado", "Nao Seriado"
+  codigoTurmaCenso?: string // Código único do Censo
+  // Campos legados para compatibilidade
+  gradeId?: string // @deprecated Use serieAnoId
+  gradeName?: string // @deprecated Use serieAnoName
 }
 
-export interface AcademicYear {
+// ============================================
+// ALIASES PARA COMPATIBILIDADE (DEPRECATED)
+// ============================================
+/**
+ * @deprecated Use Turma ao invés de Classroom
+ * Mantido para compatibilidade durante migração
+ */
+export type Classroom = Turma
+
+/**
+ * Ano Letivo - Período em que as atividades escolares são planejadas e executadas
+ * Alinhado ao Censo Escolar (Educacenso)
+ */
+export interface AnoLetivo {
   id: string
-  name: string
+  name: string // Ex: "2024", "2024/2025"
+  ano: number // 2024, 2025 (para ordenação)
   startDate: string
   endDate: string
   status: 'pending' | 'active' | 'finished'
   periods: Period[]
-  classes: Classroom[]
+  turmas: Turma[] // Array de turmas (antes classes)
+  // Campo legado para compatibilidade
+  classes?: Turma[] // @deprecated Use turmas
+}
+
+// ============================================
+// ALIASES PARA COMPATIBILIDADE (DEPRECATED)
+// ============================================
+/**
+ * @deprecated Use AnoLetivo ao invés de AcademicYear
+ * Mantido para compatibilidade durante migração
+ */
+export type AcademicYear = AnoLetivo
+
+export interface SchoolInfrastructure {
+  classrooms: {
+    total: number
+    regular: number
+    accessible: number
+    capacity: number
+  }
+  specialRooms: {
+    lab: number
+    library: number
+    computer: number
+    science: number
+    art: number
+  }
+  bathrooms: {
+    total: number
+    accessible: number
+  }
+  dependencies: {
+    kitchen: boolean
+    cafeteria: boolean
+    court: boolean
+    playground: boolean
+  }
+  utilities: {
+    water: 'public' | 'well' | 'cistern' | 'none'
+    energy: 'public' | 'generator' | 'none'
+    sewage: 'public' | 'septic' | 'none'
+    internet: {
+      type: 'fiber' | 'radio' | 'satellite' | 'none'
+      speed?: number
+    }
+  }
+  equipment: {
+    computers: number
+    projectors: number
+    tvs: number
+    printers: number
+  }
+}
+
+export interface AdministrativeRooms {
+  secretariat: number
+  direction: number
+  coordination: number
+  storage: number
+  teachersRoom: number
+  meetingRoom: number
+}
+
+export interface EducationModality {
+  id: string
+  type: 'infantil' | 'fundamental' | 'medio' | 'eja' | 'especial' | 'profissional'
+  level?: string
+  fullTime: boolean
+  active: boolean
 }
 
 export interface School {
@@ -41,19 +173,21 @@ export interface School {
   director: string
   status: 'active' | 'inactive'
   logo?: string
-  academicYears: AcademicYear[]
+  academicYears: AnoLetivo[] // Usando AnoLetivo (alias mantém compatibilidade)
   inepCode?: string
   administrativeDependency?: 'Federal' | 'Estadual' | 'Municipal' | 'Privada'
   locationType?: 'Urbana' | 'Rural'
   polo?: string
-  infrastructure?: {
+  infrastructure?: SchoolInfrastructure | {
     classrooms: number
     accessible: boolean
     internet: boolean
     library: boolean
     lab: boolean
   }
+  administrativeRooms?: AdministrativeRooms
   educationTypes?: string[]
+  educationModalities?: EducationModality[]
   coordinates?: {
     lat: number
     lng: number
@@ -84,18 +218,47 @@ export interface EvaluationRule {
   recoveryStrategy?: 'replace_if_higher' | 'always_replace' | 'average'
 }
 
-export interface Grade {
+// ============================================
+// NOVAS INTERFACES - Alinhadas ao Censo Escolar
+// ============================================
+
+/**
+ * Série/Ano Escolar - Representa a progressão anual (1º ao 9º ano no Fundamental, 1º ao 3º no Médio)
+ * Alinhado ao Censo Escolar (Educacenso)
+ */
+export interface SerieAno {
   id: string
-  name: string
+  name: string // Ex: "1º Ano", "2º Ano", "3º Ano"
+  numero: number // 1, 2, 3, 4, 5, 6, 7, 8, 9 (para ordenação)
   subjects: Subject[]
   evaluationRuleId?: string
 }
 
-export interface Course {
+/**
+ * Etapa de Ensino - Representa os níveis educacionais (Educação Infantil, Ensino Fundamental, Ensino Médio)
+ * Alinhado ao Censo Escolar (Educacenso) - Códigos INEP
+ */
+export interface EtapaEnsino {
   id: string
-  name: string
-  grades: Grade[]
+  name: string // Ex: "Educação Infantil", "Ensino Fundamental", "Ensino Médio"
+  codigoCenso: string // Ex: "01", "02", "03" (código do INEP)
+  seriesAnos: SerieAno[]
 }
+
+// ============================================
+// ALIASES PARA COMPATIBILIDADE (DEPRECATED)
+// ============================================
+/**
+ * @deprecated Use SerieAno ao invés de Grade
+ * Mantido para compatibilidade durante migração - SERÁ REMOVIDO
+ */
+export type Grade = SerieAno
+
+/**
+ * @deprecated Use EtapaEnsino ao invés de Course
+ * Mantido para compatibilidade durante migração - SERÁ REMOVIDO
+ */
+export type Course = EtapaEnsino
 
 export interface TeacherAllocation {
   id: string
@@ -104,6 +267,43 @@ export interface TeacherAllocation {
   classroomId?: string
   subjectId?: string
   createdAt: string
+}
+
+export interface Certification {
+  id: string
+  name: string
+  institution: string
+  year: number
+  type: 'course' | 'workshop' | 'specialization' | 'other'
+}
+
+export interface TeacherEducation {
+  graduation?: {
+    course: string
+    institution: string
+    year: number
+    area: string
+  }
+  specialization?: {
+    course: string
+    institution: string
+    year: number
+  }
+  master?: {
+    course: string
+    institution: string
+    year: number
+  }
+  doctorate?: {
+    course: string
+    institution: string
+    year: number
+  }
+}
+
+export interface TeacherWorkload {
+  total: number
+  bySubject: Record<string, number>
 }
 
 export interface Teacher {
@@ -119,13 +319,22 @@ export interface Teacher {
   admissionDate?: string
   role?: string
   academicBackground?: string
+  // Novos campos para Censo Escolar
+  education?: TeacherEducation
+  enabledSubjects?: string[] // subjectIds
+  functionalSituation?: 'efetivo' | 'temporario' | 'terceirizado' | 'estagiario'
+  contractType?: 'CLT' | 'estatutario' | 'terceirizado'
+  workload?: TeacherWorkload
+  experienceYears?: number
+  certifications?: Certification[]
 }
 
 export interface AssessmentType {
   id: string
   name: string
   description?: string
-  applicableGradeIds: string[]
+  applicableSerieAnoIds: string[] // IDs de SerieAno (preferencial)
+  applicableGradeIds?: string[] // DEPRECATED: IDs de SerieAno (mantido para compatibilidade)
   excludeFromAverage: boolean
 }
 
@@ -236,6 +445,32 @@ export interface QuickLink {
   order: number
 }
 
+export interface HeroSlide {
+  id: string
+  imageUrl: string
+  title?: string
+  subtitle?: string
+  description?: string
+  buttonText?: string
+  buttonLink?: string
+  order: number
+  active: boolean
+}
+
+export interface HeroSectionConfig {
+  badgeText?: string
+  title?: string
+  description?: string
+  primaryButtonText?: string
+  primaryButtonLink?: string
+  secondaryButtonText?: string
+  secondaryButtonLink?: string
+  slides: HeroSlide[]
+  enableCarousel: boolean
+  autoPlay: boolean
+  autoPlayInterval?: number // em segundos
+}
+
 export interface GeneralSettings {
   municipalityName: string
   educationSecretaryName: string
@@ -250,6 +485,7 @@ export interface GeneralSettings {
   savedLayouts?: DashboardLayout[]
   serviceCards?: ServiceCard[]
   quickLinks?: QuickLink[]
+  heroSection?: HeroSectionConfig
 }
 
 export type AlertType = 'dropout_risk' | 'low_performance' | 'system'
@@ -304,6 +540,193 @@ export interface InstitutionalContent {
   title: string
   content: string
   updatedAt: string
+}
+
+// --- Interfaces para Documentos Escolares ---
+
+export type DocumentType =
+  | 'historico'
+  | 'declaracao_matricula'
+  | 'ficha_individual'
+  | 'declaracao_transferencia'
+  | 'ata_resultados'
+  | 'certificado'
+
+export interface DocumentContent {
+  [key: string]: unknown
+}
+
+export interface SchoolDocument {
+  id: string
+  type: DocumentType
+  studentId?: string
+  schoolId: string
+  academicYearId?: string
+  classroomId?: string
+  protocolNumber: string
+  content: DocumentContent
+  generatedAt: string
+  generatedBy: string
+  status: 'draft' | 'issued' | 'cancelled'
+  signedBy?: string
+  signedAt?: string
+  pdfUrl?: string
+  sequentialNumber?: number
+}
+
+// --- Interfaces para Protocolos e Secretaria ---
+
+export type ProtocolType =
+  | 'matricula'
+  | 'transferencia'
+  | 'declaracao'
+  | 'recurso'
+  | 'outros'
+
+export type ProtocolStatus =
+  | 'pending'
+  | 'in_progress'
+  | 'completed'
+  | 'cancelled'
+
+export type ProtocolPriority = 'normal' | 'preferential' | 'urgent'
+
+export interface ProtocolDocument {
+  id: string
+  type: string
+  status: 'requested' | 'preparing' | 'ready' | 'delivered'
+  requestedAt: string
+  readyAt?: string
+  deliveredAt?: string
+  preparedBy?: string
+  fileUrl?: string
+  notes?: string
+}
+
+export interface ProtocolHistory {
+  id: string
+  action: string
+  description: string
+  userId: string
+  timestamp: string
+}
+
+export interface Protocol {
+  id: string
+  number: string
+  type: ProtocolType
+  requester: {
+    name: string
+    cpf: string
+    phone: string
+    email?: string
+    relationship: 'pai' | 'mae' | 'responsavel' | 'aluno' | 'outro'
+  }
+  studentId?: string
+  schoolId: string
+  description: string
+  status: ProtocolStatus
+  priority: ProtocolPriority
+  createdAt: string
+  updatedAt: string
+  completedAt?: string
+  assignedTo?: string
+  documents: ProtocolDocument[]
+  history: ProtocolHistory[]
+  deadline?: string
+  notes?: string
+}
+
+export interface Appointment {
+  id: string
+  protocolId?: string
+  schoolId: string
+  requester: {
+    name: string
+    cpf: string
+    phone: string
+    email?: string
+  }
+  type: 'matricula' | 'documentos' | 'informacoes' | 'outros'
+  date: string
+  time: string
+  status: 'scheduled' | 'confirmed' | 'completed' | 'cancelled'
+  notes?: string
+  confirmedAt?: string
+  reminderSent: boolean
+}
+
+export interface ServiceQueue {
+  id: string
+  schoolId: string
+  ticketNumber: string
+  type: 'matricula' | 'documentos' | 'informacoes'
+  priority: ProtocolPriority
+  requester: {
+    name: string
+    cpf: string
+    phone?: string
+  }
+  status: 'waiting' | 'calling' | 'attending' | 'completed'
+  createdAt: string
+  calledAt?: string
+  startedAt?: string
+  completedAt?: string
+  attendedBy?: string
+  estimatedWaitTime?: number
+}
+
+// --- Interfaces para Comunicação e Notificações ---
+
+export type NotificationType = 'email' | 'sms' | 'push' | 'system'
+
+export type NotificationStatus =
+  | 'pending'
+  | 'sent'
+  | 'delivered'
+  | 'failed'
+  | 'read'
+
+export interface Notification {
+  id: string
+  type: NotificationType
+  recipient: {
+    type: 'student' | 'guardian' | 'teacher' | 'user'
+    id: string
+    contact: string
+  }
+  template: string
+  subject?: string
+  content: string
+  status: NotificationStatus
+  sentAt?: string
+  deliveredAt?: string
+  readAt?: string
+  error?: string
+  metadata?: Record<string, unknown>
+}
+
+export interface NotificationTemplate {
+  id: string
+  name: string
+  type: 'email' | 'sms'
+  subject?: string
+  body: string
+  variables: string[]
+  active: boolean
+}
+
+export interface NotificationSettings {
+  userId: string
+  emailEnabled: boolean
+  smsEnabled: boolean
+  pushEnabled: boolean
+  preferences: {
+    boletim: boolean
+    frequencia: boolean
+    avisos: boolean
+    eventos: boolean
+  }
 }
 
 export const initialDashboardLayout: DashboardLayout = {
@@ -450,6 +873,20 @@ export const initialQuickLinks: QuickLink[] = [
   },
 ]
 
+export const initialHeroSection: HeroSectionConfig = {
+  badgeText: 'Educação Municipal',
+  title: '',
+  description: '',
+  primaryButtonText: 'Consulta de Boletim',
+  primaryButtonLink: '/publico/boletim',
+  secondaryButtonText: 'Documentos Oficiais',
+  secondaryButtonLink: '/publico/documentos',
+  slides: [],
+  enableCarousel: false,
+  autoPlay: true,
+  autoPlayInterval: 5,
+}
+
 export const initialSettings: GeneralSettings = {
   municipalityName: 'Prefeitura Municipal',
   educationSecretaryName: 'Secretaria Municipal de Educação',
@@ -462,6 +899,7 @@ export const initialSettings: GeneralSettings = {
   savedLayouts: [initialDashboardLayout],
   serviceCards: initialServiceCards,
   quickLinks: initialQuickLinks,
+  heroSection: initialHeroSection,
 }
 
 export const mockEvaluationRules: EvaluationRule[] = [
@@ -508,40 +946,305 @@ export const mockEvaluationRules: EvaluationRule[] = [
   },
 ]
 
-export const mockCourses: Course[] = [
+// Mock de Etapas de Ensino (alinhado ao Censo Escolar) - DADOS COMPLETOS
+// Usar dados expandidos se disponíveis, senão usar dados básicos
+export const mockEtapasEnsino: EtapaEnsino[] = expandedMockEtapasEnsino.length > 0 ? expandedMockEtapasEnsino : [
   {
-    id: 'c1',
-    name: 'Ensino Fundamental I',
-    grades: [
+    id: 'e1',
+    name: 'Educação Infantil',
+    codigoCenso: '01', // Código INEP para Educação Infantil
+    seriesAnos: [
       {
-        id: 'g1',
+        id: 'ei1',
+        name: 'Creche - 0 a 2 anos',
+        numero: 0,
+        evaluationRuleId: 'rule2',
+        subjects: [
+          { id: 'ei_s1', name: 'Linguagem Oral e Escrita', workload: 200 },
+          { id: 'ei_s2', name: 'Matemática', workload: 200 },
+          { id: 'ei_s3', name: 'Natureza e Sociedade', workload: 150 },
+          { id: 'ei_s4', name: 'Artes', workload: 100 },
+          { id: 'ei_s5', name: 'Movimento', workload: 100 },
+        ],
+      },
+      {
+        id: 'ei2',
+        name: 'Pré-Escola - 3 a 5 anos',
+        numero: 0,
+        evaluationRuleId: 'rule2',
+        subjects: [
+          { id: 'ei_s6', name: 'Linguagem Oral e Escrita', workload: 200 },
+          { id: 'ei_s7', name: 'Matemática', workload: 200 },
+          { id: 'ei_s8', name: 'Natureza e Sociedade', workload: 150 },
+          { id: 'ei_s9', name: 'Artes', workload: 100 },
+          { id: 'ei_s10', name: 'Movimento', workload: 100 },
+        ],
+      },
+    ],
+  },
+  {
+    id: 'e2',
+    name: 'Ensino Fundamental - Anos Iniciais',
+    codigoCenso: '03', // Código INEP para Ensino Fundamental - Anos Iniciais
+    seriesAnos: [
+      {
+        id: 'sa1',
         name: '1º Ano',
+        numero: 1,
         evaluationRuleId: 'rule2',
         subjects: [
           { id: 's1', name: 'Português', workload: 200 },
           { id: 's2', name: 'Matemática', workload: 200 },
+          { id: 's3', name: 'Ciências', workload: 80 },
+          { id: 's4', name: 'História', workload: 80 },
+          { id: 's5', name: 'Geografia', workload: 80 },
+          { id: 's6', name: 'Artes', workload: 80 },
+          { id: 's7', name: 'Educação Física', workload: 80 },
         ],
       },
       {
-        id: 'g5',
-        name: '5º Ano',
+        id: 'sa2',
+        name: '2º Ano',
+        numero: 2,
+        evaluationRuleId: 'rule2',
+        subjects: [
+          { id: 's8', name: 'Português', workload: 200 },
+          { id: 's9', name: 'Matemática', workload: 200 },
+          { id: 's10', name: 'Ciências', workload: 80 },
+          { id: 's11', name: 'História', workload: 80 },
+          { id: 's12', name: 'Geografia', workload: 80 },
+          { id: 's13', name: 'Artes', workload: 80 },
+          { id: 's14', name: 'Educação Física', workload: 80 },
+        ],
+      },
+      {
+        id: 'sa3',
+        name: '3º Ano',
+        numero: 3,
         evaluationRuleId: 'rule3',
         subjects: [
-          { id: 's9', name: 'Português', workload: 180 },
-          { id: 's10', name: 'Matemática', workload: 180 },
-          { id: 's11', name: 'História', workload: 80 },
+          { id: 's15', name: 'Português', workload: 180 },
+          { id: 's16', name: 'Matemática', workload: 180 },
+          { id: 's17', name: 'Ciências', workload: 80 },
+          { id: 's18', name: 'História', workload: 80 },
+          { id: 's19', name: 'Geografia', workload: 80 },
+          { id: 's20', name: 'Artes', workload: 80 },
+          { id: 's21', name: 'Educação Física', workload: 80 },
+        ],
+      },
+      {
+        id: 'sa4',
+        name: '4º Ano',
+        numero: 4,
+        evaluationRuleId: 'rule3',
+        subjects: [
+          { id: 's22', name: 'Português', workload: 180 },
+          { id: 's23', name: 'Matemática', workload: 180 },
+          { id: 's24', name: 'Ciências', workload: 80 },
+          { id: 's25', name: 'História', workload: 80 },
+          { id: 's26', name: 'Geografia', workload: 80 },
+          { id: 's27', name: 'Artes', workload: 80 },
+          { id: 's28', name: 'Educação Física', workload: 80 },
+        ],
+      },
+      {
+        id: 'sa5',
+        name: '5º Ano',
+        numero: 5,
+        evaluationRuleId: 'rule3',
+        subjects: [
+          { id: 's29', name: 'Português', workload: 180 },
+          { id: 's30', name: 'Matemática', workload: 180 },
+          { id: 's31', name: 'Ciências', workload: 80 },
+          { id: 's32', name: 'História', workload: 80 },
+          { id: 's33', name: 'Geografia', workload: 80 },
+          { id: 's34', name: 'Artes', workload: 80 },
+          { id: 's35', name: 'Educação Física', workload: 80 },
+        ],
+      },
+    ],
+  },
+  {
+    id: 'e3',
+    name: 'Ensino Fundamental - Anos Finais',
+    codigoCenso: '04', // Código INEP para Ensino Fundamental - Anos Finais
+    seriesAnos: [
+      {
+        id: 'sa6',
+        name: '6º Ano',
+        numero: 6,
+        evaluationRuleId: 'rule1',
+        subjects: [
+          { id: 's36', name: 'Português', workload: 180 },
+          { id: 's37', name: 'Matemática', workload: 180 },
+          { id: 's38', name: 'Ciências', workload: 80 },
+          { id: 's39', name: 'História', workload: 80 },
+          { id: 's40', name: 'Geografia', workload: 80 },
+          { id: 's41', name: 'Artes', workload: 80 },
+          { id: 's42', name: 'Educação Física', workload: 80 },
+          { id: 's43', name: 'Inglês', workload: 80 },
+        ],
+      },
+      {
+        id: 'sa7',
+        name: '7º Ano',
+        numero: 7,
+        evaluationRuleId: 'rule1',
+        subjects: [
+          { id: 's44', name: 'Português', workload: 180 },
+          { id: 's45', name: 'Matemática', workload: 180 },
+          { id: 's46', name: 'Ciências', workload: 80 },
+          { id: 's47', name: 'História', workload: 80 },
+          { id: 's48', name: 'Geografia', workload: 80 },
+          { id: 's49', name: 'Artes', workload: 80 },
+          { id: 's50', name: 'Educação Física', workload: 80 },
+          { id: 's51', name: 'Inglês', workload: 80 },
+        ],
+      },
+      {
+        id: 'sa8',
+        name: '8º Ano',
+        numero: 8,
+        evaluationRuleId: 'rule1',
+        subjects: [
+          { id: 's52', name: 'Português', workload: 180 },
+          { id: 's53', name: 'Matemática', workload: 180 },
+          { id: 's54', name: 'Ciências', workload: 80 },
+          { id: 's55', name: 'História', workload: 80 },
+          { id: 's56', name: 'Geografia', workload: 80 },
+          { id: 's57', name: 'Artes', workload: 80 },
+          { id: 's58', name: 'Educação Física', workload: 80 },
+          { id: 's59', name: 'Inglês', workload: 80 },
+        ],
+      },
+      {
+        id: 'sa9',
+        name: '9º Ano',
+        numero: 9,
+        evaluationRuleId: 'rule1',
+        subjects: [
+          { id: 's60', name: 'Português', workload: 180 },
+          { id: 's61', name: 'Matemática', workload: 180 },
+          { id: 's62', name: 'Ciências', workload: 80 },
+          { id: 's63', name: 'História', workload: 80 },
+          { id: 's64', name: 'Geografia', workload: 80 },
+          { id: 's65', name: 'Artes', workload: 80 },
+          { id: 's66', name: 'Educação Física', workload: 80 },
+          { id: 's67', name: 'Inglês', workload: 80 },
+        ],
+      },
+    ],
+  },
+  {
+    id: 'e4',
+    name: 'Ensino Médio',
+    codigoCenso: '08', // Código INEP para Ensino Médio
+    seriesAnos: [
+      {
+        id: 'em1',
+        name: '1º Ano',
+        numero: 1,
+        evaluationRuleId: 'rule1',
+        subjects: [
+          { id: 's68', name: 'Português', workload: 200 },
+          { id: 's69', name: 'Matemática', workload: 200 },
+          { id: 's70', name: 'Física', workload: 80 },
+          { id: 's71', name: 'Química', workload: 80 },
+          { id: 's72', name: 'Biologia', workload: 80 },
+          { id: 's73', name: 'História', workload: 80 },
+          { id: 's74', name: 'Geografia', workload: 80 },
+          { id: 's75', name: 'Filosofia', workload: 80 },
+          { id: 's76', name: 'Sociologia', workload: 80 },
+          { id: 's77', name: 'Artes', workload: 80 },
+          { id: 's78', name: 'Educação Física', workload: 80 },
+          { id: 's79', name: 'Inglês', workload: 80 },
+        ],
+      },
+      {
+        id: 'em2',
+        name: '2º Ano',
+        numero: 2,
+        evaluationRuleId: 'rule1',
+        subjects: [
+          { id: 's80', name: 'Português', workload: 200 },
+          { id: 's81', name: 'Matemática', workload: 200 },
+          { id: 's82', name: 'Física', workload: 80 },
+          { id: 's83', name: 'Química', workload: 80 },
+          { id: 's84', name: 'Biologia', workload: 80 },
+          { id: 's85', name: 'História', workload: 80 },
+          { id: 's86', name: 'Geografia', workload: 80 },
+          { id: 's87', name: 'Filosofia', workload: 80 },
+          { id: 's88', name: 'Sociologia', workload: 80 },
+          { id: 's89', name: 'Artes', workload: 80 },
+          { id: 's90', name: 'Educação Física', workload: 80 },
+          { id: 's91', name: 'Inglês', workload: 80 },
+        ],
+      },
+      {
+        id: 'em3',
+        name: '3º Ano',
+        numero: 3,
+        evaluationRuleId: 'rule1',
+        subjects: [
+          { id: 's92', name: 'Português', workload: 200 },
+          { id: 's93', name: 'Matemática', workload: 200 },
+          { id: 's94', name: 'Física', workload: 80 },
+          { id: 's95', name: 'Química', workload: 80 },
+          { id: 's96', name: 'Biologia', workload: 80 },
+          { id: 's97', name: 'História', workload: 80 },
+          { id: 's98', name: 'Geografia', workload: 80 },
+          { id: 's99', name: 'Filosofia', workload: 80 },
+          { id: 's100', name: 'Sociologia', workload: 80 },
+          { id: 's101', name: 'Artes', workload: 80 },
+          { id: 's102', name: 'Educação Física', workload: 80 },
+          { id: 's103', name: 'Inglês', workload: 80 },
+        ],
+      },
+    ],
+  },
+  {
+    id: 'e5',
+    name: 'EJA - Educação de Jovens e Adultos',
+    codigoCenso: '69', // Código INEP para EJA
+    seriesAnos: [
+      {
+        id: 'eja1',
+        name: 'EJA - Fase I (1º ao 3º Ano)',
+        numero: 1,
+        evaluationRuleId: 'rule2',
+        subjects: [
+          { id: 'eja_s1', name: 'Língua Portuguesa', workload: 200 },
+          { id: 'eja_s2', name: 'Matemática', workload: 200 },
+          { id: 'eja_s3', name: 'Ciências da Natureza', workload: 100 },
+          { id: 'eja_s4', name: 'Ciências Humanas', workload: 100 },
+        ],
+      },
+      {
+        id: 'eja2',
+        name: 'EJA - Fase II (4º e 5º Ano)',
+        numero: 2,
+        evaluationRuleId: 'rule3',
+        subjects: [
+          { id: 'eja_s5', name: 'Língua Portuguesa', workload: 180 },
+          { id: 'eja_s6', name: 'Matemática', workload: 180 },
+          { id: 'eja_s7', name: 'Ciências da Natureza', workload: 100 },
+          { id: 'eja_s8', name: 'Ciências Humanas', workload: 100 },
         ],
       },
     ],
   },
 ]
 
-export const mockAssessmentTypes: AssessmentType[] = [
+// Alias para compatibilidade (DEPRECATED - será removido)
+export const mockCourses: Course[] = mockEtapasEnsino
+
+// Usar dados expandidos se disponíveis, senão usar dados básicos
+export const mockAssessmentTypes: AssessmentType[] = expandedMockAssessmentTypes.length > 0 ? expandedMockAssessmentTypes : [
   {
     id: 'at1',
     name: 'Prova Bimestral',
     description: 'Avaliação principal do bimestre, abrangendo todo o conteúdo.',
-    applicableGradeIds: ['g5'],
+    applicableSerieAnoIds: ['sa1', 'sa2', 'sa3', 'sa4', 'sa5', 'sa6', 'sa7', 'sa8', 'sa9', 'em1', 'em2', 'em3'],
     excludeFromAverage: false,
   },
   {
@@ -549,19 +1252,55 @@ export const mockAssessmentTypes: AssessmentType[] = [
     name: 'Trabalho em Grupo',
     description:
       'Atividades realizadas em equipe para avaliação de competências colaborativas.',
-    applicableGradeIds: ['g5'],
+    applicableSerieAnoIds: ['sa1', 'sa2', 'sa3', 'sa4', 'sa5', 'sa6', 'sa7', 'sa8', 'sa9', 'em1', 'em2', 'em3'],
     excludeFromAverage: false,
   },
   {
     id: 'at3',
     name: 'Simulado Extra',
     description: 'Teste simulado para preparação, sem impacto na nota final.',
-    applicableGradeIds: ['g5'],
+    applicableSerieAnoIds: ['sa6', 'sa7', 'sa8', 'sa9', 'em1', 'em2', 'em3'],
+    excludeFromAverage: true,
+  },
+  {
+    id: 'at4',
+    name: 'Avaliação Diagnóstica',
+    description: 'Avaliação inicial para identificar conhecimentos prévios.',
+    applicableSerieAnoIds: ['sa1', 'sa2', 'sa3', 'sa4', 'sa5', 'sa6', 'sa7', 'sa8', 'sa9'],
+    excludeFromAverage: false,
+  },
+  {
+    id: 'at5',
+    name: 'Avaliação Formativa',
+    description: 'Avaliação contínua durante o processo de aprendizagem.',
+    applicableSerieAnoIds: ['sa1', 'sa2', 'sa3', 'sa4', 'sa5', 'sa6', 'sa7', 'sa8', 'sa9', 'em1', 'em2', 'em3'],
+    excludeFromAverage: false,
+  },
+  {
+    id: 'at6',
+    name: 'Prova de Recuperação',
+    description: 'Avaliação para recuperação de notas abaixo da média.',
+    applicableSerieAnoIds: ['sa1', 'sa2', 'sa3', 'sa4', 'sa5', 'sa6', 'sa7', 'sa8', 'sa9', 'em1', 'em2', 'em3'],
+    excludeFromAverage: false,
+  },
+  {
+    id: 'at7',
+    name: 'ENEM',
+    description: 'Exame Nacional do Ensino Médio.',
+    applicableSerieAnoIds: ['em1', 'em2', 'em3'],
+    excludeFromAverage: true,
+  },
+  {
+    id: 'at8',
+    name: 'SAEB',
+    description: 'Sistema de Avaliação da Educação Básica.',
+    applicableSerieAnoIds: ['sa5', 'sa9'],
     excludeFromAverage: true,
   },
 ]
 
-export const mockSchools: School[] = [
+// Usar dados expandidos se disponíveis, senão usar dados básicos
+export const mockSchools: School[] = expandedMockSchools.length > 0 ? expandedMockSchools : [
   {
     id: '1',
     code: 'ESC-001',
@@ -591,6 +1330,7 @@ export const mockSchools: School[] = [
       {
         id: 'y2024',
         name: '2024',
+        ano: 2024,
         startDate: '2024-02-01',
         endDate: '2024-12-15',
         status: 'active',
@@ -620,13 +1360,15 @@ export const mockSchools: School[] = [
             endDate: '2024-12-15',
           },
         ],
-        classes: [
+        turmas: [
           {
             id: 'cl1',
             name: '5º Ano A',
             shift: 'Matutino',
-            gradeId: 'g5',
-            gradeName: '5º Ano',
+            serieAnoId: 'sa5',
+            serieAnoName: '5º Ano',
+            etapaEnsinoId: 'e1',
+            etapaEnsinoName: 'Ensino Fundamental - Anos Iniciais',
             studentCount: 25,
             acronym: '5A-M',
             operatingHours: '07:00 - 12:00',
@@ -634,13 +1376,17 @@ export const mockSchools: School[] = [
             operatingDays: ['seg', 'ter', 'qua', 'qui', 'sex'],
             isMultiGrade: false,
             maxDependencySubjects: 2,
+            educationModality: 'Regular',
+            tipoRegime: 'Seriado',
           },
           {
             id: 'cl2',
             name: '1º Ano A',
             shift: 'Vespertino',
-            gradeId: 'g1',
-            gradeName: '1º Ano',
+            serieAnoId: 'sa1',
+            serieAnoName: '1º Ano',
+            etapaEnsinoId: 'e1',
+            etapaEnsinoName: 'Ensino Fundamental - Anos Iniciais',
             studentCount: 20,
             acronym: '1A-V',
             operatingHours: '13:00 - 18:00',
@@ -648,6 +1394,8 @@ export const mockSchools: School[] = [
             operatingDays: ['seg', 'ter', 'qua', 'qui', 'sex'],
             isMultiGrade: false,
             maxDependencySubjects: 0,
+            educationModality: 'Regular',
+            tipoRegime: 'Seriado',
           },
         ],
       },
@@ -682,7 +1430,7 @@ export const mockSchools: School[] = [
   },
 ]
 
-export const mockTeachers: Teacher[] = [
+export const mockTeachers: Teacher[] = expandedMockTeachers.length > 0 ? expandedMockTeachers : [
   {
     id: '1',
     name: 'Prof. Alberto Campos',
@@ -715,19 +1463,22 @@ export interface User {
   id: string
   name: string
   email: string
-  password?: string
+  password?: string // DEPRECATED: Usar passwordHash. Mantido para compatibilidade durante migração
+  passwordHash?: string // Hash da senha (bcrypt)
   role: UserRole
   schoolIds?: string[]
   schoolId?: string
   createdAt: string
 }
 
+// Senha padrão: 'Tiko6273@' (hash gerado com bcrypt, salt rounds: 10)
+// Hash: $2b$10$8j36teGplmOkuPjI.7XjseTqbtgQxrYtjnymxja//VqOQ4M7qNR1a
 export const initialUsers: User[] = [
   {
     id: '1',
     name: 'JUNIELSON FARIAS',
     email: 'junielsonfarias@gmail.com',
-    password: 'Tiko6273@',
+    passwordHash: '$2b$10$8j36teGplmOkuPjI.7XjseTqbtgQxrYtjnymxja//VqOQ4M7qNR1a', // Tiko6273@
     role: 'admin',
     createdAt: new Date().toISOString(),
   },
@@ -735,6 +1486,7 @@ export const initialUsers: User[] = [
 
 export interface Enrollment {
   id: string
+  studentId?: string // ID do aluno (para validações)
   schoolId: string
   academicYearId?: string // ID do ano letivo (preferencial)
   classroomId?: string // ID da turma (preferencial)
@@ -742,6 +1494,7 @@ export interface Enrollment {
   year: number // Ano numérico (mantido para compatibilidade)
   status: 'Cursando' | 'Aprovado' | 'Reprovado' | 'Transferido' | 'Abandono'
   type: 'regular' | 'dependency'
+  enrollmentDate?: string // Data de matrícula (ISO string)
 }
 
 export interface Student {
@@ -801,7 +1554,7 @@ export interface Student {
   fatherEducation?: string
 }
 
-export const mockStudents: Student[] = [
+export const mockStudents: Student[] = expandedMockStudents.length > 0 ? expandedMockStudents : [
   {
     id: '1',
     registration: 'EDU-2024001',
@@ -877,7 +1630,7 @@ export const mockProjects: Project[] = [
   },
 ]
 
-export const mockAssessments: Assessment[] = [
+export const mockAssessments: Assessment[] = expandedMockAssessments.length > 0 ? expandedMockAssessments : [
   {
     id: 'as1',
     studentId: '1',
@@ -952,9 +1705,9 @@ export const mockAssessments: Assessment[] = [
   },
 ]
 
-export const mockAttendance: AttendanceRecord[] = []
+export const mockAttendance: AttendanceRecord[] = expandedMockAttendance.length > 0 ? expandedMockAttendance : []
 
-export const mockOccurrences: Occurrence[] = [
+export const mockOccurrences: Occurrence[] = expandedMockOccurrences.length > 0 ? expandedMockOccurrences : [
   {
     id: 'occ1',
     studentId: '1',
@@ -1000,7 +1753,8 @@ export const mockLessonPlans: LessonPlan[] = [
 
 // --- Mock Data for Website ---
 
-export const mockNews: NewsPost[] = [
+// Usar dados expandidos se disponíveis, senão usar dados básicos
+export const mockNews: NewsPost[] = expandedMockNews.length > 0 ? expandedMockNews : [
   {
     id: '1',
     title: 'Volta às Aulas 2025',
@@ -1026,7 +1780,8 @@ export const mockNews: NewsPost[] = [
   },
 ]
 
-export const mockPublicDocuments: PublicDocument[] = [
+// Usar dados expandidos se disponíveis, senão usar dados básicos
+export const mockPublicDocuments: PublicDocument[] = expandedMockPublicDocuments.length > 0 ? expandedMockPublicDocuments : [
   {
     id: '1',
     organ: 'SEMED',
@@ -1051,7 +1806,8 @@ export const mockPublicDocuments: PublicDocument[] = [
   },
 ]
 
-export const mockInstitutionalContent: InstitutionalContent[] = [
+// Usar dados expandidos se disponíveis, senão usar dados básicos
+export const mockInstitutionalContent: InstitutionalContent[] = expandedMockInstitutionalContent.length > 0 ? expandedMockInstitutionalContent : [
   {
     section: 'semed_info',
     title: 'Sobre a SEMED',
@@ -1093,3 +1849,186 @@ export const mockAlertRules: AlertRule[] = [
     active: true,
   },
 ]
+
+// --- Interfaces para Conselho de Classe ---
+
+export interface CouncilMember {
+  id: string
+  name: string
+  role: 'director' | 'coordinator' | 'teacher' | 'pedagogue' | 'other'
+  signature?: string
+}
+
+export interface StudentCouncilAnalysis {
+  studentId: string
+  studentName: string
+  overallPerformance: 'excellent' | 'good' | 'regular' | 'poor'
+  attendanceRate: number
+  averageGrade: number
+  subjectsWithIssues: Array<{
+    subjectId: string
+    subjectName: string
+    periodId: string
+    periodName: string
+    grade: number
+    issue: string
+  }>
+  recoveryActivities: Array<{
+    subjectId: string
+    subjectName: string
+    activity: string
+    deadline?: string
+  }>
+  observations: string
+  finalDecision: 'approved' | 'approved_with_recovery' | 'dependency' | 'retained' | 'pending'
+  dependencySubjects?: string[]
+}
+
+export interface ClassCouncil {
+  id: string
+  schoolId: string
+  academicYearId: string
+  classroomId: string
+  classroomName: string
+  date: string
+  periodId: string
+  periodName: string
+  type: 'bimestral' | 'final' | 'extraordinary'
+  status: 'scheduled' | 'in_progress' | 'completed' | 'cancelled'
+  members: CouncilMember[]
+  studentsAnalysis: StudentCouncilAnalysis[]
+  generalObservations: string
+  decisions: Array<{
+    id: string
+    description: string
+    responsible: string
+    deadline?: string
+  }>
+  minutes: string
+  createdAt: string
+  updatedAt: string
+  createdBy: string
+}
+
+export const mockClassCouncils: ClassCouncil[] = []
+
+// --- Interfaces para Anexos de Documentos ---
+
+export type AttachmentEntityType = 'student' | 'teacher' | 'school' | 'enrollment' | 'assessment' | 'occurrence' | 'protocol' | 'council'
+
+export type AttachmentCategory =
+  | 'identity'
+  | 'academic'
+  | 'medical'
+  | 'legal'
+  | 'financial'
+  | 'administrative'
+  | 'other'
+
+export interface DocumentAttachment {
+  id: string
+  entityType: AttachmentEntityType
+  entityId: string
+  category: AttachmentCategory
+  name: string
+  description?: string
+  fileName: string
+  fileType: string
+  fileSize: number // em bytes
+  fileUrl: string
+  uploadedBy: string
+  uploadedAt: string
+  isPublic: boolean
+  tags?: string[]
+}
+
+export const mockDocumentAttachments: DocumentAttachment[] = []
+
+// --- Interfaces para Transferência Automática ---
+
+export interface StudentTransfer {
+  id: string
+  studentId: string
+  studentName: string
+  fromSchoolId: string
+  fromSchoolName: string
+  toSchoolId?: string
+  toSchoolName?: string
+  toSchoolExternal?: string
+  type: 'internal' | 'external'
+  reason: string
+  transferDate: string
+  status: 'pending' | 'approved' | 'rejected' | 'completed'
+  academicYearId: string
+  fromClassroomId?: string
+  toClassroomId?: string
+  transferHistory: boolean
+  transferAssessments: boolean
+  transferDocuments: boolean
+  notificationSent: boolean
+  notificationSentAt?: string
+  approvedBy?: string
+  approvedAt?: string
+  notes?: string
+  createdAt: string
+  updatedAt: string
+  createdBy: string
+}
+
+export const mockStudentTransfers: StudentTransfer[] = []
+
+// --- Interfaces para Funcionários (Não-Docentes) ---
+
+export type StaffRole =
+  | 'secretary'
+  | 'coordinator'
+  | 'director'
+  | 'pedagogue'
+  | 'librarian'
+  | 'janitor'
+  | 'cook'
+  | 'security'
+  | 'nurse'
+  | 'psychologist'
+  | 'social_worker'
+  | 'administrative'
+  | 'other'
+
+export interface Staff {
+  id: string
+  name: string
+  cpf?: string
+  email: string
+  phone: string
+  photo?: string
+  role: StaffRole
+  roleLabel: string // Nome legível do cargo
+  schoolId?: string // ID da escola onde trabalha (opcional, pode ser da secretaria)
+  admissionDate: string
+  employmentBond: 'Contratado' | 'Efetivo' | 'Terceirizado' | 'Estagiário'
+  contractType: 'CLT' | 'Estatutário' | 'Terceirizado' | 'Estágio'
+  functionalSituation: 'efetivo' | 'temporario' | 'terceirizado' | 'estagiario'
+  workload: number // Carga horária semanal
+  salary?: number
+  status: 'active' | 'inactive' | 'on_leave'
+  address?: {
+    street: string
+    number: string
+    neighborhood: string
+    city: string
+    state: string
+    zipCode: string
+  }
+  emergencyContact?: {
+    name: string
+    phone: string
+    relationship: string
+  }
+  qualifications?: string[]
+  certifications?: string[]
+  observations?: string
+  createdAt: string
+  updatedAt: string
+}
+
+export const mockStaff: Staff[] = expandedMockStaff.length > 0 ? expandedMockStaff : []

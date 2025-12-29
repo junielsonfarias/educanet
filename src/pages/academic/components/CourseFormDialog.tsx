@@ -20,9 +20,33 @@ import {
 } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import { FormDescription } from '@/components/ui/form'
+import { validateEtapaEnsinoCode, ETAPA_ENSINO_CODES } from '@/lib/validations'
+
+// Códigos INEP para Etapas de Ensino (Censo Escolar)
+const CODIGOS_CENSO = Object.entries(ETAPA_ENSINO_CODES).map(([code, data]) => ({
+  codigo: code,
+  name: data.name,
+}))
 
 const courseSchema = z.object({
-  name: z.string().min(3, 'Nome do curso deve ter pelo menos 3 caracteres'),
+  name: z.string().min(3, 'Nome da etapa de ensino deve ter pelo menos 3 caracteres'),
+  codigoCenso: z
+    .string()
+    .min(1, 'Código do Censo Escolar é obrigatório')
+    .refine(
+      (val) => validateEtapaEnsinoCode(val).valid,
+      (val) => ({
+        message: validateEtapaEnsinoCode(val).error || 'Código do Censo Escolar inválido',
+      }),
+    ),
 })
 
 interface CourseFormDialogProps {
@@ -42,6 +66,7 @@ export function CourseFormDialog({
     resolver: zodResolver(courseSchema),
     defaultValues: {
       name: '',
+      codigoCenso: '',
     },
   })
 
@@ -50,14 +75,17 @@ export function CourseFormDialog({
       if (initialData) {
         form.reset({
           name: initialData.name,
+          codigoCenso: initialData.codigoCenso || '',
         })
       } else {
         form.reset({
           name: '',
+          codigoCenso: '',
         })
       }
     }
-  }, [open, initialData, form])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, initialData?.id])
 
   const handleSubmit = (data: z.infer<typeof courseSchema>) => {
     onSubmit(data)
@@ -69,12 +97,12 @@ export function CourseFormDialog({
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
           <DialogTitle>
-            {initialData ? 'Editar Curso' : 'Novo Curso'}
+            {initialData ? 'Editar Etapa de Ensino' : 'Nova Etapa de Ensino'}
           </DialogTitle>
           <DialogDescription>
             {initialData
-              ? 'Atualize o nome do curso.'
-              : 'Crie um novo curso para a rede de ensino.'}
+              ? 'Atualize os dados da etapa de ensino.'
+              : 'Crie uma nova etapa de ensino conforme Censo Escolar (INEP).'}
           </DialogDescription>
         </DialogHeader>
         <Form {...form}>
@@ -84,13 +112,53 @@ export function CourseFormDialog({
           >
             <FormField
               control={form.control}
+              name="codigoCenso"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Código do Censo Escolar (INEP) *</FormLabel>
+                  <Select
+                    onValueChange={(value) => {
+                      field.onChange(value)
+                      // Preenche automaticamente o nome baseado no código
+                      const selected = CODIGOS_CENSO.find((c) => c.codigo === value)
+                      if (selected && !form.getValues('name')) {
+                        form.setValue('name', selected.name)
+                      }
+                    }}
+                    defaultValue={field.value}
+                  >
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecione o código INEP..." />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {CODIGOS_CENSO.map((item) => (
+                        <SelectItem key={item.codigo} value={item.codigo}>
+                          {item.codigo} - {item.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormDescription>
+                    Código oficial do Censo Escolar (Educacenso) do INEP
+                  </FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
               name="name"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Nome do Curso</FormLabel>
+                  <FormLabel>Nome da Etapa de Ensino *</FormLabel>
                   <FormControl>
-                    <Input placeholder="Ex: Ensino Fundamental" {...field} />
+                    <Input placeholder="Ex: Ensino Fundamental - Anos Iniciais" {...field} />
                   </FormControl>
+                  <FormDescription>
+                    Nome descritivo da etapa de ensino
+                  </FormDescription>
                   <FormMessage />
                 </FormItem>
               )}

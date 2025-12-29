@@ -58,7 +58,7 @@ import { cn } from '@/lib/utils'
 export default function IndividualPerformanceReport() {
   const { students } = useStudentStore()
   const { assessments, assessmentTypes } = useAssessmentStore()
-  const { courses, evaluationRules } = useCourseStore()
+  const { etapasEnsino, evaluationRules } = useCourseStore()
   const { schools } = useSchoolStore()
   const { settings } = useSettingsStore()
 
@@ -102,23 +102,24 @@ export default function IndividualPerformanceReport() {
     const academicYear = school?.academicYears.find(
       (y) => y.name === selectedEnrollment.year.toString(),
     )
-    const classroom = academicYear?.classes.find(
+    const turmas = academicYear?.turmas || academicYear?.classes || []
+    const classroom = turmas.find(
       (c) => c.name === selectedEnrollment.grade,
     )
 
     let gradeStructure: any = null
     let courseEvaluationRule: any = null
 
-    for (const course of courses) {
-      const g = course.grades.find(
-        (gr) =>
-          gr.name === selectedEnrollment.grade ||
-          (classroom && gr.id === classroom.gradeId),
+    for (const etapaEnsino of etapasEnsino) {
+      const s = etapaEnsino.seriesAnos.find(
+        (sr) =>
+          sr.name === selectedEnrollment.grade ||
+          (classroom && sr.id === classroom.serieAnoId),
       )
-      if (g) {
-        gradeStructure = g
+      if (s) {
+        gradeStructure = s
         courseEvaluationRule = evaluationRules.find(
-          (r) => r.id === g.evaluationRuleId,
+          (r) => r.id === s.evaluationRuleId,
         )
         break
       }
@@ -171,7 +172,7 @@ export default function IndividualPerformanceReport() {
     student,
     selectedEnrollment,
     schools,
-    courses,
+    etapasEnsino,
     evaluationRules,
     assessments,
     assessmentTypes,

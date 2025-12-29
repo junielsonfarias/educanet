@@ -47,6 +47,8 @@ import useSchoolStore from '@/stores/useSchoolStore'
 import { SchoolFormDialog } from './components/SchoolFormDialog'
 import { School } from '@/lib/mock-data'
 import { useToast } from '@/hooks/use-toast'
+import { usePermissions } from '@/hooks/usePermissions'
+import { RequirePermission } from '@/components/RequirePermission'
 
 export default function SchoolsList() {
   const { schools, addSchool, updateSchool, deleteSchool } = useSchoolStore()
@@ -57,6 +59,7 @@ export default function SchoolsList() {
 
   const navigate = useNavigate()
   const { toast } = useToast()
+  const { hasPermission } = usePermissions()
 
   const filteredSchools = schools.filter(
     (school) =>
@@ -115,10 +118,17 @@ export default function SchoolsList() {
             Gerencie as unidades escolares da rede municipal.
           </p>
         </div>
-        <Button onClick={openCreateDialog} className="w-full sm:w-auto">
-          <Plus className="mr-2 h-4 w-4" />
-          Nova Escola
-        </Button>
+        <RequirePermission permission="create:school">
+          <Button 
+            onClick={openCreateDialog} 
+            className="w-full sm:w-auto bg-gradient-to-r from-primary via-blue-600 to-primary bg-size-200 bg-pos-0 hover:bg-pos-100 text-white shadow-lg hover:shadow-xl transition-all duration-500 transform hover:scale-105 font-semibold"
+          >
+            <div className="p-1 rounded-md bg-white/20 mr-2">
+              <Plus className="h-5 w-5" />
+            </div>
+            Nova Escola
+          </Button>
+        </RequirePermission>
       </div>
 
       <Card>
@@ -171,7 +181,7 @@ export default function SchoolsList() {
                   filteredSchools.map((school) => (
                     <TableRow
                       key={school.id}
-                      className="cursor-pointer hover:bg-muted/50"
+                      className="cursor-pointer border-l-4 border-l-transparent hover:border-l-primary hover:bg-gradient-to-r hover:from-primary/5 hover:to-transparent transition-all duration-200"
                       onClick={() => navigate(`/escolas/${school.id}`)}
                     >
                       <TableCell
@@ -204,10 +214,17 @@ export default function SchoolsList() {
                       </TableCell>
                       <TableCell>
                         <Badge
-                          variant={
-                            school.status === 'active' ? 'default' : 'secondary'
-                          }
+                          className={`flex items-center gap-1.5 px-2.5 py-1 font-medium ${
+                            school.status === 'active'
+                              ? 'bg-gradient-to-r from-green-500 to-emerald-600 text-white shadow-md'
+                              : 'bg-gradient-to-r from-gray-400 to-gray-500 text-white'
+                          }`}
                         >
+                          <div
+                            className={`h-2 w-2 rounded-full ${
+                              school.status === 'active' ? 'bg-white' : 'bg-white/80'
+                            }`}
+                          />
                           {school.status === 'active' ? 'Ativa' : 'Inativa'}
                         </Badge>
                       </TableCell>
@@ -233,23 +250,27 @@ export default function SchoolsList() {
                             >
                               Ver Detalhes
                             </DropdownMenuItem>
-                            <DropdownMenuItem
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                openEditDialog(school)
-                              }}
-                            >
-                              Editar Dados
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                              className="text-destructive focus:text-destructive"
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                setDeleteId(school.id)
-                              }}
-                            >
-                              Excluir
-                            </DropdownMenuItem>
+                            <RequirePermission permission="edit:school">
+                              <DropdownMenuItem
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  openEditDialog(school)
+                                }}
+                              >
+                                Editar Dados
+                              </DropdownMenuItem>
+                            </RequirePermission>
+                            <RequirePermission permission="delete:school">
+                              <DropdownMenuItem
+                                className="text-destructive focus:text-destructive"
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  setDeleteId(school.id)
+                                }}
+                              >
+                                Excluir
+                              </DropdownMenuItem>
+                            </RequirePermission>
                           </DropdownMenuContent>
                         </DropdownMenu>
                       </TableCell>

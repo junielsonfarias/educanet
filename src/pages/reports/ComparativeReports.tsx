@@ -28,6 +28,7 @@ import {
 import { School, CheckSquare, X } from 'lucide-react'
 import useSchoolStore from '@/stores/useSchoolStore'
 import useStudentStore from '@/stores/useStudentStore'
+import { SafeChart } from '@/components/charts/SafeChart'
 
 export default function ComparativeReports() {
   const { schools } = useSchoolStore()
@@ -151,32 +152,42 @@ export default function ComparativeReports() {
               <CardTitle>Gráfico Comparativo</CardTitle>
             </CardHeader>
             <CardContent>
-              <ResponsiveContainer width="100%" height={400}>
-                <BarChart
-                  data={comparisonData}
-                  margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
-                >
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                  <XAxis dataKey="shortName" />
-                  <YAxis />
-                  <Tooltip cursor={{ fill: 'transparent' }} />
-                  <Legend />
-                  <Bar
-                    dataKey={
-                      selectedMetric === 'approval'
-                        ? 'approvalRate'
-                        : 'students'
-                    }
-                    name={
-                      selectedMetric === 'approval'
-                        ? 'Aprovação (%)'
-                        : 'Total Alunos'
-                    }
-                    fill="hsl(var(--primary))"
-                    radius={[4, 4, 0, 0]}
-                  />
-                </BarChart>
-              </ResponsiveContainer>
+              <SafeChart
+                data={comparisonData}
+                minHeight={400}
+                validateData={(data) =>
+                  Array.isArray(data) &&
+                  data.length > 0 &&
+                  data[0]?.shortName !== undefined
+                }
+              >
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart
+                    data={comparisonData}
+                    margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
+                  >
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                    <XAxis dataKey="shortName" />
+                    <YAxis />
+                    <Tooltip cursor={{ fill: 'transparent' }} />
+                    <Legend />
+                    <Bar
+                      dataKey={
+                        selectedMetric === 'approval'
+                          ? 'approvalRate'
+                          : 'students'
+                      }
+                      name={
+                        selectedMetric === 'approval'
+                          ? 'Aprovação (%)'
+                          : 'Total Alunos'
+                      }
+                      fill="hsl(var(--primary))"
+                      radius={[4, 4, 0, 0]}
+                    />
+                  </BarChart>
+                </ResponsiveContainer>
+              </SafeChart>
             </CardContent>
           </Card>
 

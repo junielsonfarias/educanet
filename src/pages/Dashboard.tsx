@@ -17,7 +17,6 @@ import {
   XAxis,
   Line,
   LineChart,
-  ResponsiveContainer,
 } from 'recharts'
 import {
   School,
@@ -66,15 +65,16 @@ export default function Dashboard() {
     switch (key) {
       case 'totalStudents':
         return (
-          <Card className="hover:shadow-md transition-shadow h-full">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">
-                Total de Alunos
-              </CardTitle>
-              <Users className="h-4 w-4 text-muted-foreground" />
+          <Card className="relative overflow-hidden bg-gradient-to-br from-white via-blue-50/50 to-white border-blue-200/50 hover:border-blue-300 hover:shadow-xl transition-all duration-300 group h-full">
+            <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-blue-500/10 to-transparent rounded-full blur-2xl opacity-0 group-hover:opacity-100 transition-opacity" />
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 relative z-10">
+              <CardTitle className="text-sm font-medium">Total de Alunos</CardTitle>
+              <div className="p-2.5 rounded-lg bg-gradient-to-br from-blue-50 to-blue-100">
+                <Users className="h-5 w-5 text-blue-600" />
+              </div>
             </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">1,500</div>
+            <CardContent className="relative z-10">
+              <div className="text-2xl font-bold text-blue-700">1,500</div>
               <p className="text-xs text-muted-foreground">
                 +12% em relação ao mês passado
               </p>
@@ -83,15 +83,16 @@ export default function Dashboard() {
         )
       case 'activeSchools':
         return (
-          <Card className="hover:shadow-md transition-shadow h-full">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">
-                Escolas Ativas
-              </CardTitle>
-              <School className="h-4 w-4 text-muted-foreground" />
+          <Card className="relative overflow-hidden bg-gradient-to-br from-white via-primary/5 to-white border-primary/20 hover:border-primary/40 hover:shadow-xl transition-all duration-300 group h-full">
+            <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-primary/10 to-transparent rounded-full blur-2xl opacity-0 group-hover:opacity-100 transition-opacity" />
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 relative z-10">
+              <CardTitle className="text-sm font-medium">Escolas Ativas</CardTitle>
+              <div className="p-2.5 rounded-lg bg-gradient-to-br from-primary/10 to-primary/20">
+                <School className="h-5 w-5 text-primary" />
+              </div>
             </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">12</div>
+            <CardContent className="relative z-10">
+              <div className="text-2xl font-bold text-primary">12</div>
               <p className="text-xs text-muted-foreground">
                 Todas em funcionamento
               </p>
@@ -100,13 +101,16 @@ export default function Dashboard() {
         )
       case 'totalClasses':
         return (
-          <Card className="hover:shadow-md transition-shadow h-full">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <Card className="relative overflow-hidden bg-gradient-to-br from-white via-purple-50/50 to-white border-purple-200/50 hover:border-purple-300 hover:shadow-xl transition-all duration-300 group h-full">
+            <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-purple-500/10 to-transparent rounded-full blur-2xl opacity-0 group-hover:opacity-100 transition-opacity" />
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 relative z-10">
               <CardTitle className="text-sm font-medium">Turmas</CardTitle>
-              <BookOpen className="h-4 w-4 text-muted-foreground" />
+              <div className="p-2.5 rounded-lg bg-gradient-to-br from-purple-50 to-purple-100">
+                <BookOpen className="h-5 w-5 text-purple-600" />
+              </div>
             </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">48</div>
+            <CardContent className="relative z-10">
+              <div className="text-2xl font-bold text-purple-700">48</div>
               <p className="text-xs text-muted-foreground">
                 5 turmas com vagas abertas
               </p>
@@ -115,15 +119,16 @@ export default function Dashboard() {
         )
       case 'approvalRate':
         return (
-          <Card className="hover:shadow-md transition-shadow h-full">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">
-                Taxa de Aprovação
-              </CardTitle>
-              <TrendingUp className="h-4 w-4 text-muted-foreground" />
+          <Card className="relative overflow-hidden bg-gradient-to-br from-white via-green-50/50 to-white border-green-200/50 hover:border-green-300 hover:shadow-xl transition-all duration-300 group h-full">
+            <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-green-500/10 to-transparent rounded-full blur-2xl opacity-0 group-hover:opacity-100 transition-opacity" />
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 relative z-10">
+              <CardTitle className="text-sm font-medium">Taxa de Aprovação</CardTitle>
+              <div className="p-2.5 rounded-lg bg-gradient-to-br from-green-50 to-green-100">
+                <TrendingUp className="h-5 w-5 text-green-600" />
+              </div>
             </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">94.2%</div>
+            <CardContent className="relative z-10">
+              <div className="text-2xl font-bold text-green-700">94.2%</div>
               <p className="text-xs text-muted-foreground">
                 +2.1% desde o último ano
               </p>
@@ -146,25 +151,23 @@ export default function Dashboard() {
                 }}
                 className="h-[300px] w-full"
               >
-                <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={enrollmentData}>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                    <XAxis
-                      dataKey="month"
-                      tickLine={false}
-                      axisLine={false}
-                      tickMargin={10}
-                    />
-                    <ChartTooltip content={<ChartTooltipContent />} />
-                    <Line
-                      type="monotone"
-                      dataKey="alunos"
-                      strokeWidth={2}
-                      activeDot={{ r: 8 }}
-                      stroke="var(--color-alunos)"
-                    />
-                  </LineChart>
-                </ResponsiveContainer>
+                <LineChart data={enrollmentData} width={391} height={300}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                  <XAxis
+                    dataKey="month"
+                    tickLine={false}
+                    axisLine={false}
+                    tickMargin={10}
+                  />
+                  <ChartTooltip content={<ChartTooltipContent />} />
+                  <Line
+                    type="monotone"
+                    dataKey="alunos"
+                    strokeWidth={2}
+                    activeDot={{ r: 8 }}
+                    stroke="var(--color-alunos)"
+                  />
+                </LineChart>
               </ChartContainer>
             </CardContent>
           </Card>
@@ -183,30 +186,30 @@ export default function Dashboard() {
                 }}
                 className="h-[300px] w-full"
               >
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart
-                    data={performanceData}
-                    layout="vertical"
-                    margin={{ left: 20 }}
-                  >
-                    <CartesianGrid strokeDasharray="3 3" horizontal={false} />
-                    <XAxis type="number" domain={[0, 10]} hide />
-                    <ChartTooltip content={<ChartTooltipContent />} />
-                    <Bar
-                      dataKey="media"
-                      fill="var(--color-media)"
-                      radius={[0, 4, 4, 0]}
-                      barSize={32}
-                    />
-                    <XAxis
-                      type="category"
-                      dataKey="subject"
-                      tickLine={false}
-                      axisLine={false}
-                      hide
-                    />
-                  </BarChart>
-                </ResponsiveContainer>
+                <BarChart
+                  data={performanceData}
+                  layout="vertical"
+                  margin={{ left: 20 }}
+                  width={375}
+                  height={300}
+                >
+                  <CartesianGrid strokeDasharray="3 3" horizontal={false} />
+                  <XAxis type="number" domain={[0, 10]} hide />
+                  <ChartTooltip content={<ChartTooltipContent />} />
+                  <Bar
+                    dataKey="media"
+                    fill="var(--color-media)"
+                    radius={[0, 4, 4, 0]}
+                    barSize={32}
+                  />
+                  <XAxis
+                    type="category"
+                    dataKey="subject"
+                    tickLine={false}
+                    axisLine={false}
+                    hide
+                  />
+                </BarChart>
               </ChartContainer>
               <div className="mt-4 space-y-2">
                 {performanceData.map((item) => (

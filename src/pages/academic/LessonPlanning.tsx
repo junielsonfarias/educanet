@@ -43,6 +43,7 @@ import useUserStore from '@/stores/useUserStore'
 import useSchoolStore from '@/stores/useSchoolStore'
 import useCourseStore from '@/stores/useCourseStore'
 import { useToast } from '@/hooks/use-toast'
+import { RequirePermission } from '@/components/RequirePermission'
 
 const planSchema = z.object({
   schoolId: z.string().min(1, 'Escola é obrigatória'),
@@ -61,7 +62,7 @@ export default function LessonPlanning() {
   const { lessonPlans, addLessonPlan } = useLessonPlanStore()
   const { currentUser } = useUserStore()
   const { schools } = useSchoolStore()
-  const { courses } = useCourseStore()
+  const { etapasEnsino } = useCourseStore()
   const { toast } = useToast()
 
   const [open, setOpen] = useState(false)
@@ -95,24 +96,26 @@ export default function LessonPlanning() {
     if (!selectedYearId || !selectedSchoolId) return []
     const school = schools.find((s) => s.id === selectedSchoolId)
     const year = school?.academicYears.find((y) => y.id === selectedYearId)
-    return year?.classes || []
+    const turmas = year?.turmas || []
+    return turmas
   }, [schools, selectedSchoolId, selectedYearId])
 
   const availableSubjects = useMemo(() => {
     if (!selectedClassId || !selectedYearId || !selectedSchoolId) return []
     const school = schools.find((s) => s.id === selectedSchoolId)
     const year = school?.academicYears.find((y) => y.id === selectedYearId)
-    const classroom = year?.classes.find((c) => c.id === selectedClassId)
+    const turmas = year?.turmas || []
+    const classroom = turmas.find((c) => c.id === selectedClassId)
 
     if (!classroom) return []
 
-    // Find grade and subjects
-    const course = courses.find((c) =>
-      c.grades.some((g) => g.id === classroom.gradeId),
+    // Find serieAno and subjects
+    const etapaEnsino = etapasEnsino.find((e) =>
+      e.seriesAnos.some((s) => s.id === classroom.serieAnoId),
     )
-    const grade = course?.grades.find((g) => g.id === classroom.gradeId)
-    return grade?.subjects || []
-  }, [schools, selectedSchoolId, selectedYearId, selectedClassId, courses])
+    const serieAno = etapaEnsino?.seriesAnos.find((s) => s.id === classroom.serieAnoId)
+    return serieAno?.subjects || []
+  }, [schools, selectedSchoolId, selectedYearId, selectedClassId, etapasEnsino])
 
   // Filter plans for current user
   const myPlans = useMemo(() => {
@@ -161,9 +164,16 @@ export default function LessonPlanning() {
 
         <Dialog open={open} onOpenChange={setOpen}>
           <DialogTrigger asChild>
-            <Button>
-              <Plus className="mr-2 h-4 w-4" /> Novo Plano de Aula
-            </Button>
+            <RequirePermission permission="create:assessment">
+              <Button
+                className="bg-gradient-to-r from-purple-500 via-purple-600 to-purple-500 bg-size-200 bg-pos-0 hover:bg-pos-100 text-white shadow-lg hover:shadow-xl transition-all duration-500 transform hover:scale-105 font-semibold"
+              >
+                <div className="p-1 rounded-md bg-white/20 mr-2">
+                  <Plus className="h-5 w-5" />
+                </div>
+                Novo Plano de Aula
+              </Button>
+            </RequirePermission>
           </DialogTrigger>
           <DialogContent className="sm:max-w-[800px] max-h-[90vh] overflow-y-auto">
             <DialogHeader>
@@ -408,8 +418,14 @@ export default function LessonPlanning() {
                 </div>
 
                 <div className="flex justify-end pt-4">
-                  <Button type="submit">
-                    <Save className="mr-2 h-4 w-4" /> Salvar Plano
+                  <Button 
+                    type="submit"
+                    className="bg-gradient-to-r from-purple-500 via-purple-600 to-purple-500 bg-size-200 bg-pos-0 hover:bg-pos-100 text-white shadow-lg hover:shadow-xl transition-all duration-500 transform hover:scale-105 font-semibold"
+                  >
+                    <div className="p-1 rounded-md bg-white/20 mr-2">
+                      <Save className="h-5 w-5" />
+                    </div>
+                    Salvar Plano
                   </Button>
                 </div>
               </form>

@@ -35,6 +35,7 @@ import useCourseStore from '@/stores/useCourseStore'
 import useStudentStore from '@/stores/useStudentStore'
 import useAssessmentStore from '@/stores/useAssessmentStore'
 import { cn } from '@/lib/utils'
+import { RequirePermission } from '@/components/RequirePermission'
 
 // --- Storage Key for Persistence ---
 const STORAGE_KEY = 'edu_assessment_filters_v2'
@@ -146,7 +147,7 @@ StudentRow.displayName = 'StudentRow'
 
 export default function AssessmentInput() {
   const { schools } = useSchoolStore()
-  const { courses, evaluationRules } = useCourseStore()
+  const { etapasEnsino, evaluationRules } = useCourseStore()
   const { students } = useStudentStore()
   const { assessments, addAssessment, assessmentTypes } = useAssessmentStore()
   const { toast } = useToast()
@@ -196,7 +197,9 @@ export default function AssessmentInput() {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(value))
     })
     return () => subscription.unsubscribe()
-  }, [form])
+    // form.watch é estável, mas incluímos para garantir que o subscription seja recriado se necessário
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   // --- Derived Options with Memoization ---
 
@@ -215,31 +218,37 @@ export default function AssessmentInput() {
     [academicYears, academicYearId],
   )
 
-  // Derive available Grades (Courses/Series) from classes in the selected year
+  // Derive available Grades (Series/Anos) from turmas in the selected year
   const availableGrades = useMemo(() => {
     if (!selectedYear) return []
-    const gradeIds = new Set(selectedYear.classes.map((c) => c.gradeId))
-    const flattenGrades = courses.flatMap((c) =>
-      c.grades.map((g) => ({ ...g, courseName: c.name })),
+    const turmas = selectedYear.turmas || []
+    const serieAnoIds = new Set(
+      turmas.map((c: any) => c.serieAnoId).filter(Boolean),
     )
-    return flattenGrades.filter((g) => gradeIds.has(g.id))
-  }, [selectedYear, courses])
+    const flattenSeriesAnos = (etapasEnsino || []).flatMap((e) =>
+      (e.seriesAnos || []).map((s) => ({ ...s, etapaEnsinoName: e.name })),
+    )
+    return flattenSeriesAnos.filter((s) => serieAnoIds.has(s.id))
+  }, [selectedYear, etapasEnsino])
 
   // Derive available Shifts based on selected Grade
   const availableShifts = useMemo(() => {
     if (!selectedYear || !gradeId) return []
-    const classesInGrade = selectedYear.classes.filter(
-      (c) => c.gradeId === gradeId,
+    const turmas = selectedYear.turmas || []
+    const classesInGrade = turmas.filter(
+      (c: any) => c.serieAnoId === gradeId,
     )
-    const shifts = new Set(classesInGrade.map((c) => c.shift))
+    const shifts = new Set(classesInGrade.map((c: any) => c.shift))
     return Array.from(shifts)
   }, [selectedYear, gradeId])
 
   // Derive available Classes based on Grade AND Shift
   const availableClasses = useMemo(() => {
     if (!selectedYear || !gradeId || !shift) return []
-    return selectedYear.classes.filter(
-      (c) => c.gradeId === gradeId && c.shift === shift,
+    const turmas = selectedYear.turmas || []
+    return turmas.filter(
+      (c: any) =>
+        c.serieAnoId === gradeId && c.shift === shift,
     )
   }, [selectedYear, gradeId, shift])
 
@@ -269,9 +278,9 @@ export default function AssessmentInput() {
   const availableAssessmentTypes = useMemo(() => {
     if (!currentGradeStructure) return []
 
-    // Filter by grade
+    // Filter by grade/serieAno
     const gradeTypes = assessmentTypes.filter((t) =>
-      t.applicableGradeIds.includes(currentGradeStructure.id),
+      (t.applicableSerieAnoIds || t.applicableGradeIds || []).includes(currentGradeStructure.id),
     )
 
     // Filter by category
@@ -295,26 +304,31 @@ export default function AssessmentInput() {
     } else {
       form.setValue('academicYearId', '')
     }
-  }, [schoolId, academicYears, academicYearId, form])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [schoolId, academicYearId])
 
   useEffect(() => {
     const validGrade = availableGrades.find((g) => g.id === gradeId)
     if (!validGrade) form.setValue('gradeId', '')
-  }, [availableGrades, gradeId, form])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [gradeId])
 
   useEffect(() => {
     if (!availableShifts.includes(shift)) form.setValue('shift', '')
-  }, [availableShifts, shift, form])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [shift])
 
   useEffect(() => {
     const validClass = availableClasses.find((c) => c.id === classId)
     if (!validClass) form.setValue('classId', '')
-  }, [availableClasses, classId, form])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [classId])
 
   useEffect(() => {
     const validSubject = subjects.find((s) => s.id === subjectId)
     if (!validSubject) form.setValue('subjectId', '')
-  }, [subjects, subjectId, form])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [subjectId])
 
   // Reset assessment type if not in the new available list
   useEffect(() => {
@@ -324,7 +338,8 @@ export default function AssessmentInput() {
       )
       if (!exists) form.setValue('assessmentTypeId', '')
     }
-  }, [availableAssessmentTypes, assessmentTypeId, form])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [assessmentTypeId])
 
   // --- Load Grades Data ---
 
@@ -340,8 +355,8 @@ export default function AssessmentInput() {
       // Filter by school and active enrollment
       const targetClass = availableClasses.find((c) => c.id === classId)
 
-      const classStudents = students.filter((s) => {
-        const enrollment = s.enrollments.find((e) => e.status === 'Cursando')
+      const classStudents = (students || []).filter((s) => {
+        const enrollment = (s.enrollments || []).find((e) => e.status === 'Cursando')
         // Match Logic: School Match AND Grade Match.
         // Note: Enrollment.grade is usually the Class Name.
         return (
@@ -429,8 +444,8 @@ export default function AssessmentInput() {
     const values = form.getValues()
     const targetClass = availableClasses.find((c) => c.id === values.classId)
 
-    const classStudents = students.filter((s) => {
-      const enrollment = s.enrollments.find((e) => e.status === 'Cursando')
+    const classStudents = (students || []).filter((s) => {
+      const enrollment = (s.enrollments || []).find((e) => e.status === 'Cursando')
       return (
         enrollment &&
         enrollment.schoolId === values.schoolId &&
@@ -488,9 +503,9 @@ export default function AssessmentInput() {
     const targetClass = availableClasses.find((c) => c.id === classId)
     if (!targetClass) return []
 
-    return students
+    return (students || [])
       .filter((s) => {
-        const enrollment = s.enrollments.find((e) => e.status === 'Cursando')
+        const enrollment = (s.enrollments || []).find((e) => e.status === 'Cursando')
         return (
           enrollment &&
           enrollment.schoolId === schoolId &&
@@ -522,9 +537,13 @@ export default function AssessmentInput() {
         </p>
       </div>
 
-      <Card className="border-t-4 border-t-primary">
-        <CardHeader className="pb-4">
+      <Card className="relative overflow-hidden bg-gradient-to-br from-white via-purple-50/30 to-white border-purple-200/50 border-t-4 border-t-purple-500 hover:border-purple-600 hover:shadow-lg transition-all duration-300 group">
+        <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-purple-500/10 to-transparent rounded-full blur-2xl opacity-0 group-hover:opacity-100 transition-opacity" />
+        <CardHeader className="pb-4 relative z-10">
           <CardTitle className="flex items-center gap-2 text-lg">
+            <div className="p-2 rounded-lg bg-gradient-to-br from-purple-100 to-purple-200">
+              <Save className="h-5 w-5 text-purple-600" />
+            </div>
             <Filter className="h-5 w-5" />
             Filtros de Seleção
           </CardTitle>
@@ -612,7 +631,7 @@ export default function AssessmentInput() {
                             <SelectItem key={g.id} value={g.id}>
                               {g.name}{' '}
                               <span className="text-muted-foreground text-xs">
-                                ({g.courseName})
+                                ({g.etapaEnsinoName || g.courseName})
                               </span>
                             </SelectItem>
                           ))}
@@ -819,26 +838,40 @@ export default function AssessmentInput() {
 
       {/* Grid Display */}
       {isConfigComplete ? (
-        <Card className="animate-fade-in-up">
-          <CardHeader className="flex flex-row items-center justify-between">
+        <Card className="animate-fade-in-up relative overflow-hidden bg-gradient-to-br from-white via-purple-50/20 to-white border-purple-200/50 hover:shadow-lg transition-all duration-300">
+          <CardHeader className="flex flex-row items-center justify-between relative z-10">
             <div className="space-y-1">
-              <CardTitle>Diário de Classe</CardTitle>
+              <CardTitle className="flex items-center gap-2">
+                <div className="p-1.5 rounded-md bg-gradient-to-br from-purple-100 to-purple-200">
+                  <Save className="h-4 w-4 text-purple-600" />
+                </div>
+                Diário de Classe
+              </CardTitle>
               <CardDescription>
                 {filteredStudents.length} alunos listados
               </CardDescription>
             </div>
             <div className="flex gap-2">
-              <Badge variant="secondary" className="h-8 px-3">
+              <Badge className="h-8 px-3 bg-gradient-to-r from-purple-500/20 to-purple-600/20 text-purple-700 border-purple-300">
                 {evaluationRule?.name}
               </Badge>
-              <Button onClick={handleSave} disabled={loading} size="sm">
-                {loading ? (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                ) : (
-                  <Save className="mr-2 h-4 w-4" />
-                )}
-                Salvar Notas
-              </Button>
+              <RequirePermission permission="create:assessment">
+                <Button 
+                  onClick={handleSave} 
+                  disabled={loading} 
+                  size="sm"
+                  className="bg-gradient-to-r from-purple-500 via-purple-600 to-purple-500 bg-size-200 bg-pos-0 hover:bg-pos-100 text-white shadow-lg hover:shadow-xl transition-all duration-500 transform hover:scale-105 font-semibold disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
+                >
+                  {loading ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : (
+                    <div className="p-0.5 rounded-md bg-white/20 mr-2">
+                      <Save className="h-4 w-4" />
+                    </div>
+                  )}
+                  Salvar Notas
+                </Button>
+              </RequirePermission>
             </div>
           </CardHeader>
           <CardContent>
@@ -864,10 +897,12 @@ export default function AssessmentInput() {
                 ))}
 
                 <div className="flex justify-end pt-6 sticky bottom-4">
-                  <Button size="lg" onClick={handleSave} className="shadow-lg">
-                    <Save className="mr-2 h-4 w-4" />
-                    Salvar Alterações
-                  </Button>
+                  <RequirePermission permission="create:assessment">
+                    <Button size="lg" onClick={handleSave} className="shadow-lg">
+                      <Save className="mr-2 h-4 w-4" />
+                      Salvar Alterações
+                    </Button>
+                  </RequirePermission>
                 </div>
               </div>
             )}

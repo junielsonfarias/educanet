@@ -1,194 +1,292 @@
 import React, { createContext, useContext, useState, useEffect } from 'react'
 import {
-  Course,
-  mockCourses,
+  EtapaEnsino,
+  mockEtapasEnsino,
   EvaluationRule,
   mockEvaluationRules,
-  Grade,
+  SerieAno,
   Subject,
 } from '@/lib/mock-data'
+import { handleError } from '@/lib/error-handling'
+import { sanitizeStoreData } from '@/lib/data-sanitizer'
 
 interface CourseContextType {
-  courses: Course[]
+  etapasEnsino: EtapaEnsino[]
   evaluationRules: EvaluationRule[]
-  addCourse: (course: Omit<Course, 'id' | 'grades'>) => void
-  updateCourse: (id: string, data: Partial<Course>) => void
-  addGrade: (courseId: string, grade: Omit<Grade, 'id' | 'subjects'>) => void
-  updateGrade: (courseId: string, gradeId: string, data: Partial<Grade>) => void
+  addEtapaEnsino: (etapa: Omit<EtapaEnsino, 'id' | 'seriesAnos'>) => void
+  updateEtapaEnsino: (id: string, data: Partial<EtapaEnsino>) => void
+  addSerieAno: (etapaEnsinoId: string, serieAno: Omit<SerieAno, 'id' | 'subjects'>) => void
+  updateSerieAno: (etapaEnsinoId: string, serieAnoId: string, data: Partial<SerieAno>) => void
   addSubject: (
-    courseId: string,
-    gradeId: string,
+    etapaEnsinoId: string,
+    serieAnoId: string,
     subject: Omit<Subject, 'id'>,
   ) => void
   updateSubject: (
-    courseId: string,
-    gradeId: string,
+    etapaEnsinoId: string,
+    serieAnoId: string,
     subjectId: string,
     data: Partial<Subject>,
   ) => void
-  removeSubject: (courseId: string, gradeId: string, subjectId: string) => void
+  removeSubject: (etapaEnsinoId: string, serieAnoId: string, subjectId: string) => void
   addEvaluationRule: (rule: Omit<EvaluationRule, 'id'>) => void
   updateEvaluationRule: (id: string, rule: Partial<EvaluationRule>) => void
-  getCourse: (id: string) => Course | undefined
+  getEtapaEnsino: (id: string) => EtapaEnsino | undefined
+  // Aliases para compatibilidade (deprecated)
+  courses: EtapaEnsino[]
+  addCourse: (course: Omit<EtapaEnsino, 'id' | 'seriesAnos'>) => void
+  updateCourse: (id: string, data: Partial<EtapaEnsino>) => void
+  addGrade: (courseId: string, grade: Omit<SerieAno, 'id' | 'subjects'>) => void
+  updateGrade: (courseId: string, gradeId: string, data: Partial<SerieAno>) => void
+  getCourse: (id: string) => EtapaEnsino | undefined
 }
 
 const CourseContext = createContext<CourseContextType | null>(null)
 
 export const CourseProvider = ({ children }: { children: React.ReactNode }) => {
-  const [courses, setCourses] = useState<Course[]>(mockCourses)
+  const [etapasEnsino, setEtapasEnsino] = useState<EtapaEnsino[]>(mockEtapasEnsino)
   const [evaluationRules, setEvaluationRules] =
     useState<EvaluationRule[]>(mockEvaluationRules)
 
   useEffect(() => {
-    const storedCourses = localStorage.getItem('edu_courses')
-    if (storedCourses) setCourses(JSON.parse(storedCourses))
+    try {
+      // Migração: tenta buscar da nova key, se não encontrar, tenta da antiga
+      const storedEtapas = localStorage.getItem('edu_etapas_ensino')
+      const storedCourses = localStorage.getItem('edu_courses')
+      
+      if (storedEtapas) {
+        const parsed = JSON.parse(storedEtapas)
+        // Sanitizar dados usando utilitário centralizado
+        const sanitized = sanitizeStoreData<EtapaEnsino>(parsed, {
+          arrayFields: ['seriesAnos'],
+          customSanitizer: (e: any) => ({
+            ...e,
+            seriesAnos: Array.isArray(e.seriesAnos)
+              ? e.seriesAnos.map((s: any) => ({
+                  ...s,
+                  subjects: Array.isArray(s.subjects) ? s.subjects : [],
+                }))
+              : [],
+          }),
+          defaults: {} as Partial<EtapaEnsino>,
+        })
+        setEtapasEnsino(sanitized.length > 0 ? sanitized : mockEtapasEnsino)
+      } else if (storedCourses) {
+        // Migra dados antigos para nova estrutura
+        const oldCourses = JSON.parse(storedCourses)
+        // Sanitizar dados: garantir que todas as etapas tenham seriesAnos como array
+        const sanitized = sanitizeStoreData<EtapaEnsino>(oldCourses, {
+          arrayFields: ['seriesAnos'],
+          customSanitizer: (e: any) => ({
+            ...e,
+            seriesAnos: Array.isArray(e.seriesAnos)
+              ? e.seriesAnos.map((s: any) => ({
+                  ...s,
+                  subjects: Array.isArray(s.subjects) ? s.subjects : [],
+                }))
+              : Array.isArray(e.grades)
+                ? e.grades.map((g: any) => ({
+                    ...g,
+                    subjects: Array.isArray(g.subjects) ? g.subjects : [],
+                  }))
+                : [],
+          }),
+          defaults: {} as Partial<EtapaEnsino>,
+        })
+        setEtapasEnsino(sanitized.length > 0 ? sanitized : mockEtapasEnsino)
+        // Salva na nova key
+        localStorage.setItem('edu_etapas_ensino', JSON.stringify(sanitized))
+        // Remove key antiga após migração
+        localStorage.removeItem('edu_courses')
+      }
 
-    const storedRules = localStorage.getItem('edu_eval_rules')
-    if (storedRules) setEvaluationRules(JSON.parse(storedRules))
+      const storedRules = localStorage.getItem('edu_eval_rules')
+      if (storedRules) {
+        setEvaluationRules(JSON.parse(storedRules))
+      }
+    } catch (error) {
+      handleError(error as Error, {
+        showToast: false,
+        context: { action: 'loadCourses', source: 'localStorage' },
+      })
+      setEtapasEnsino(mockEtapasEnsino)
+      setEvaluationRules(mockEvaluationRules)
+    }
   }, [])
 
   useEffect(() => {
-    localStorage.setItem('edu_courses', JSON.stringify(courses))
-  }, [courses])
+    localStorage.setItem('edu_etapas_ensino', JSON.stringify(etapasEnsino))
+  }, [etapasEnsino])
 
   useEffect(() => {
     localStorage.setItem('edu_eval_rules', JSON.stringify(evaluationRules))
   }, [evaluationRules])
 
-  const addCourse = (data: Omit<Course, 'id' | 'grades'>) => {
-    const newCourse: Course = {
+  const addEtapaEnsino = (data: Omit<EtapaEnsino, 'id' | 'seriesAnos'>) => {
+    const newEtapa: EtapaEnsino = {
       ...data,
       id: Math.random().toString(36).substring(2, 11),
-      grades: [],
+      seriesAnos: [],
+      // Garante que codigoCenso seja salvo se fornecido
+      ...((data as any).codigoCenso ? { codigoCenso: (data as any).codigoCenso } : {}),
     }
-    setCourses((prev) => [...prev, newCourse])
+    setEtapasEnsino((prev) => [...prev, newEtapa])
   }
 
-  const updateCourse = (id: string, data: Partial<Course>) => {
-    setCourses((prev) => prev.map((c) => (c.id === id ? { ...c, ...data } : c)))
+  const updateEtapaEnsino = (id: string, data: Partial<EtapaEnsino>) => {
+    setEtapasEnsino((prev) =>
+      prev.map((e) =>
+        e.id === id
+          ? {
+              ...e,
+              ...data,
+              // Garantir que seriesAnos sempre seja um array
+              seriesAnos: Array.isArray(data.seriesAnos)
+                ? data.seriesAnos
+                : Array.isArray(e.seriesAnos)
+                  ? e.seriesAnos
+                  : [],
+            }
+          : e,
+      ),
+    )
   }
 
-  const addGrade = (courseId: string, data: Omit<Grade, 'id' | 'subjects'>) => {
-    setCourses((prev) =>
-      prev.map((c) => {
-        if (c.id === courseId) {
+  // Aliases para compatibilidade (deprecated)
+  const addCourse = addEtapaEnsino
+  const updateCourse = updateEtapaEnsino
+
+  const addSerieAno = (etapaEnsinoId: string, data: Omit<SerieAno, 'id' | 'subjects'>) => {
+    setEtapasEnsino((prev) =>
+      prev.map((e) => {
+        if (e.id === etapaEnsinoId) {
+          const newSerieAno: SerieAno = {
+            ...data,
+            id: Math.random().toString(36).substring(2, 11),
+            subjects: [],
+            // Garante que numero seja salvo
+            ...(data.numero !== undefined ? { numero: data.numero } : {}),
+          }
           return {
-            ...c,
-            grades: [
-              ...c.grades,
-              {
-                ...data,
-                id: Math.random().toString(36).substring(2, 11),
-                subjects: [],
-              },
-            ],
+            ...e,
+            seriesAnos: [...(e.seriesAnos || []), newSerieAno],
           }
         }
-        return c
+        return e
       }),
     )
   }
 
-  const updateGrade = (
-    courseId: string,
-    gradeId: string,
-    data: Partial<Grade>,
+  // Alias para compatibilidade (deprecated)
+  const addGrade = (courseId: string, data: Omit<SerieAno, 'id' | 'subjects'>) => {
+    addSerieAno(courseId, data)
+  }
+
+  const updateSerieAno = (
+    etapaEnsinoId: string,
+    serieAnoId: string,
+    data: Partial<SerieAno>,
   ) => {
-    setCourses((prev) =>
-      prev.map((c) => {
-        if (c.id === courseId) {
+    setEtapasEnsino((prev) =>
+      prev.map((e) => {
+        if (e.id === etapaEnsinoId) {
           return {
-            ...c,
-            grades: c.grades.map((g) =>
-              g.id === gradeId ? { ...g, ...data } : g,
+            ...e,
+            seriesAnos: (e.seriesAnos || []).map((s) =>
+              s.id === serieAnoId ? { ...s, ...data } : s,
             ),
           }
         }
-        return c
+        return e
       }),
     )
   }
 
+  // Alias para compatibilidade (deprecated)
+  const updateGrade = (courseId: string, gradeId: string, data: Partial<SerieAno>) => {
+    updateSerieAno(courseId, gradeId, data)
+  }
+
   const addSubject = (
-    courseId: string,
-    gradeId: string,
+    etapaEnsinoId: string,
+    serieAnoId: string,
     data: Omit<Subject, 'id'>,
   ) => {
-    setCourses((prev) =>
-      prev.map((c) => {
-        if (c.id === courseId) {
+    setEtapasEnsino((prev) =>
+      prev.map((e) => {
+        if (e.id === etapaEnsinoId) {
           return {
-            ...c,
-            grades: c.grades.map((g) => {
-              if (g.id === gradeId) {
+            ...e,
+            seriesAnos: (e.seriesAnos || []).map((s) => {
+              if (s.id === serieAnoId) {
                 return {
-                  ...g,
+                  ...s,
                   subjects: [
-                    ...g.subjects,
+                    ...(s.subjects || []),
                     { ...data, id: Math.random().toString(36).substring(2, 11) },
                   ],
                 }
               }
-              return g
+              return s
             }),
           }
         }
-        return c
+        return e
       }),
     )
   }
 
   const updateSubject = (
-    courseId: string,
-    gradeId: string,
+    etapaEnsinoId: string,
+    serieAnoId: string,
     subjectId: string,
     data: Partial<Subject>,
   ) => {
-    setCourses((prev) =>
-      prev.map((c) => {
-        if (c.id === courseId) {
+    setEtapasEnsino((prev) =>
+      prev.map((e) => {
+        if (e.id === etapaEnsinoId) {
           return {
-            ...c,
-            grades: c.grades.map((g) => {
-              if (g.id === gradeId) {
+            ...e,
+            seriesAnos: (e.seriesAnos || []).map((s) => {
+              if (s.id === serieAnoId) {
                 return {
-                  ...g,
-                  subjects: g.subjects.map((s) =>
-                    s.id === subjectId ? { ...s, ...data } : s,
+                  ...s,
+                  subjects: (s.subjects || []).map((subj) =>
+                    subj.id === subjectId ? { ...subj, ...data } : subj,
                   ),
                 }
               }
-              return g
+              return s
             }),
           }
         }
-        return c
+        return e
       }),
     )
   }
 
   const removeSubject = (
-    courseId: string,
-    gradeId: string,
+    etapaEnsinoId: string,
+    serieAnoId: string,
     subjectId: string,
   ) => {
-    setCourses((prev) =>
-      prev.map((c) => {
-        if (c.id === courseId) {
+    setEtapasEnsino((prev) =>
+      prev.map((e) => {
+        if (e.id === etapaEnsinoId) {
           return {
-            ...c,
-            grades: c.grades.map((g) => {
-              if (g.id === gradeId) {
+            ...e,
+            seriesAnos: (e.seriesAnos || []).map((s) => {
+              if (s.id === serieAnoId) {
                 return {
-                  ...g,
-                  subjects: g.subjects.filter((s) => s.id !== subjectId),
+                  ...s,
+                  subjects: (s.subjects || []).filter((subj) => subj.id !== subjectId),
                 }
               }
-              return g
+              return s
             }),
           }
         }
-        return c
+        return e
       }),
     )
   }
@@ -207,22 +305,33 @@ export const CourseProvider = ({ children }: { children: React.ReactNode }) => {
     )
   }
 
-  const getCourse = (id: string) => courses.find((c) => c.id === id)
+  const getEtapaEnsino = (id: string) => etapasEnsino.find((e) => e.id === id)
+
+  // Aliases para compatibilidade (deprecated)
+  const courses = etapasEnsino
+  const getCourse = getEtapaEnsino
 
   return (
     <CourseContext.Provider
       value={{
-        courses,
+        etapasEnsino,
         evaluationRules,
-        addCourse,
-        updateCourse,
-        addGrade,
-        updateGrade,
+        addEtapaEnsino,
+        updateEtapaEnsino,
+        addSerieAno,
+        updateSerieAno,
         addSubject,
         updateSubject,
         removeSubject,
         addEvaluationRule,
         updateEvaluationRule,
+        getEtapaEnsino,
+        // Aliases para compatibilidade (deprecated)
+        courses,
+        addCourse,
+        updateCourse,
+        addGrade,
+        updateGrade,
         getCourse,
       }}
     >

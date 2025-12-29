@@ -20,6 +20,7 @@ import usePublicContentStore from '@/stores/usePublicContentStore'
 import useSettingsStore from '@/stores/useSettingsStore'
 import { format, parseISO } from 'date-fns'
 import { ServiceCard } from '@/lib/mock-data'
+import { HeroCarousel } from '@/components/public/HeroCarousel'
 
 export default function InstitutionalHome() {
   const { news, documents, getContent } = usePublicContentStore()
@@ -78,49 +79,114 @@ export default function InstitutionalHome() {
   return (
     <div className="space-y-12 animate-fade-in">
       {/* Hero Section */}
-      <section className="relative overflow-hidden rounded-2xl bg-primary px-6 py-16 md:px-12 md:py-24 text-primary-foreground shadow-xl">
-        <div className="absolute inset-0 opacity-10 bg-[url('https://img.usecurling.com/p/1200/400?q=education&color=blue')] bg-cover bg-center" />
+      <section className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-primary via-blue-600 to-primary/90 px-6 py-16 md:px-12 md:py-24 text-white shadow-2xl min-h-[500px] md:min-h-[600px]">
+        {/* Carrossel de Imagens (se habilitado e houver slides) */}
+        {settings.heroSection?.enableCarousel &&
+        Array.isArray(settings.heroSection?.slides) &&
+        settings.heroSection.slides.filter((s) => s && s.active).length > 0 ? (
+          <div className="absolute inset-0">
+            <HeroCarousel
+              slides={settings.heroSection.slides}
+              autoPlay={settings.heroSection.autoPlay}
+              autoPlayInterval={settings.heroSection.autoPlayInterval}
+            />
+          </div>
+        ) : (
+          <>
+            {/* Padrão decorativo com círculos */}
+            <div className="absolute inset-0 opacity-10">
+              <div className="absolute top-0 left-0 w-96 h-96 bg-white rounded-full blur-3xl animate-pulse" />
+              <div className="absolute bottom-0 right-0 w-96 h-96 bg-blue-300 rounded-full blur-3xl animate-pulse delay-1000" />
+            </div>
+            
+            {/* Grid pattern sutil */}
+            <div className="absolute inset-0 bg-[linear-gradient(to_right,#ffffff08_1px,transparent_1px),linear-gradient(to_bottom,#ffffff08_1px,transparent_1px)] bg-[size:4rem_4rem]" />
+            
+            {/* Imagem de fundo com overlay (fallback) */}
+            <div className="absolute inset-0 opacity-10 bg-[url('https://img.usecurling.com/p/1200/400?q=education&color=blue')] bg-cover bg-center" />
+          </>
+        )}
+        
         <div className="relative z-10 max-w-3xl">
           <Badge
             variant="secondary"
-            className="mb-4 bg-white/20 text-white hover:bg-white/30"
+            className="mb-4 bg-white/20 text-white hover:bg-white/30 border-white/30 backdrop-blur-sm transition-all duration-300"
           >
-            Educação Municipal
+            {settings.heroSection?.badgeText || 'Educação Municipal'}
           </Badge>
-          <h1 className="text-4xl font-bold tracking-tight md:text-6xl mb-4">
-            {settings.educationSecretaryName}
+          <h1 className="text-4xl md:text-5xl lg:text-6xl font-extrabold tracking-tight mb-4 bg-gradient-to-r from-white via-blue-100 to-white bg-clip-text text-transparent">
+            {settings.heroSection?.title || settings.educationSecretaryName}
           </h1>
-          <p className="text-lg md:text-xl opacity-90 mb-8 max-w-2xl">
-            Bem-vindo ao portal oficial da educação de{' '}
-            {settings.municipalityName}. Aqui você encontra notícias, serviços e
-            transparência sobre a gestão educacional.
+          <p className="text-lg md:text-xl opacity-95 mb-8 max-w-2xl leading-relaxed">
+            {settings.heroSection?.description || (
+              <>
+                Bem-vindo ao portal oficial da educação de{' '}
+                <span className="font-semibold">{settings.municipalityName}</span>. Aqui você encontra notícias, serviços e
+                transparência sobre a gestão educacional.
+              </>
+            )}
           </p>
           <div className="flex flex-wrap gap-4">
-            <Link to="/publico/boletim">
-              <Button size="lg" variant="secondary" className="gap-2">
-                <GraduationCap className="h-5 w-5" />
-                Consulta de Boletim
-              </Button>
-            </Link>
-            <Link to="/publico/documentos">
-              <Button
-                size="lg"
-                variant="outline"
-                className="gap-2 bg-transparent text-white border-white hover:bg-white hover:text-primary"
-              >
-                <FileText className="h-5 w-5" />
-                Documentos Oficiais
-              </Button>
-            </Link>
+            {settings.heroSection?.primaryButtonText && settings.heroSection?.primaryButtonLink && (
+              <Link to={settings.heroSection.primaryButtonLink}>
+                <Button 
+                  size="lg" 
+                  className="gap-2 bg-gradient-to-r from-white to-blue-50 text-primary hover:from-blue-50 hover:to-white shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105 font-semibold"
+                >
+                  <GraduationCap className="h-5 w-5" />
+                  {settings.heroSection.primaryButtonText}
+                </Button>
+              </Link>
+            )}
+            {settings.heroSection?.secondaryButtonText && settings.heroSection?.secondaryButtonLink && (
+              <Link to={settings.heroSection.secondaryButtonLink}>
+                <Button
+                  size="lg"
+                  variant="outline"
+                  className="gap-2 bg-transparent text-white border-2 border-white/50 hover:bg-white hover:text-primary hover:border-white transition-all duration-300 transform hover:scale-105 font-semibold backdrop-blur-sm"
+                >
+                  <FileText className="h-5 w-5" />
+                  {settings.heroSection.secondaryButtonText}
+                </Button>
+              </Link>
+            )}
+            {/* Fallback para botões padrão se não configurados */}
+            {!settings.heroSection?.primaryButtonText && (
+              <>
+                <Link to="/publico/boletim">
+                  <Button 
+                    size="lg" 
+                    className="gap-2 bg-gradient-to-r from-white to-blue-50 text-primary hover:from-blue-50 hover:to-white shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105 font-semibold"
+                  >
+                    <GraduationCap className="h-5 w-5" />
+                    Consulta de Boletim
+                  </Button>
+                </Link>
+                <Link to="/publico/documentos">
+                  <Button
+                    size="lg"
+                    variant="outline"
+                    className="gap-2 bg-transparent text-white border-2 border-white/50 hover:bg-white hover:text-primary hover:border-white transition-all duration-300 transform hover:scale-105 font-semibold backdrop-blur-sm"
+                  >
+                    <FileText className="h-5 w-5" />
+                    Documentos Oficiais
+                  </Button>
+                </Link>
+              </>
+            )}
           </div>
         </div>
       </section>
 
       {/* Services Grid (Dynamic) */}
-      <section className="container mx-auto px-4">
-        <div className="flex items-center gap-2 mb-6">
-          <School className="h-6 w-6 text-primary" />
-          <h2 className="text-2xl font-bold">Serviços</h2>
+      <section className="container mx-auto px-4 py-12 md:py-16">
+        <div className="flex items-center gap-3 mb-8">
+          <div className="h-12 w-12 rounded-full bg-gradient-to-br from-primary/20 to-blue-600/20 flex items-center justify-center">
+            <School className="h-6 w-6 text-primary" />
+          </div>
+          <h2 className="text-3xl md:text-4xl font-bold bg-gradient-to-r from-primary to-blue-600 bg-clip-text text-transparent">
+            Serviços
+          </h2>
         </div>
         <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
           {(settings.serviceCards || [])
@@ -132,16 +198,17 @@ export default function InstitutionalHome() {
 
               return (
                 <Link to={card.link} key={card.id}>
-                  <Card className="hover:shadow-lg transition-shadow cursor-pointer h-full group hover:border-primary/50">
-                    <CardContent className="p-6 flex flex-col items-center text-center gap-4">
+                  <Card className="group relative overflow-hidden border-2 border-transparent hover:border-primary/50 transition-all duration-300 hover:shadow-2xl hover:-translate-y-1 bg-gradient-to-br from-white via-primary/5 to-white">
+                    <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                    <CardContent className="p-6 flex flex-col items-center text-center gap-4 relative z-10">
                       <div
-                        className={`h-14 w-14 rounded-full ${colors.bg} flex items-center justify-center ${colors.text} group-hover:scale-110 transition-transform`}
+                        className={`h-16 w-16 rounded-full ${colors.bg} flex items-center justify-center ${colors.text} group-hover:scale-110 transition-transform duration-300 shadow-lg group-hover:shadow-xl`}
                       >
                         <IconComp className="h-8 w-8" />
                       </div>
                       <div>
-                        <h3 className="font-bold text-lg mb-1">{card.title}</h3>
-                        <p className="text-sm text-muted-foreground">
+                        <h3 className="font-bold text-lg mb-2 group-hover:text-primary transition-colors">{card.title}</h3>
+                        <p className="text-sm text-muted-foreground leading-relaxed">
                           {card.description}
                         </p>
                       </div>
@@ -160,16 +227,20 @@ export default function InstitutionalHome() {
           {/* News Section */}
           <div className="space-y-6">
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Newspaper className="h-6 w-6 text-primary" />
-                <h2 className="text-2xl font-bold">Últimas Notícias</h2>
+              <div className="flex items-center gap-3">
+                <div className="h-10 w-10 rounded-full bg-gradient-to-br from-primary/20 to-blue-600/20 flex items-center justify-center">
+                  <Newspaper className="h-5 w-5 text-primary" />
+                </div>
+                <h2 className="text-2xl md:text-3xl font-bold bg-gradient-to-r from-primary to-blue-600 bg-clip-text text-transparent">
+                  Últimas Notícias
+                </h2>
               </div>
               <Link to="/publico/noticias">
                 <Button
                   variant="ghost"
-                  className="text-primary hover:underline"
+                  className="text-primary hover:bg-primary/10 font-semibold transition-all duration-300"
                 >
-                  Ver todas
+                  Ver todas <ArrowRight className="ml-1 h-4 w-4" />
                 </Button>
               </Link>
             </div>
@@ -178,33 +249,34 @@ export default function InstitutionalHome() {
               {activeNews.length > 0 ? (
                 activeNews.map((post) => (
                   <Link to={`/publico/noticias/${post.id}`} key={post.id}>
-                    <Card className="overflow-hidden hover:shadow-md transition-shadow cursor-pointer h-full">
+                    <Card className="group overflow-hidden border-2 border-transparent hover:border-primary/50 transition-all duration-300 hover:shadow-xl hover:-translate-y-1 cursor-pointer h-full bg-gradient-to-br from-white to-primary/5">
                       <div className="flex flex-col md:flex-row h-full">
-                        <div className="md:w-1/3 h-48 md:h-auto bg-muted">
+                        <div className="md:w-1/3 h-48 md:h-auto bg-muted relative overflow-hidden">
                           <img
                             src={
                               post.imageUrl ||
                               'https://img.usecurling.com/p/400/300?q=education'
                             }
                             alt={post.title}
-                            className="w-full h-full object-cover"
+                            className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
                           />
+                          <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
                         </div>
                         <div className="p-6 flex-1 flex flex-col justify-between">
                           <div>
-                            <div className="text-xs text-muted-foreground mb-2 flex items-center gap-2">
-                              <Calendar className="h-3 w-3" />
+                            <Badge className="mb-2 bg-gradient-to-r from-primary/10 to-blue-600/10 text-primary border border-primary/20">
+                              <Calendar className="h-3 w-3 mr-1" />
                               {format(parseISO(post.publishDate), 'dd/MM/yyyy')}
-                            </div>
-                            <h3 className="text-xl font-bold mb-2 hover:text-primary transition-colors">
+                            </Badge>
+                            <h3 className="text-xl font-bold mb-2 group-hover:text-primary transition-colors">
                               {post.title}
                             </h3>
-                            <p className="text-muted-foreground line-clamp-2 mb-4">
+                            <p className="text-muted-foreground line-clamp-2 mb-4 leading-relaxed">
                               {post.summary}
                             </p>
                           </div>
-                          <span className="text-primary text-sm font-medium flex items-center hover:underline">
-                            Ler mais <ArrowRight className="ml-1 h-4 w-4" />
+                          <span className="text-primary text-sm font-semibold flex items-center group-hover:gap-2 transition-all">
+                            Ler mais <ArrowRight className="ml-1 h-4 w-4 group-hover:translate-x-1 transition-transform" />
                           </span>
                         </div>
                       </div>
@@ -222,16 +294,20 @@ export default function InstitutionalHome() {
           {/* Documents Section (Moved here) */}
           <div className="space-y-6">
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <FileText className="h-6 w-6 text-primary" />
-                <h2 className="text-2xl font-bold">Documentos Recentes</h2>
+              <div className="flex items-center gap-3">
+                <div className="h-10 w-10 rounded-full bg-gradient-to-br from-primary/20 to-blue-600/20 flex items-center justify-center">
+                  <FileText className="h-5 w-5 text-primary" />
+                </div>
+                <h2 className="text-2xl md:text-3xl font-bold bg-gradient-to-r from-primary to-blue-600 bg-clip-text text-transparent">
+                  Documentos Recentes
+                </h2>
               </div>
               <Link to="/publico/documentos">
                 <Button
                   variant="ghost"
-                  className="text-primary hover:underline"
+                  className="text-primary hover:bg-primary/10 font-semibold transition-all duration-300"
                 >
-                  Ver todos
+                  Ver todos <ArrowRight className="ml-1 h-4 w-4" />
                 </Button>
               </Link>
             </div>
@@ -267,8 +343,7 @@ export default function InstitutionalHome() {
                                 {doc.summary}
                               </p>
                               <Badge
-                                variant="outline"
-                                className="mt-2 text-[10px] font-normal"
+                                className="mt-2 text-[10px] font-normal bg-gradient-to-r from-primary/10 to-blue-600/10 text-primary border border-primary/20"
                               >
                                 {doc.organ}
                               </Badge>
@@ -290,11 +365,15 @@ export default function InstitutionalHome() {
 
         {/* Sidebar Info Section - Takes 2 columns (40%) */}
         <div className="lg:col-span-2 space-y-8">
-          <Card>
+          <Card className="bg-gradient-to-br from-white via-primary/5 to-white border-2 border-primary/10">
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Building className="h-5 w-5 text-primary" />
-                Informações
+              <CardTitle className="flex items-center gap-3">
+                <div className="h-10 w-10 rounded-full bg-gradient-to-br from-primary/20 to-blue-600/20 flex items-center justify-center">
+                  <Building className="h-5 w-5 text-primary" />
+                </div>
+                <span className="bg-gradient-to-r from-primary to-blue-600 bg-clip-text text-transparent font-bold">
+                  Informações
+                </span>
               </CardTitle>
             </CardHeader>
             <CardContent className="prose prose-sm text-muted-foreground">
@@ -387,5 +466,90 @@ export default function InstitutionalHome() {
         </div>
       </div>
     </div>
+  )
+}
+
+// Componente para exibir conteúdo do slide
+function HeroSlideContent({
+  slide,
+  defaultBadge,
+  defaultTitle,
+  defaultDescription,
+  defaultPrimaryButton,
+  defaultPrimaryLink,
+  defaultSecondaryButton,
+  defaultSecondaryLink,
+}: {
+  slide?: HeroSlide
+  defaultBadge: string
+  defaultTitle: string
+  defaultDescription: string
+  defaultPrimaryButton: string
+  defaultPrimaryLink: string
+  defaultSecondaryButton: string
+  defaultSecondaryLink: string
+}) {
+  return (
+    <>
+      {defaultBadge && (
+        <Badge
+          variant="secondary"
+          className="mb-4 bg-white/20 text-white hover:bg-white/30 border-white/30 backdrop-blur-sm transition-all duration-300"
+        >
+          {defaultBadge}
+        </Badge>
+      )}
+      {slide?.title && (
+        <h1 className="text-4xl md:text-5xl lg:text-6xl font-extrabold tracking-tight mb-4 bg-gradient-to-r from-white via-blue-100 to-white bg-clip-text text-transparent">
+          {slide.title}
+        </h1>
+      )}
+      {slide?.subtitle && (
+        <h2 className="text-2xl md:text-3xl font-bold mb-4 text-white/90">
+          {slide.subtitle}
+        </h2>
+      )}
+      {(slide?.description || defaultDescription) && (
+        <p className="text-lg md:text-xl opacity-95 mb-8 max-w-2xl leading-relaxed">
+          {slide?.description || defaultDescription}
+        </p>
+      )}
+      {(slide?.buttonText || defaultPrimaryButton) && (
+        <div className="flex flex-wrap gap-4">
+          {slide?.buttonText && slide?.buttonLink ? (
+            <Link to={slide.buttonLink}>
+              <Button
+                size="lg"
+                className="gap-2 bg-gradient-to-r from-white to-blue-50 text-primary hover:from-blue-50 hover:to-white shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105 font-semibold"
+              >
+                {slide.buttonText}
+              </Button>
+            </Link>
+          ) : (
+            <Link to={defaultPrimaryLink}>
+              <Button
+                size="lg"
+                className="gap-2 bg-gradient-to-r from-white to-blue-50 text-primary hover:from-blue-50 hover:to-white shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105 font-semibold"
+              >
+                <GraduationCap className="h-5 w-5" />
+                {defaultPrimaryButton}
+              </Button>
+            </Link>
+          )}
+          {defaultSecondaryButton && (
+            <Link to={defaultSecondaryLink}>
+              <Button
+                size="lg"
+                variant="outline"
+                className="gap-2 bg-transparent text-white border-2 border-white/50 hover:bg-white hover:text-primary hover:border-white transition-all duration-300 transform hover:scale-105 font-semibold backdrop-blur-sm"
+              >
+                <FileText className="h-5 w-5" />
+                {defaultSecondaryButton}
+              </Button>
+            </Link>
+          )}
+        </div>
+      )}
+    </>
   )
 }

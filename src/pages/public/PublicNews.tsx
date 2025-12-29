@@ -33,11 +33,15 @@ export default function PublicNews() {
   return (
     <div className="container mx-auto px-4 py-8 animate-fade-in space-y-8">
       <div className="text-center mb-8">
-        <h1 className="text-4xl font-bold text-primary mb-4 flex items-center justify-center gap-3">
-          <Newspaper className="h-10 w-10" />
-          Notícias e Comunicados
-        </h1>
-        <p className="text-xl text-muted-foreground">
+        <div className="flex items-center justify-center gap-3 mb-4">
+          <div className="h-16 w-16 rounded-full bg-gradient-to-br from-primary/20 to-blue-600/20 flex items-center justify-center">
+            <Newspaper className="h-8 w-8 text-primary" />
+          </div>
+          <h1 className="text-4xl md:text-5xl font-extrabold bg-gradient-to-r from-primary via-blue-600 to-primary bg-clip-text text-transparent">
+            Notícias e Comunicados
+          </h1>
+        </div>
+        <p className="text-xl text-muted-foreground max-w-2xl mx-auto leading-relaxed">
           Fique por dentro de tudo o que acontece na educação municipal.
         </p>
       </div>
@@ -64,7 +68,8 @@ export default function PublicNews() {
               key={post.id}
               className="block h-full"
             >
-              <Card className="overflow-hidden hover:shadow-lg transition-shadow flex flex-col h-full group">
+              <Card className="group relative overflow-hidden border-2 border-transparent hover:border-primary/50 transition-all duration-300 hover:shadow-2xl hover:-translate-y-1 flex flex-col h-full bg-gradient-to-br from-white via-primary/5 to-white">
+                <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
                 <div className="h-48 bg-muted relative overflow-hidden">
                   <img
                     src={
@@ -72,23 +77,27 @@ export default function PublicNews() {
                       'https://img.usecurling.com/p/400/300?q=education'
                     }
                     alt={post.title}
-                    className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                    className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
                   />
-                  <div className="absolute top-2 right-2 bg-background/80 backdrop-blur-sm px-2 py-1 rounded text-xs font-medium flex items-center gap-1">
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+                  <div className="absolute top-2 right-2 bg-gradient-to-r from-primary/90 to-blue-600/90 backdrop-blur-sm px-3 py-1.5 rounded-lg text-xs font-semibold text-white shadow-lg flex items-center gap-1">
                     <Calendar className="h-3 w-3" />
                     {format(parseISO(post.publishDate), 'dd/MM/yyyy')}
                   </div>
                 </div>
-                <CardHeader className="pb-2">
-                  <CardTitle className="line-clamp-2 group-hover:text-primary transition-colors">
+                <CardHeader className="pb-2 relative z-10">
+                  <CardTitle className="line-clamp-2 group-hover:text-primary transition-colors font-bold">
                     {post.title}
                   </CardTitle>
-                  <CardDescription className="line-clamp-3">
+                  <CardDescription className="line-clamp-3 leading-relaxed">
                     {post.summary}
                   </CardDescription>
                 </CardHeader>
-                <CardContent className="mt-auto pt-4">
-                  <Button variant="outline" className="w-full gap-2 group/btn">
+                <CardContent className="mt-auto pt-4 relative z-10">
+                  <Button 
+                    variant="outline" 
+                    className="w-full gap-2 group/btn border-2 border-primary/20 hover:border-primary hover:bg-primary/10 transition-all duration-300"
+                  >
                     Ler Notícia
                     <ArrowRight className="h-4 w-4 transition-transform group-hover/btn:translate-x-1" />
                   </Button>
@@ -97,9 +106,12 @@ export default function PublicNews() {
             </Link>
           ))
         ) : (
-          <div className="col-span-full text-center py-12 text-muted-foreground">
-            <Newspaper className="h-12 w-12 mx-auto mb-4 opacity-20" />
-            <p>Nenhuma notícia encontrada.</p>
+          <div className="col-span-full text-center py-12">
+            <div className="mb-4 p-4 rounded-full bg-gradient-to-br from-primary/10 via-primary/5 to-transparent inline-flex">
+              <FileText className="h-12 w-12 text-primary/60" />
+            </div>
+            <h3 className="text-lg font-semibold mb-2 text-foreground">Nenhuma notícia disponível</h3>
+            <p className="text-muted-foreground">Nenhuma notícia encontrada.</p>
           </div>
         )}
       </div>

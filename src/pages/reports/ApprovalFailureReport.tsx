@@ -138,36 +138,36 @@ export default function ApprovalFailureReport() {
                   }}
                   className="h-[400px] w-full"
                 >
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart
-                      data={data}
-                      margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
-                    >
-                      <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                      <XAxis dataKey="stage" />
-                      <YAxis unit="%" />
-                      <ChartTooltip content={<ChartTooltipContent />} />
-                      <ChartLegend content={<ChartLegendContent />} />
-                      <Bar
-                        dataKey="approvalRate"
-                        fill="var(--color-approvalRate)"
-                        radius={[4, 4, 0, 0]}
-                        name="Aprovação"
-                      />
-                      <Bar
-                        dataKey="failureRate"
-                        fill="var(--color-failureRate)"
-                        radius={[4, 4, 0, 0]}
-                        name="Reprovação"
-                      />
-                      <Bar
-                        dataKey="dropoutRate"
-                        fill="var(--color-dropoutRate)"
-                        radius={[4, 4, 0, 0]}
-                        name="Abandono"
-                      />
-                    </BarChart>
-                  </ResponsiveContainer>
+                  <BarChart
+                    data={data}
+                    margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
+                    width={400}
+                    height={400}
+                  >
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                    <XAxis dataKey="stage" />
+                    <YAxis unit="%" />
+                    <ChartTooltip content={<ChartTooltipContent />} />
+                    <ChartLegend content={<ChartLegendContent />} />
+                    <Bar
+                      dataKey="approvalRate"
+                      fill="var(--color-approvalRate)"
+                      radius={[4, 4, 0, 0]}
+                      name="Aprovação"
+                    />
+                    <Bar
+                      dataKey="failureRate"
+                      fill="var(--color-failureRate)"
+                      radius={[4, 4, 0, 0]}
+                      name="Reprovação"
+                    />
+                    <Bar
+                      dataKey="dropoutRate"
+                      fill="var(--color-dropoutRate)"
+                      radius={[4, 4, 0, 0]}
+                      name="Abandono"
+                    />
+                  </BarChart>
                 </ChartContainer>
               </CardContent>
             </Card>

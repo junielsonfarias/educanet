@@ -4,6 +4,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import * as z from 'zod'
 import { Check, ChevronsUpDown, Eye, EyeOff } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { validatePasswordStrength } from '@/lib/auth-utils'
 
 import {
   Dialog,
@@ -89,12 +90,15 @@ export function UserFormDialog({
         })
       }
 
-      if (data.password && data.password.length < 6) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          message: 'A senha deve ter no mínimo 6 caracteres',
-          path: ['password'],
-        })
+      if (data.password) {
+        const validation = validatePasswordStrength(data.password)
+        if (!validation.isValid) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: validation.errors[0] || 'Senha não atende aos requisitos de segurança',
+            path: ['password'],
+          })
+        }
       }
 
       if (data.password !== data.confirmPassword) {
@@ -166,7 +170,8 @@ export function UserFormDialog({
       setShowPassword(false)
       setShowConfirmPassword(false)
     }
-  }, [open, initialData, form])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, initialData?.id])
 
   const role = form.watch('role')
 

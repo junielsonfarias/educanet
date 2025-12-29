@@ -15,6 +15,7 @@ import {
   ChartConfig,
 } from '@/components/ui/chart'
 import { SchoolQEduData } from '@/services/qedu-service'
+import { SafeChart } from '@/components/charts/SafeChart'
 
 interface QEduOverviewProps {
   aggregateData: {
@@ -106,21 +107,31 @@ export function QEduOverview({
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <ChartContainer config={idebConfig} className="h-[300px] w-full">
-              <AreaChart data={historicalTrendData}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                <XAxis dataKey="year" />
-                <YAxis domain={[0, 10]} />
-                <ChartTooltip content={<ChartTooltipContent />} />
-                <Area
-                  type="monotone"
-                  dataKey="score"
-                  stroke="var(--color-score)"
-                  fill="var(--color-score)"
-                  fillOpacity={0.2}
-                />
-              </AreaChart>
-            </ChartContainer>
+            <SafeChart
+              data={historicalTrendData}
+              minHeight={300}
+              validateData={(data) =>
+                Array.isArray(data) &&
+                data.length > 0 &&
+                data[0]?.year !== undefined
+              }
+            >
+              <ChartContainer config={idebConfig} className="h-[300px] w-full">
+                <AreaChart data={historicalTrendData}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                  <XAxis dataKey="year" />
+                  <YAxis domain={[0, 10]} />
+                  <ChartTooltip content={<ChartTooltipContent />} />
+                  <Area
+                    type="monotone"
+                    dataKey="score"
+                    stroke="var(--color-score)"
+                    fill="var(--color-score)"
+                    fillOpacity={0.2}
+                  />
+                </AreaChart>
+              </ChartContainer>
+            </SafeChart>
           </CardContent>
         </Card>
         <Card>

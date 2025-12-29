@@ -105,15 +105,18 @@ export default function GeneralSettings() {
 
         <TabsContent value="institution" className="space-y-6 mt-4">
           <div className="grid gap-6">
-            <Card>
-              <CardHeader>
+            <Card className="relative overflow-hidden bg-gradient-to-br from-white via-primary/5 to-white border-primary/20 hover:border-primary/40 hover:shadow-lg transition-all duration-300 group">
+              <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-primary/10 to-transparent rounded-full blur-2xl opacity-0 group-hover:opacity-100 transition-opacity" />
+              <CardHeader className="relative z-10">
                 <CardTitle className="flex items-center gap-2">
-                  <Building className="h-5 w-5 text-primary" />
+                  <div className="p-2 rounded-lg bg-gradient-to-br from-primary/10 to-primary/20">
+                    <Building className="h-5 w-5 text-primary" />
+                  </div>
                   Dados da Instituição
                 </CardTitle>
                 <CardDescription>
                   Estas informações aparecerão em todos os documentos oficiais
-                  gerados.
+                  gerados e no cabeçalho do site institucional.
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
@@ -129,14 +132,19 @@ export default function GeneralSettings() {
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="educationSecretaryName">
-                      Nome da Secretaria de Educação
+                      Nome da Secretaria Municipal de Educação
+                      <span className="text-primary ml-1">*</span>
                     </Label>
                     <Input
                       id="educationSecretaryName"
                       value={formData.educationSecretaryName}
                       onChange={handleChange}
                       placeholder="Ex: Secretaria Municipal de Educação"
+                      className="font-semibold"
                     />
+                    <p className="text-xs text-muted-foreground">
+                      Este nome aparecerá no cabeçalho do site institucional junto com "SEMED"
+                    </p>
                   </div>
                 </div>
               </CardContent>
@@ -146,17 +154,31 @@ export default function GeneralSettings() {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <FileText className="h-5 w-5 text-primary" />
-                  Identidade Visual e Rodapé
+                  Identidade Visual do Cabeçalho
                 </CardTitle>
                 <CardDescription>
-                  Logotipos e textos de rodapé do site e relatórios.
+                  Configure os logotipos que aparecem no cabeçalho do site institucional e textos de rodapé.
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
+                <div className="bg-primary/5 border border-primary/20 rounded-lg p-4 mb-6">
+                  <h4 className="font-semibold text-sm mb-2">Estrutura do Cabeçalho:</h4>
+                  <div className="text-xs text-muted-foreground space-y-1">
+                    <p><strong>Primeira linha:</strong> Logo do Município (esquerda) | Nome da Secretaria + SEMED (centro) | Logo da Secretaria (direita)</p>
+                    <p><strong>Segunda linha:</strong> Menu de navegação</p>
+                  </div>
+                </div>
+                
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                   {/* Municipality Logo */}
                   <div className="space-y-4">
-                    <Label>Logo do Município</Label>
+                    <Label>
+                      Logo do Município (Logo 1)
+                      <span className="text-primary ml-1">*</span>
+                    </Label>
+                    <p className="text-xs text-muted-foreground -mt-2">
+                      Aparece no lado esquerdo do cabeçalho
+                    </p>
                     <div className="border-2 border-dashed rounded-lg p-6 flex flex-col items-center justify-center min-h-[200px] bg-muted/30">
                       {formData.municipalityLogo ? (
                         <div className="relative group w-full h-full flex items-center justify-center">
@@ -212,7 +234,13 @@ export default function GeneralSettings() {
 
                   {/* Secretary Logo */}
                   <div className="space-y-4">
-                    <Label>Logo da Secretaria</Label>
+                    <Label>
+                      Logo da Secretaria (Logo 2)
+                      <span className="text-primary ml-1">*</span>
+                    </Label>
+                    <p className="text-xs text-muted-foreground -mt-2">
+                      Aparece no lado direito do cabeçalho
+                    </p>
                     <div className="border-2 border-dashed rounded-lg p-6 flex flex-col items-center justify-center min-h-[200px] bg-muted/30">
                       {formData.secretaryLogo ? (
                         <div className="relative group w-full h-full flex items-center justify-center">

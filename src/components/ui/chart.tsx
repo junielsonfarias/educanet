@@ -43,7 +43,11 @@ const ChartContainer = React.forwardRef<
   }
 >(({ id, className, children, config, ...props }, ref) => {
   const uniqueId = React.useId()
-  const chartId = `chart-${id || uniqueId.replace(/:/g, '')}`
+  // Memoizar chartId para evitar mudanças entre renders que podem causar problemas no ResponsiveContainer
+  const chartId = React.useMemo(
+    () => `chart-${id || uniqueId.replace(/:/g, '')}`,
+    [id, uniqueId],
+  )
 
   return (
     <ChartContext.Provider value={{ config }}>
@@ -57,7 +61,7 @@ const ChartContainer = React.forwardRef<
         {...props}
       >
         <ChartStyle id={chartId} config={config} />
-        <RechartsPrimitive.ResponsiveContainer>
+        <RechartsPrimitive.ResponsiveContainer key={chartId}>
           {children}
         </RechartsPrimitive.ResponsiveContainer>
       </div>

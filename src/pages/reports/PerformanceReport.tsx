@@ -33,14 +33,14 @@ import { getStudentsByClassroom } from '@/lib/enrollment-utils'
 
 export default function PerformanceReport() {
   const { schools } = useSchoolStore()
-  const { courses, evaluationRules } = useCourseStore()
+  const { etapasEnsino, evaluationRules } = useCourseStore()
   const { students } = useStudentStore()
   const { assessments, assessmentTypes } = useAssessmentStore()
 
   const [selectedSchool, setSelectedSchool] = useState<string>('')
   const [selectedYear, setSelectedYear] = useState<string>('')
 
-  const activeSchool = schools.find((s) => s.id === selectedSchool)
+  const activeSchool = (schools || []).find((s) => s.id === selectedSchool)
   const academicYears = activeSchool?.academicYears || []
   const activeYear = academicYears.find((y) => y.id === selectedYear)
 
@@ -49,7 +49,8 @@ export default function PerformanceReport() {
 
     const data: any[] = []
 
-    activeYear.classes.forEach((cls) => {
+    const turmas = activeYear.turmas || activeYear.classes || []
+    turmas.forEach((cls) => {
       // Find students in this class using utility function
       const classStudents = getStudentsByClassroom(
         students,
@@ -60,14 +61,14 @@ export default function PerformanceReport() {
         activeYear.name,
       )
 
-      // Find grade/course info
-      const grade = courses
-        .flatMap((c) => c.grades)
-        .find((g) => g.id === cls.gradeId)
+      // Find serieAno/etapaEnsino info
+      const serieAno = (etapasEnsino || [])
+        .flatMap((e) => (e.seriesAnos || []))
+        .find((s) => s.id === (cls.serieAnoId || cls.gradeId))
 
-      if (!grade) return
+      if (!serieAno) return
 
-      const rule = evaluationRules.find((r) => r.id === grade.evaluationRuleId)
+      const rule = (evaluationRules || []).find((r) => r.id === serieAno.evaluationRuleId)
       if (!rule) return
 
       classStudents.forEach((student) => {
@@ -81,7 +82,7 @@ export default function PerformanceReport() {
 
         let gradeSum = 0
 
-        grade.subjects.forEach((subject) => {
+        (serieAno.subjects || []).forEach((subject) => {
           const subjectAssessments = assessments.filter(
             (a) =>
               a.studentId === student.id &&
@@ -117,7 +118,7 @@ export default function PerformanceReport() {
           overallAverage: studentStats.avg.toFixed(1),
           rawAverage: studentStats.avg, // for calculation
           status: studentStats.failed === 0 ? 'Aprovado' : 'Em Risco',
-          subjects: grade.subjects, // Pass subjects for dashboard calc
+          subjects: serieAno.subjects || [], // Pass subjects for dashboard calc
         })
       })
     })
@@ -127,7 +128,7 @@ export default function PerformanceReport() {
     activeSchool,
     activeYear,
     students,
-    courses,
+    etapasEnsino,
     evaluationRules,
     assessments,
     assessmentTypes,
@@ -195,7 +196,7 @@ export default function PerformanceReport() {
                   <SelectValue placeholder="Selecione..." />
                 </SelectTrigger>
                 <SelectContent>
-                  {schools.map((s) => (
+                  {(schools || []).map((s) => (
                     <SelectItem key={s.id} value={s.id}>
                       {s.name}
                     </SelectItem>

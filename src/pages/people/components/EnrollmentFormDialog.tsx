@@ -28,9 +28,21 @@ import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import useSchoolStore from '@/stores/useSchoolStore'
 import useCourseStore from '@/stores/useCourseStore'
+import useStudentStore from '@/stores/useStudentStore'
 import { useEffect } from 'react'
 import { validateEnrollment } from '@/lib/enrollment-utils'
+import {
+  validateEnrollmentComplete,
+  validateAgeGrade,
+  validateDateLogic,
+} from '@/lib/validations'
 import { useToast } from '@/hooks/use-toast'
+import {
+  safeArray,
+  safeFind,
+  safeMap,
+  safeFlatMap,
+} from '@/lib/array-utils'
 
 const enrollmentSchema = z.object({
   schoolId: z.string().min(1, 'Escola é obrigatória'),
@@ -51,15 +63,18 @@ interface EnrollmentFormDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   onSubmit: (data: any) => void
+  studentId?: string
 }
 
 export function EnrollmentFormDialog({
   open,
   onOpenChange,
   onSubmit,
+  studentId,
 }: EnrollmentFormDialogProps) {
   const { schools } = useSchoolStore()
-  const { courses } = useCourseStore()
+  const { etapasEnsino } = useCourseStore()
+  const { students, enrollments } = useStudentStore()
   const { toast } = useToast()
 
   const form = useForm<z.infer<typeof enrollmentSchema>>({
@@ -79,22 +94,23 @@ export function EnrollmentFormDialog({
   const selectedYearId = form.watch('yearId')
   const selectedClassId = form.watch('classId')
 
-  const selectedSchool = schools.find((s) => s.id === selectedSchoolId)
+  const selectedSchool = safeFind(schools, (s) => s.id === selectedSchoolId)
   const academicYears = selectedSchool?.academicYears || []
 
   const selectedYear = academicYears.find((y) => y.id === selectedYearId)
-  const classes = selectedYear?.classes || []
+  const turmas = selectedYear?.turmas || []
+  const classes = turmas
 
   const selectedClass = classes.find((c) => c.id === selectedClassId)
   const isMultiGrade = selectedClass?.isMultiGrade
 
   // Determine Grade and Shift to display
-  const displayGrade = selectedClass?.gradeName || ''
+  const displayGrade = selectedClass?.serieAnoName || ''
   const displayShift = selectedClass?.shift || ''
 
-  // Flatten grades for selection
-  const flattenGrades = courses.flatMap((c) =>
-    c.grades.map((g) => ({ ...g, courseName: c.name })),
+  // Flatten seriesAnos for selection
+  const flattenGrades = safeFlatMap(etapasEnsino, (e) =>
+    safeMap(e.seriesAnos, (s) => ({ ...s, courseName: e.name, etapaEnsinoName: e.name })),
   )
 
   // Reset downstream fields when upstream changes
@@ -103,13 +119,15 @@ export function EnrollmentFormDialog({
       form.setValue('yearId', '')
       form.setValue('classId', '')
     }
-  }, [selectedSchoolId, form])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedSchoolId])
 
   useEffect(() => {
     if (!selectedYearId) {
       form.setValue('classId', '')
     }
-  }, [selectedYearId, form])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedYearId])
 
   const handleSubmit = (data: z.infer<typeof enrollmentSchema>) => {
     const currentClass = classes.find((c) => c.id === data.classId)
@@ -122,8 +140,8 @@ export function EnrollmentFormDialog({
     if (isMultiGrade && data.multiSeriesGradeId) {
       const mg = flattenGrades.find((g) => g.id === data.multiSeriesGradeId)
       if (mg) gradeName = mg.name
-    } else if (currentClass?.gradeName) {
-      gradeName = currentClass.gradeName
+    } else if (currentClass?.serieAnoName) {
+      gradeName = currentClass.serieAnoName
     }
 
     // Criar objeto de enrollment para validação
@@ -143,15 +161,87 @@ export function EnrollmentFormDialog({
         | 'Abandono',
     }
 
-    // Validar relacionamentos antes de criar
-    const validation = validateEnrollment(enrollmentData, schools)
-    if (!validation.valid) {
+    // Validar relacionamentos básicos
+    const basicValidation = validateEnrollment(enrollmentData, schools)
+    if (!basicValidation.valid) {
       toast({
         title: 'Erro de Validação',
-        description: validation.errors.join('. '),
+        description: basicValidation.errors.join('. '),
         variant: 'destructive',
       })
       return
+    }
+
+    // Validação completa de matrícula (se studentId fornecido)
+    if (studentId) {
+      const student = students.find((s) => s.id === studentId)
+      if (student) {
+        // Validar idade vs série/ano
+        if (student.birthDate && currentClass?.serieAnoId) {
+          const gradeNumber = currentClass.serieAnoName
+            ? parseInt(currentClass.serieAnoName.replace(/\D/g, ''))
+            : undefined
+
+          if (gradeNumber) {
+            const ageValidation = validateAgeGrade(student.birthDate, gradeNumber, true)
+            if (!ageValidation.valid && ageValidation.error) {
+              toast({
+                title: 'Atenção - Idade vs Série',
+                description: ageValidation.error,
+                variant: 'destructive',
+              })
+              // Não bloquear, mas alertar
+            } else if (ageValidation.warning) {
+              toast({
+                title: 'Atenção',
+                description: ageValidation.warning,
+                variant: 'default',
+              })
+            }
+          }
+        }
+
+        // Validar data de nascimento vs data de matrícula
+        if (student.birthDate && selectedYear?.startDate) {
+          const dateValidation = validateDateLogic(student.birthDate, selectedYear.startDate)
+          if (!dateValidation.valid) {
+            toast({
+              title: 'Erro de Validação',
+              description: dateValidation.error || 'Data inválida',
+              variant: 'destructive',
+            })
+            return
+          }
+        }
+
+        // Validação completa de matrícula
+        const completeValidation = validateEnrollmentComplete(
+          enrollmentData,
+          studentId,
+          enrollments,
+          schools,
+        )
+
+        if (!completeValidation.valid) {
+          toast({
+            title: 'Erro de Validação de Matrícula',
+            description: completeValidation.errors.join('. '),
+            variant: 'destructive',
+          })
+          return
+        }
+
+        // Mostrar avisos se houver
+        if (completeValidation.warnings.length > 0) {
+          completeValidation.warnings.forEach((warning) => {
+            toast({
+              title: 'Atenção',
+              description: warning,
+              variant: 'default',
+            })
+          })
+        }
+      }
     }
 
     onSubmit({
@@ -199,7 +289,7 @@ export function EnrollmentFormDialog({
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        {schools.map((school) => (
+                        {safeMap(schools, (school) => (
                           <SelectItem key={school.id} value={school.id}>
                             {school.name}
                           </SelectItem>
@@ -228,7 +318,7 @@ export function EnrollmentFormDialog({
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        {academicYears.map((year) => (
+                        {safeMap(academicYears, (year) => (
                           <SelectItem key={year.id} value={year.id}>
                             {year.name} (
                             {year.status === 'active' ? 'Ativo' : year.status})
@@ -259,7 +349,7 @@ export function EnrollmentFormDialog({
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      {classes.map((cls) => (
+                      {safeMap(classes, (cls) => (
                         <SelectItem key={cls.id} value={cls.id}>
                           {cls.name}
                         </SelectItem>
@@ -310,7 +400,7 @@ export function EnrollmentFormDialog({
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        {flattenGrades.map((grade) => (
+                        {safeMap(flattenGrades, (grade) => (
                           <SelectItem key={grade.id} value={grade.id}>
                             {grade.name} ({grade.courseName})
                           </SelectItem>

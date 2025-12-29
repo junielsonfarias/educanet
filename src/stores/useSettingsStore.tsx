@@ -5,6 +5,8 @@ import {
   DashboardLayout,
   initialDashboardLayout,
 } from '@/lib/mock-data'
+import { handleError } from '@/lib/error-handling'
+import { sanitizeStoreItem } from '@/lib/data-sanitizer'
 
 interface SettingsContextType {
   settings: GeneralSettings
@@ -28,9 +30,17 @@ export const SettingsProvider = ({
     if (stored) {
       try {
         const parsed = JSON.parse(stored)
-        setSettings({ ...initialSettings, ...parsed })
+        const sanitized = sanitizeStoreItem<GeneralSettings>(parsed, {
+          arrayFields: ['savedLayouts'],
+          defaults: initialSettings,
+        })
+        setSettings(sanitized || initialSettings)
       } catch (error) {
-        console.error('Failed to parse settings from local storage:', error)
+        handleError(error as Error, {
+          showToast: false,
+          context: { action: 'loadSettings', source: 'localStorage' },
+        })
+        setSettings(initialSettings)
       }
     }
   }, [])

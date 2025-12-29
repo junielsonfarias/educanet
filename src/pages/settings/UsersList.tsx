@@ -89,22 +89,38 @@ export default function UsersList() {
     }
   }, [currentUser, navigate, toast])
 
-  const handleCreateUser = (data: any) => {
-    addUser(data)
-    toast({
-      title: 'Usuário criado',
-      description: `O usuário ${data.name} foi criado com sucesso.`,
-    })
+  const handleCreateUser = async (data: any) => {
+    try {
+      await addUser(data)
+      toast({
+        title: 'Usuário criado',
+        description: `O usuário ${data.name} foi criado com sucesso.`,
+      })
+    } catch (error) {
+      toast({
+        variant: 'destructive',
+        title: 'Erro ao criar usuário',
+        description: 'Não foi possível criar o usuário. Tente novamente.',
+      })
+    }
   }
 
-  const handleUpdateUser = (data: any) => {
+  const handleUpdateUser = async (data: any) => {
     if (editingUser) {
-      updateUser(editingUser.id, data)
-      toast({
-        title: 'Usuário atualizado',
-        description: `Os dados de ${data.name} foram atualizados.`,
-      })
-      setEditingUser(null)
+      try {
+        await updateUser(editingUser.id, data)
+        toast({
+          title: 'Usuário atualizado',
+          description: `Os dados de ${data.name} foram atualizados.`,
+        })
+        setEditingUser(null)
+      } catch (error) {
+        toast({
+          variant: 'destructive',
+          title: 'Erro ao atualizar usuário',
+          description: 'Não foi possível atualizar o usuário. Tente novamente.',
+        })
+      }
     }
   }
 
@@ -224,8 +240,13 @@ export default function UsersList() {
             Controle de acesso e perfis do sistema.
           </p>
         </div>
-        <Button onClick={openCreateDialog} className="w-full sm:w-auto">
-          <Plus className="mr-2 h-4 w-4" />
+        <Button 
+          onClick={openCreateDialog} 
+          className="w-full sm:w-auto bg-gradient-to-r from-primary via-blue-600 to-primary bg-size-200 bg-pos-0 hover:bg-pos-100 text-white shadow-lg hover:shadow-xl transition-all duration-500 transform hover:scale-105 font-semibold"
+        >
+          <div className="p-1 rounded-md bg-white/20 mr-2">
+            <Plus className="h-5 w-5" />
+          </div>
           Novo Usuário
         </Button>
       </div>

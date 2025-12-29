@@ -51,6 +51,7 @@ import { useNavigate } from 'react-router-dom'
 import { StudentFormDialog } from './components/StudentFormDialog'
 import { Student } from '@/lib/mock-data'
 import { useToast } from '@/hooks/use-toast'
+import { RequirePermission } from '@/components/RequirePermission'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -85,8 +86,7 @@ export default function StudentsList() {
   const navigate = useNavigate()
   const { toast } = useToast()
 
-  const isAdminOrSupervisor =
-    currentUser?.role === 'admin' || currentUser?.role === 'supervisor'
+  // Permissões serão verificadas via RequirePermission
 
   // Unique grades for filter
   const uniqueGrades = Array.from(
@@ -223,12 +223,17 @@ export default function StudentsList() {
           <Button variant="outline" className="w-full sm:w-auto">
             Exportar Lista
           </Button>
-          {isAdminOrSupervisor && (
-            <Button onClick={openCreateDialog} className="w-full sm:w-auto">
-              <Plus className="mr-2 h-4 w-4" />
+          <RequirePermission permission="create:student">
+            <Button 
+              onClick={openCreateDialog} 
+              className="w-full sm:w-auto bg-gradient-to-r from-primary via-blue-600 to-primary bg-size-200 bg-pos-0 hover:bg-pos-100 text-white shadow-lg hover:shadow-xl transition-all duration-500 transform hover:scale-105 font-semibold"
+            >
+              <div className="p-1 rounded-md bg-white/20 mr-2">
+                <Plus className="h-5 w-5" />
+              </div>
               Novo Aluno
             </Button>
-          )}
+          </RequirePermission>
         </div>
       </div>
 
@@ -329,8 +334,14 @@ export default function StudentsList() {
               <TableBody>
                 {paginatedStudents.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={6} className="h-24 text-center">
-                      Nenhum aluno encontrado.
+                    <TableCell colSpan={6} className="h-32 text-center">
+                      <div className="flex flex-col items-center justify-center py-4">
+                        <div className="mb-3 p-3 rounded-full bg-gradient-to-br from-blue-500/10 via-blue-500/5 to-transparent">
+                          <Users className="h-8 w-8 text-blue-600/60" />
+                        </div>
+                        <p className="text-sm font-medium text-foreground">Nenhum aluno encontrado.</p>
+                        <p className="text-xs text-muted-foreground mt-1">Tente ajustar os filtros de busca.</p>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ) : (
@@ -352,7 +363,7 @@ export default function StudentsList() {
                     return (
                       <TableRow
                         key={studentId}
-                        className="cursor-pointer hover:bg-muted/50"
+                        className="cursor-pointer border-l-4 border-l-transparent hover:border-l-blue-500 hover:bg-gradient-to-r hover:from-blue-50/50 hover:to-transparent transition-all duration-200"
                         onClick={() => navigate(`/pessoas/alunos/${studentId}`)}
                       >
                         <TableCell>
@@ -374,17 +385,21 @@ export default function StudentsList() {
                         <TableCell>{displayGrade || '-'}</TableCell>
                         <TableCell>
                           <Badge
-                            variant={
+                            className={`flex items-center gap-1.5 px-2.5 py-1 font-medium ${
                               displayStatus === 'Cursando'
-                                ? 'outline'
-                                : 'secondary'
-                            }
-                            className={
-                              displayStatus === 'Cursando'
-                                ? 'bg-green-50 text-green-700 border-green-200'
-                                : ''
-                            }
+                                ? 'bg-gradient-to-r from-green-500 to-emerald-600 text-white shadow-md'
+                                : displayStatus === 'Transferido'
+                                ? 'bg-gradient-to-r from-blue-500 to-blue-600 text-white'
+                                : displayStatus === 'Aprovado'
+                                ? 'bg-gradient-to-r from-green-500 to-green-600 text-white'
+                                : 'bg-gradient-to-r from-gray-400 to-gray-500 text-white'
+                            }`}
                           >
+                            <div
+                              className={`h-2 w-2 rounded-full ${
+                                displayStatus === 'Cursando' ? 'bg-white' : 'bg-white/80'
+                              }`}
+                            />
                             {displayStatus || 'Inativo'}
                           </Badge>
                         </TableCell>
@@ -418,28 +433,28 @@ export default function StudentsList() {
                                 <FileText className="h-4 w-4" /> Histórico
                                 Escolar
                               </DropdownMenuItem>
-                              {isAdminOrSupervisor && (
-                                <>
-                                  <DropdownMenuSeparator />
-                                  <DropdownMenuItem
-                                    onClick={(e) => {
-                                      e.stopPropagation()
-                                      openEditDialog(student)
-                                    }}
-                                  >
-                                    Editar Cadastro
-                                  </DropdownMenuItem>
-                                  <DropdownMenuItem
-                                    className="text-destructive"
-                                    onClick={(e) => {
-                                      e.stopPropagation()
-                                      setDeleteId(studentId)
-                                    }}
-                                  >
-                                    Excluir
-                                  </DropdownMenuItem>
-                                </>
-                              )}
+                              <RequirePermission permission="edit:student">
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    openEditDialog(student)
+                                  }}
+                                >
+                                  Editar Cadastro
+                                </DropdownMenuItem>
+                              </RequirePermission>
+                              <RequirePermission permission="delete:student">
+                                <DropdownMenuItem
+                                  className="text-destructive"
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    setDeleteId(studentId)
+                                  }}
+                                >
+                                  Excluir
+                                </DropdownMenuItem>
+                              </RequirePermission>
                             </DropdownMenuContent>
                           </DropdownMenu>
                         </TableCell>

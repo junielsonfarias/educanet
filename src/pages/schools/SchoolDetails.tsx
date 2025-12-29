@@ -51,7 +51,7 @@ export default function SchoolDetails() {
   const navigate = useNavigate()
   const { getSchool, addAcademicYear, addClassroom, updateAcademicYearStatus } =
     useSchoolStore()
-  const { courses } = useCourseStore()
+  const { etapasEnsino } = useCourseStore()
   const { toast } = useToast()
 
   const [isYearDialogOpen, setIsYearDialogOpen] = useState(false)
@@ -344,7 +344,7 @@ export default function SchoolDetails() {
                               : 'Pendente'}
                         </Badge>
                         <span className="text-sm text-muted-foreground ml-2">
-                          {year.classes.length} Turmas
+                          {(year.turmas || year.classes || []).length} Turmas
                         </span>
                       </div>
                     </div>
@@ -400,13 +400,13 @@ export default function SchoolDetails() {
                         </Button>
                       </div>
 
-                      {year.classes.length === 0 ? (
+                      {(year.turmas || year.classes || []).length === 0 ? (
                         <p className="text-sm text-muted-foreground italic">
                           Nenhuma turma cadastrada.
                         </p>
                       ) : (
                         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                          {year.classes.map((classroom) => (
+                          {(year.turmas || year.classes || []).map((classroom) => (
                             <div
                               key={classroom.id}
                               className="bg-secondary/20 p-4 rounded-md border flex flex-col gap-2"
@@ -463,7 +463,7 @@ export default function SchoolDetails() {
         open={isClassDialogOpen}
         onOpenChange={setIsClassDialogOpen}
         onSubmit={handleAddClass}
-        courses={courses}
+        etapasEnsino={etapasEnsino}
       />
     </div>
   )

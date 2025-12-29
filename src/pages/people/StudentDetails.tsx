@@ -48,6 +48,13 @@ import { EnrollmentFormDialog } from './components/EnrollmentFormDialog'
 import { ProjectEnrollmentDialog } from './components/ProjectEnrollmentDialog'
 import { StudentTransferDialog } from './components/StudentTransferDialog'
 import { StudentInfoCard } from './components/StudentInfoCard'
+import {
+  safeArray,
+  safeFind,
+  safeMap,
+  safeFilter,
+  safeLength,
+} from '@/lib/array-utils'
 import { StudentPerformanceCard } from './components/StudentPerformanceCard'
 import { StudentAssessmentHistory } from './components/StudentAssessmentHistory'
 import { StudentAttendanceCard } from './components/StudentAttendanceCard'
@@ -68,7 +75,7 @@ export default function StudentDetails() {
   } = useStudentStore()
   const { schools } = useSchoolStore()
   const { assessments, assessmentTypes } = useAssessmentStore()
-  const { courses } = useCourseStore()
+  const { etapasEnsino } = useCourseStore()
   const { projects } = useProjectStore()
   const { currentUser } = useUserStore()
   const { getStudentOccurrences } = useOccurrenceStore()
@@ -95,14 +102,14 @@ export default function StudentDetails() {
   }
 
   // Current Info - usando funções utilitárias
-  const activeEnrollment = student.enrollments.find(
+  const activeEnrollment = safeFind(student?.enrollments,
     (e) => e.status === 'Cursando',
   )
-  const currentSchool = schools.find((s) => s.id === activeEnrollment?.schoolId)
+  const currentSchool = safeFind(schools, (s) => s.id === activeEnrollment?.schoolId)
   const currentYear =
     activeEnrollment && currentSchool
-      ? getAcademicYearFromEnrollment(activeEnrollment, schools)
-      : currentSchool?.academicYears.find(
+      ? getAcademicYearFromEnrollment(activeEnrollment, schools || [])
+      : safeFind(safeArray(currentSchool?.academicYears),
           (y) => y.name === activeEnrollment?.year.toString(),
         )
 
@@ -112,35 +119,39 @@ export default function StudentDetails() {
 
   if (activeEnrollment && currentYear && currentSchool) {
     // Usar função utilitária para buscar turma
-    const classroom = getClassroomFromEnrollment(activeEnrollment, schools)
+    const classroom = getClassroomFromEnrollment(activeEnrollment, schools || [])
     
-    // Buscar grade usando gradeId da turma (prioritário)
-    if (classroom?.gradeId) {
-      for (const course of courses) {
-        const g = course.grades.find((gr) => gr.id === classroom.gradeId)
-        if (g) {
-          gradeStructure = g
-          break
+    // Buscar grade usando serieAnoId da turma (prioritário)
+    if (classroom?.serieAnoId && Array.isArray(etapasEnsino)) {
+      for (const etapaEnsino of etapasEnsino) {
+        if (Array.isArray(etapaEnsino.seriesAnos)) {
+          const s = etapaEnsino.seriesAnos.find((sr) => sr.id === classroom.serieAnoId)
+          if (s) {
+            gradeStructure = s
+            break
+          }
         }
       }
     }
     
     // Fallback: buscar por nome se não encontrou por ID
-    if (!gradeStructure) {
-      for (const course of courses) {
-        const g = course.grades.find(
-          (gr) => gr.name === activeEnrollment.grade,
-        )
-        if (g) {
-          gradeStructure = g
-          break
+    if (!gradeStructure && Array.isArray(etapasEnsino)) {
+      for (const etapaEnsino of etapasEnsino) {
+        if (Array.isArray(etapaEnsino.seriesAnos)) {
+          const s = etapaEnsino.seriesAnos.find(
+            (sr) => sr.name === activeEnrollment.grade,
+          )
+          if (s) {
+            gradeStructure = s
+            break
+          }
         }
       }
     }
   }
   const subjects = gradeStructure?.subjects || []
 
-  const occurrences = getStudentOccurrences(student.id).sort(
+  const occurrences = (getStudentOccurrences(student.id) || []).sort(
     (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime(),
   )
 
@@ -315,15 +326,15 @@ export default function StudentDetails() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {student.enrollments.length === 0 ? (
+                    {safeLength(student?.enrollments) === 0 ? (
                       <TableRow>
                         <TableCell colSpan={5} className="text-center h-24">
                           Nenhuma matrícula registrada.
                         </TableCell>
                       </TableRow>
                     ) : (
-                      student.enrollments.map((e) => {
-                        const school = schools.find((s) => s.id === e.schoolId)
+                      safeMap(student?.enrollments, (e) => {
+                        const school = safeFind(schools, (s) => s.id === e.schoolId)
                         return (
                           <TableRow key={e.id}>
                             <TableCell className="font-medium">
@@ -378,14 +389,14 @@ export default function StudentDetails() {
                 )}
               </CardHeader>
               <CardContent>
-                {student.projectIds.length === 0 ? (
+                {safeLength(student?.projectIds) === 0 ? (
                   <p className="text-sm text-muted-foreground italic py-4 text-center">
                     O aluno não participa de nenhum projeto no momento.
                   </p>
                 ) : (
                   <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                    {student.projectIds.map((pid) => {
-                      const proj = projects.find((p) => p.id === pid)
+                    {safeMap(student?.projectIds, (pid) => {
+                      const proj = safeFind(projects, (p) => p.id === pid)
                       if (!proj) return null
                       return (
                         <div
@@ -427,7 +438,7 @@ export default function StudentDetails() {
             <div className="grid gap-6">
               <StudentPerformanceCard student={student} />
               <StudentAssessmentHistory
-                assessments={assessments.filter(
+                assessments={safeFilter(assessments,
                   (a) => a.studentId === student.id,
                 )}
                 assessmentTypes={assessmentTypes}
@@ -462,7 +473,7 @@ export default function StudentDetails() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {occurrences.map((occ) => (
+                      {safeMap(occurrences, (occ) => (
                         <TableRow key={occ.id}>
                           <TableCell className="whitespace-nowrap">
                             {format(parseISO(occ.date), 'dd/MM/yyyy HH:mm')}

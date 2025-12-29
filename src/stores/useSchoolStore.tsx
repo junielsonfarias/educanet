@@ -1,5 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react'
-import { School, mockSchools, AcademicYear, Classroom } from '@/lib/mock-data'
+import { School, mockSchools, AnoLetivo, Turma } from '@/lib/mock-data'
+import { handleError } from '@/lib/error-handling'
+import { sanitizeStoreData } from '@/lib/data-sanitizer'
 
 interface SchoolContextType {
   schools: School[]
@@ -9,7 +11,7 @@ interface SchoolContextType {
   getSchool: (id: string) => School | undefined
   addAcademicYear: (
     schoolId: string,
-    year: Omit<AcademicYear, 'id' | 'classes' | 'status'>,
+    year: Omit<AnoLetivo, 'id' | 'turmas' | 'status'>,
   ) => void
   updateAcademicYearStatus: (
     schoolId: string,
@@ -19,15 +21,28 @@ interface SchoolContextType {
   addClassroom: (
     schoolId: string,
     yearId: string,
-    classroom: Omit<Classroom, 'id'>,
+    classroom: Omit<Turma, 'id'>,
   ) => void
   updateClassroom: (
     schoolId: string,
     yearId: string,
     classId: string,
-    data: Partial<Classroom>,
+    data: Partial<Turma>,
   ) => void
   deleteClassroom: (schoolId: string, yearId: string, classId: string) => void
+  // Aliases para compatibilidade (deprecated)
+  addTurma: (
+    schoolId: string,
+    yearId: string,
+    turma: Omit<Turma, 'id'>,
+  ) => void
+  updateTurma: (
+    schoolId: string,
+    yearId: string,
+    turmaId: string,
+    data: Partial<Turma>,
+  ) => void
+  deleteTurma: (schoolId: string, yearId: string, turmaId: string) => void
 }
 
 const SchoolContext = createContext<SchoolContextType | null>(null)
@@ -40,18 +55,27 @@ export const SchoolProvider = ({ children }: { children: React.ReactNode }) => {
     if (stored) {
       try {
         const parsed = JSON.parse(stored)
-        if (Array.isArray(parsed)) {
-          // Sanitize data to ensure arrays exist
-          const sanitized = parsed.map((s) => ({
+        // Sanitizar dados usando utilitário centralizado
+        const sanitized = sanitizeStoreData<School>(parsed, {
+          arrayFields: ['academicYears'],
+          customSanitizer: (s: any) => ({
             ...s,
             academicYears: Array.isArray(s.academicYears)
-              ? s.academicYears
+              ? s.academicYears.map((year: any) => ({
+                  ...year,
+                  turmas: Array.isArray(year.turmas) ? year.turmas : [],
+                  periods: Array.isArray(year.periods) ? year.periods : [],
+                }))
               : [],
-          }))
-          setSchools(sanitized)
-        }
+          }),
+        })
+        setSchools(sanitized.length > 0 ? sanitized : mockSchools)
       } catch (error) {
-        console.error('Failed to parse schools from local storage:', error)
+        handleError(error as Error, {
+          showToast: false,
+          context: { action: 'loadSchools', source: 'localStorage' },
+        })
+        setSchools(mockSchools)
       }
     }
   }, [])
@@ -81,31 +105,33 @@ export const SchoolProvider = ({ children }: { children: React.ReactNode }) => {
 
   const addAcademicYear = (
     schoolId: string,
-    yearData: Omit<AcademicYear, 'id' | 'classes' | 'status'>,
+    yearData: Omit<AnoLetivo, 'id' | 'turmas' | 'status'>,
   ) => {
     setSchools((prev) =>
       prev.map((s) => {
         if (s.id === schoolId) {
           // Replication Logic
           const lastYear =
-            s.academicYears.length > 0
-              ? s.academicYears[s.academicYears.length - 1]
+            (s.academicYears || []).length > 0
+              ? (s.academicYears || [])[(s.academicYears || []).length - 1]
               : null
 
-          let replicatedClasses: Classroom[] = []
-          if (lastYear && lastYear.classes) {
-            replicatedClasses = lastYear.classes.map((c) => ({
+          let replicatedTurmas: Turma[] = []
+          // Usa turmas (com fallback para classes apenas durante migração)
+          const lastYearTurmas = lastYear?.turmas || lastYear?.classes || []
+          if (lastYear && lastYearTurmas.length > 0) {
+            replicatedTurmas = lastYearTurmas.map((c) => ({
               ...c,
               id: Math.random().toString(36).substring(2, 11),
               studentCount: 0, // Reset student count
             }))
           }
 
-          const newYear: AcademicYear = {
+          const newYear: AnoLetivo = {
             ...yearData,
             status: 'pending', // Default status
             id: Math.random().toString(36).substring(2, 11),
-            classes: replicatedClasses,
+            turmas: replicatedTurmas,
           }
           const currentYears = Array.isArray(s.academicYears)
             ? s.academicYears
@@ -127,7 +153,7 @@ export const SchoolProvider = ({ children }: { children: React.ReactNode }) => {
         if (s.id === schoolId) {
           return {
             ...s,
-            academicYears: s.academicYears.map((y) =>
+            academicYears: (s.academicYears || []).map((y) =>
               y.id === yearId ? { ...y, status } : y,
             ),
           }
@@ -140,7 +166,7 @@ export const SchoolProvider = ({ children }: { children: React.ReactNode }) => {
   const addClassroom = (
     schoolId: string,
     yearId: string,
-    data: Omit<Classroom, 'id'>,
+    data: Omit<Turma, 'id'>,
   ) => {
     setSchools((prev) =>
       prev.map((s) => {
@@ -150,15 +176,14 @@ export const SchoolProvider = ({ children }: { children: React.ReactNode }) => {
             : []
           return {
             ...s,
-            academicYears: academicYears.map((y) => {
+            academicYears: (academicYears || []).map((y) => {
               if (y.id === yearId) {
-                const currentClasses = Array.isArray(y.classes) ? y.classes : []
+                // Usa turmas (com fallback para classes apenas durante migração)
+                const currentTurmas = y.turmas || y.classes || []
+                const newTurma = { ...data, id: Math.random().toString(36).substring(2, 11) }
                 return {
                   ...y,
-                  classes: [
-                    ...currentClasses,
-                    { ...data, id: Math.random().toString(36).substring(2, 11) },
-                  ],
+                  turmas: [...currentTurmas, newTurma],
                 }
               }
               return y
@@ -170,24 +195,30 @@ export const SchoolProvider = ({ children }: { children: React.ReactNode }) => {
     )
   }
 
+  // Alias para compatibilidade
+  const addTurma = addClassroom
+
   const updateClassroom = (
     schoolId: string,
     yearId: string,
     classId: string,
-    data: Partial<Classroom>,
+    data: Partial<Turma>,
   ) => {
     setSchools((prev) =>
       prev.map((s) => {
         if (s.id === schoolId) {
           return {
             ...s,
-            academicYears: s.academicYears.map((y) => {
+            academicYears: (s.academicYears || []).map((y) => {
               if (y.id === yearId) {
+                // Usa turmas (com fallback para classes apenas durante migração)
+                const turmas = y.turmas || y.classes || []
+                const updatedTurmas = turmas.map((c) =>
+                  c.id === classId ? { ...c, ...data } : c,
+                )
                 return {
                   ...y,
-                  classes: y.classes.map((c) =>
-                    c.id === classId ? { ...c, ...data } : c,
-                  ),
+                  turmas: updatedTurmas,
                 }
               }
               return y
@@ -198,6 +229,9 @@ export const SchoolProvider = ({ children }: { children: React.ReactNode }) => {
       }),
     )
   }
+
+  // Alias para compatibilidade
+  const updateTurma = updateClassroom
 
   const deleteClassroom = (
     schoolId: string,
@@ -209,11 +243,14 @@ export const SchoolProvider = ({ children }: { children: React.ReactNode }) => {
         if (s.id === schoolId) {
           return {
             ...s,
-            academicYears: s.academicYears.map((y) => {
+            academicYears: (s.academicYears || []).map((y) => {
               if (y.id === yearId) {
+                // Usa turmas (com fallback para classes apenas durante migração)
+                const turmas = y.turmas || y.classes || []
+                const filteredTurmas = turmas.filter((c) => c.id !== classId)
                 return {
                   ...y,
-                  classes: y.classes.filter((c) => c.id !== classId),
+                  turmas: filteredTurmas,
                 }
               }
               return y
@@ -224,6 +261,9 @@ export const SchoolProvider = ({ children }: { children: React.ReactNode }) => {
       }),
     )
   }
+
+  // Alias para compatibilidade
+  const deleteTurma = deleteClassroom
 
   return (
     <SchoolContext.Provider
@@ -238,6 +278,10 @@ export const SchoolProvider = ({ children }: { children: React.ReactNode }) => {
         addClassroom,
         updateClassroom,
         deleteClassroom,
+        // Aliases para compatibilidade
+        addTurma,
+        updateTurma,
+        deleteTurma,
       }}
     >
       {children}

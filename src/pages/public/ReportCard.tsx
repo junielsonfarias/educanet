@@ -33,6 +33,13 @@ import {
   HistoryEntry,
 } from './components/types'
 import { format } from 'date-fns'
+import {
+  safeArray,
+  safeFind,
+  safeForEach,
+  safeFilter,
+  safeMap,
+} from '@/lib/array-utils'
 
 export default function ReportCard() {
   const [searchRegistration, setSearchRegistration] = useState('')
@@ -45,12 +52,12 @@ export default function ReportCard() {
 
   const { students } = useStudentStore()
   const { assessments, assessmentTypes } = useAssessmentStore()
-  const { courses, evaluationRules } = useCourseStore()
+  const { etapasEnsino, evaluationRules } = useCourseStore()
   const { schools } = useSchoolStore()
 
-  const activeSchool = schools.find((s) => s.id === selectedSchool)
-  const academicYears = activeSchool?.academicYears || []
-  const activeYear = academicYears.find((y) => y.id === selectedYear)
+  const activeSchool = safeFind(schools, (s) => s.id === selectedSchool)
+  const academicYears = safeArray(activeSchool?.academicYears)
+  const activeYear = safeFind(academicYears, (y) => y.id === selectedYear)
 
   const availableGrades = useMemo(() => {
     if (!activeYear || !selectedSchool) return []
@@ -58,16 +65,22 @@ export default function ReportCard() {
     const validGradeNames = new Set<string>()
     const classMap = new Map<string, string>()
 
-    // Map classes to grade names
-    activeYear.classes.forEach((c) => {
-      if (c.gradeName) {
-        classMap.set(c.name, c.gradeName)
-      }
-    })
+    // Map turmas to grade names
+    const turmas = Array.isArray(activeYear?.turmas) 
+      ? activeYear.turmas 
+      : (Array.isArray(activeYear?.classes) ? activeYear.classes : [])
+    
+    if (Array.isArray(turmas)) {
+      turmas.forEach((c) => {
+        if (c?.serieAnoName || c?.gradeName) {
+          classMap.set(c.name, c.serieAnoName || c.gradeName)
+        }
+      })
+    }
 
     // Filter students with active regular enrollments in this school/year
-    students.forEach((student) => {
-      student.enrollments.forEach((e) => {
+    safeForEach(students, (student) => {
+      safeForEach(student.enrollments, (e) => {
         if (
           e.schoolId === selectedSchool &&
           e.year.toString() === activeYear.name &&
@@ -110,7 +123,7 @@ export default function ReportCard() {
     }[] = []
 
     subjects.forEach((subject: any) => {
-      const subjectAssessments = assessments.filter(
+      const subjectAssessments = safeFilter(assessments,
         (a) =>
           a.studentId === studentId &&
           a.subjectId === subject.id &&
@@ -120,10 +133,10 @@ export default function ReportCard() {
 
       // Collect Raw History
       subjectAssessments.forEach((a) => {
-        const type = assessmentTypes.find((t) => t.id === a.assessmentTypeId)
-        const period = periods.find((p: any) => p.id === a.periodId)
+        const type = safeFind(assessmentTypes, (t) => t.id === a.assessmentTypeId)
+        const period = safeFind(periods, (p: any) => p.id === a.periodId)
 
-        const recovery = assessments.find(
+        const recovery = safeFind(assessments,
           (rec) => rec.relatedAssessmentId === a.id,
         )
 
@@ -162,7 +175,7 @@ export default function ReportCard() {
           a.assessmentTypeId &&
           (a.category || 'regular') !== 'recuperation'
         ) {
-          const p = periods.find((pr: any) => pr.id === a.periodId)
+          const p = safeFind(periods, (pr: any) => pr.id === a.periodId)
           if (p) {
             allAssessments.push({
               typeId: a.assessmentTypeId,
@@ -223,7 +236,7 @@ export default function ReportCard() {
     })
 
     groupedByType.forEach((entries, typeId) => {
-      const type = assessmentTypes.find((t) => t.id === typeId)
+      const type = safeFind(assessmentTypes, (t) => t.id === typeId)
       if (type && type.excludeFromAverage) {
         evaluationTypes.push({
           id: type.id,
@@ -253,30 +266,36 @@ export default function ReportCard() {
       return
     }
 
-    const student = students.find((s) => s.registration === searchRegistration)
+    const student = safeFind(students, (s) => s.registration === searchRegistration)
     if (!student) {
       setError('Número de matrícula inválido ou não encontrado.')
       return
     }
 
     // Check for Regular Enrollment in Selected Criteria
-    const regularEnrollment = student.enrollments.find((e) => {
+    const regularEnrollment = safeFind(student?.enrollments, (e) => {
       if (e.schoolId !== selectedSchool) return false
       if (e.year.toString() !== activeYear?.name) return false
       if (e.type !== 'regular') return false
 
-      const cls = activeYear?.classes.find((c) => c.name === e.grade)
-      return cls && cls.gradeName === selectedGradeName
+      const turmas = Array.isArray(activeYear?.turmas) 
+        ? activeYear.turmas 
+        : (Array.isArray(activeYear?.classes) ? activeYear.classes : [])
+      const cls = Array.isArray(turmas) ? turmas.find((c) => c?.name === e.grade) : undefined
+      return cls && (cls.serieAnoName || cls.gradeName) === selectedGradeName
     })
 
     if (regularEnrollment) {
-      const school = schools.find((s) => s.id === regularEnrollment.schoolId)
-      const academicYear = school?.academicYears.find(
+      const school = safeFind(schools, (s) => s.id === regularEnrollment.schoolId)
+      const academicYear = safeFind(safeArray(school?.academicYears),
         (y) => y.name === regularEnrollment.year.toString(),
       )
-      const classroom = academicYear?.classes.find(
-        (c) => c.name === regularEnrollment.grade,
-      )
+      const turmas = Array.isArray(academicYear?.turmas) 
+        ? academicYear.turmas 
+        : (Array.isArray(academicYear?.classes) ? academicYear.classes : [])
+      const classroom = Array.isArray(turmas) ? turmas.find(
+        (c) => c?.name === regularEnrollment.grade,
+      ) : undefined
 
       if (!academicYear || !classroom) {
         setError('Dados acadêmicos incompletos.')
@@ -287,15 +306,15 @@ export default function ReportCard() {
       let regularGradeStructure: any = null
       let regularRule: any = null
 
-      for (const course of courses) {
-        const g = course.grades.find(
-          (gr) =>
-            gr.name === selectedGradeName ||
-            (classroom && gr.id === classroom.gradeId),
+      for (const etapaEnsino of safeArray(etapasEnsino)) {
+        const s = safeFind(safeArray(etapaEnsino.seriesAnos),
+          (serieAno) =>
+            serieAno.name === selectedGradeName ||
+            (classroom && serieAno.id === classroom.serieAnoId),
         )
-        if (g) {
-          regularGradeStructure = g
-          regularRule = evaluationRules.find((r) => r.id === g.evaluationRuleId)
+        if (s) {
+          regularGradeStructure = s
+          regularRule = safeFind(evaluationRules, (r) => r.id === s.evaluationRuleId)
           break
         }
       }
@@ -315,7 +334,7 @@ export default function ReportCard() {
         evaluationTypes: reportCardEvaluations,
         history: reportCardHistory,
       } = calculateSubjectGrades(
-        regularGradeStructure.subjects,
+        regularGradeStructure.subjects || [],
         student.id,
         academicYear.id,
         classroom.id,
@@ -325,7 +344,7 @@ export default function ReportCard() {
       )
 
       // Calculate Dependency Grades
-      const dependencyEnrollments = student.enrollments.filter(
+      const dependencyEnrollments = safeFilter(student?.enrollments,
         (e) =>
           e.schoolId === selectedSchool &&
           e.year.toString() === activeYear?.name &&
@@ -336,19 +355,22 @@ export default function ReportCard() {
       let dependencyHistory: HistoryEntry[] = []
 
       for (const depEnrollment of dependencyEnrollments) {
-        const depClass = activeYear.classes.find(
-          (c) => c.name === depEnrollment.grade,
-        )
+        const turmas = Array.isArray(activeYear?.turmas) 
+          ? activeYear.turmas 
+          : (Array.isArray(activeYear?.classes) ? activeYear.classes : [])
+        const depClass = Array.isArray(turmas) ? turmas.find(
+          (c) => c?.name === depEnrollment.grade,
+        ) : undefined
         if (!depClass) continue
 
         let depGradeStructure: any = null
         let depRule: any = null
 
-        for (const course of courses) {
-          const g = course.grades.find((gr) => gr.id === depClass.gradeId)
-          if (g) {
-            depGradeStructure = g
-            depRule = evaluationRules.find((r) => r.id === g.evaluationRuleId)
+        for (const etapaEnsino of etapasEnsino || []) {
+          const s = safeFind(safeArray(etapaEnsino.seriesAnos), (serieAno) => serieAno.id === (depClass.serieAnoId || depClass.gradeId))
+          if (s) {
+            depGradeStructure = s
+            depRule = safeFind(evaluationRules, (r) => r.id === s.evaluationRuleId)
             break
           }
         }
@@ -356,9 +378,9 @@ export default function ReportCard() {
         if (!depGradeStructure || !depRule) continue
 
         // Filter subjects with assessments
-        const activeSubjects = depGradeStructure.subjects.filter(
+        const activeSubjects = safeFilter(depGradeStructure.subjects,
           (subject: any) => {
-            return assessments.some(
+            return (assessments || []).some(
               (a) =>
                 a.studentId === student.id &&
                 a.subjectId === subject.id &&
@@ -419,17 +441,20 @@ export default function ReportCard() {
     }
 
     // Check for Dependency in Selected Series (for better error message)
-    const dependencyEnrollment = student.enrollments.find((e) => {
+    const dependencyEnrollment = safeFind(student?.enrollments, (e) => {
       if (e.schoolId !== selectedSchool) return false
       if (e.year.toString() !== activeYear?.name) return false
       if (e.type !== 'dependency') return false
 
-      const cls = activeYear?.classes.find((c) => c.name === e.grade)
-      return cls && cls.gradeName === selectedGradeName
+      const turmas = Array.isArray(activeYear?.turmas) 
+        ? activeYear.turmas 
+        : (Array.isArray(activeYear?.classes) ? activeYear.classes : [])
+      const cls = Array.isArray(turmas) ? turmas.find((c) => c?.name === e.grade) : undefined
+      return cls && (cls.serieAnoName || cls.gradeName) === selectedGradeName
     })
 
     if (dependencyEnrollment) {
-      const actualRegular = student.enrollments.find(
+      const actualRegular = safeFind(student?.enrollments,
         (e) =>
           e.schoolId === selectedSchool &&
           e.year.toString() === activeYear?.name &&
@@ -438,10 +463,13 @@ export default function ReportCard() {
 
       let suggestion = ''
       if (actualRegular) {
-        const cls = activeYear?.classes.find(
-          (c) => c.name === actualRegular.grade,
-        )
-        const regName = cls?.gradeName || actualRegular.grade
+        const turmas = Array.isArray(activeYear?.turmas) 
+          ? activeYear.turmas 
+          : (Array.isArray(activeYear?.classes) ? activeYear.classes : [])
+        const cls = Array.isArray(turmas) ? turmas.find(
+          (c) => c?.name === actualRegular.grade,
+        ) : undefined
+        const regName = cls?.serieAnoName || cls?.gradeName || actualRegular.grade
         suggestion = ` Por favor, verifique a série de matrícula regular do aluno (${regName}).`
       } else {
         suggestion =
@@ -497,7 +525,7 @@ export default function ReportCard() {
                       <SelectValue placeholder="Selecione a escola" />
                     </SelectTrigger>
                     <SelectContent>
-                      {schools.map((school) => (
+                      {safeMap(schools, (school) => (
                         <SelectItem key={school.id} value={school.id}>
                           {school.name}
                         </SelectItem>
@@ -520,7 +548,7 @@ export default function ReportCard() {
                       <SelectValue placeholder="Selecione o ano" />
                     </SelectTrigger>
                     <SelectContent>
-                      {academicYears.map((year) => (
+                      {safeMap(academicYears, (year) => (
                         <SelectItem key={year.id} value={year.id}>
                           {year.name}
                         </SelectItem>
@@ -546,7 +574,7 @@ export default function ReportCard() {
                       />
                     </SelectTrigger>
                     <SelectContent>
-                      {availableGrades.map((grade) => (
+                      {safeMap(availableGrades, (grade) => (
                         <SelectItem key={grade} value={grade}>
                           {grade}
                         </SelectItem>

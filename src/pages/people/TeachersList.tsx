@@ -31,6 +31,8 @@ import { useNavigate } from 'react-router-dom'
 import { TeacherFormDialog } from './components/TeacherFormDialog'
 import { Teacher } from '@/lib/mock-data'
 import { useToast } from '@/hooks/use-toast'
+import { usePermissions } from '@/hooks/usePermissions'
+import { RequirePermission } from '@/components/RequirePermission'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -68,7 +70,51 @@ export default function TeachersList() {
   })
 
   const handleCreate = (data: any) => {
-    addTeacher(data)
+    // Preparar dados com estrutura completa do Censo Escolar
+    const teacherData = {
+      ...data,
+      education: {
+        graduation: data.graduationCourse
+          ? {
+              course: data.graduationCourse,
+              institution: data.graduationInstitution || '',
+              year: data.graduationYear || new Date().getFullYear(),
+              area: data.graduationArea || '',
+            }
+          : undefined,
+        specialization: data.specializationCourse
+          ? {
+              course: data.specializationCourse,
+              institution: data.specializationInstitution || '',
+              year: data.specializationYear || new Date().getFullYear(),
+            }
+          : undefined,
+        master: data.masterCourse
+          ? {
+              course: data.masterCourse,
+              institution: data.masterInstitution || '',
+              year: data.masterYear || new Date().getFullYear(),
+            }
+          : undefined,
+        doctorate: data.doctorateCourse
+          ? {
+              course: data.doctorateCourse,
+              institution: data.doctorateInstitution || '',
+              year: data.doctorateYear || new Date().getFullYear(),
+            }
+          : undefined,
+      },
+      enabledSubjects: data.enabledSubjects || [],
+      functionalSituation: data.functionalSituation || 'efetivo',
+      contractType: data.contractType || 'estatutario',
+      experienceYears: data.experienceYears || 0,
+      workload: {
+        total: data.totalWorkload || 0,
+        bySubject: {},
+      },
+    }
+
+    addTeacher(teacherData)
     toast({
       title: 'Professor cadastrado',
       description: `${data.name} adicionado com sucesso.`,
@@ -77,7 +123,51 @@ export default function TeachersList() {
 
   const handleUpdate = (data: any) => {
     if (editingTeacher) {
-      updateTeacher(editingTeacher.id, data)
+      // Preparar dados com estrutura completa do Censo Escolar
+      const teacherData = {
+        ...data,
+        education: {
+          graduation: data.graduationCourse
+            ? {
+                course: data.graduationCourse,
+                institution: data.graduationInstitution || '',
+                year: data.graduationYear || new Date().getFullYear(),
+                area: data.graduationArea || '',
+              }
+            : undefined,
+          specialization: data.specializationCourse
+            ? {
+                course: data.specializationCourse,
+                institution: data.specializationInstitution || '',
+                year: data.specializationYear || new Date().getFullYear(),
+              }
+            : undefined,
+          master: data.masterCourse
+            ? {
+                course: data.masterCourse,
+                institution: data.masterInstitution || '',
+                year: data.masterYear || new Date().getFullYear(),
+              }
+            : undefined,
+          doctorate: data.doctorateCourse
+            ? {
+                course: data.doctorateCourse,
+                institution: data.doctorateInstitution || '',
+                year: data.doctorateYear || new Date().getFullYear(),
+              }
+            : undefined,
+        },
+        enabledSubjects: data.enabledSubjects || [],
+        functionalSituation: data.functionalSituation || 'efetivo',
+        contractType: data.contractType || 'estatutario',
+        experienceYears: data.experienceYears || 0,
+        workload: {
+          total: data.totalWorkload || 0,
+          bySubject: editingTeacher.workload?.bySubject || {},
+        },
+      }
+
+      updateTeacher(editingTeacher.id, teacherData)
       toast({
         title: 'Dados atualizados',
         description: 'Informações do professor atualizadas.',
@@ -118,10 +208,17 @@ export default function TeachersList() {
             Gerenciamento do corpo docente da rede.
           </p>
         </div>
-        <Button onClick={openCreateDialog} className="w-full sm:w-auto">
-          <Plus className="mr-2 h-4 w-4" />
-          Novo Professor
-        </Button>
+        <RequirePermission permission="create:teacher">
+          <Button 
+            onClick={openCreateDialog} 
+            className="w-full sm:w-auto bg-gradient-to-r from-primary via-blue-600 to-primary bg-size-200 bg-pos-0 hover:bg-pos-100 text-white shadow-lg hover:shadow-xl transition-all duration-500 transform hover:scale-105 font-semibold"
+          >
+            <div className="p-1 rounded-md bg-white/20 mr-2">
+              <Plus className="h-5 w-5" />
+            </div>
+            Novo Professor
+          </Button>
+        </RequirePermission>
       </div>
 
       <Card>
@@ -174,7 +271,7 @@ export default function TeachersList() {
                     return (
                       <TableRow
                         key={teacher.id}
-                        className="cursor-pointer hover:bg-muted/50"
+                        className="cursor-pointer border-l-4 border-l-transparent hover:border-l-blue-500 hover:bg-gradient-to-r hover:from-blue-50/50 hover:to-transparent transition-all duration-200"
                         onClick={() =>
                           navigate(`/pessoas/professores/${teacher.id}`)
                         }
@@ -218,12 +315,17 @@ export default function TeachersList() {
                         </TableCell>
                         <TableCell>
                           <Badge
-                            variant={
+                            className={`flex items-center gap-1.5 px-2.5 py-1 font-medium ${
                               teacher.status === 'active'
-                                ? 'default'
-                                : 'secondary'
-                            }
+                                ? 'bg-gradient-to-r from-green-500 to-emerald-600 text-white shadow-md'
+                                : 'bg-gradient-to-r from-gray-400 to-gray-500 text-white'
+                            }`}
                           >
+                            <div
+                              className={`h-2 w-2 rounded-full ${
+                                teacher.status === 'active' ? 'bg-white' : 'bg-white/80'
+                              }`}
+                            />
                             {teacher.status === 'active' ? 'Ativo' : 'Inativo'}
                           </Badge>
                         </TableCell>
@@ -249,23 +351,27 @@ export default function TeachersList() {
                               >
                                 Ver Detalhes
                               </DropdownMenuItem>
-                              <DropdownMenuItem
-                                onClick={(e) => {
-                                  e.stopPropagation()
-                                  openEditDialog(teacher)
-                                }}
-                              >
-                                Editar Dados
-                              </DropdownMenuItem>
-                              <DropdownMenuItem
-                                className="text-destructive"
-                                onClick={(e) => {
-                                  e.stopPropagation()
-                                  setDeleteId(teacher.id)
-                                }}
-                              >
-                                Excluir
-                              </DropdownMenuItem>
+                              <RequirePermission permission="edit:teacher">
+                                <DropdownMenuItem
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    openEditDialog(teacher)
+                                  }}
+                                >
+                                  Editar Dados
+                                </DropdownMenuItem>
+                              </RequirePermission>
+                              <RequirePermission permission="delete:teacher">
+                                <DropdownMenuItem
+                                  className="text-destructive"
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    setDeleteId(teacher.id)
+                                  }}
+                                >
+                                  Excluir
+                                </DropdownMenuItem>
+                              </RequirePermission>
                             </DropdownMenuContent>
                           </DropdownMenu>
                         </TableCell>

@@ -8,6 +8,7 @@ import {
   Trash2,
   FileBadge,
   Edit,
+  Hash,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
@@ -31,6 +32,12 @@ import { SubjectFormDialog } from './components/SubjectFormDialog'
 import { CourseFormDialog } from './components/CourseFormDialog'
 import { useToast } from '@/hooks/use-toast'
 import {
+  safeArray,
+  safeFind,
+  safeMap,
+  safeLength,
+} from '@/lib/array-utils'
+import {
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
@@ -45,13 +52,18 @@ export default function CourseDetails() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const {
-    courses,
+    etapasEnsino,
     evaluationRules,
-    addGrade,
-    updateGrade,
+    addSerieAno,
+    updateSerieAno,
     addSubject,
     updateSubject,
     removeSubject,
+    updateEtapaEnsino,
+    // Aliases para compatibilidade
+    courses,
+    addGrade,
+    updateGrade,
     updateCourse,
   } = useCourseStore()
   const { toast } = useToast()
@@ -60,20 +72,22 @@ export default function CourseDetails() {
   const [isSubjectDialogOpen, setIsSubjectDialogOpen] = useState(false)
   const [isCourseDialogOpen, setIsCourseDialogOpen] = useState(false)
 
-  const [selectedGradeId, setSelectedGradeId] = useState<string | null>(null)
-  const [editingGrade, setEditingGrade] = useState<any>(null)
+  const [selectedSerieAnoId, setSelectedSerieAnoId] = useState<string | null>(null)
+  const [editingSerieAno, setEditingSerieAno] = useState<any>(null)
   const [editingSubject, setEditingSubject] = useState<any>(null)
   const [deleteSubjectData, setDeleteSubjectData] = useState<{
-    gradeId: string
+    serieAnoId: string
     subjectId: string
   } | null>(null)
 
-  const course = courses.find((c) => c.id === id)
+  const etapaEnsino = etapasEnsino.find((e) => e.id === id)
+  // Alias para compatibilidade
+  const course = etapaEnsino
 
-  if (!course) {
+  if (!etapaEnsino) {
     return (
       <div className="flex flex-col items-center justify-center h-[50vh] gap-4">
-        <h2 className="text-2xl font-bold">Curso não encontrado</h2>
+        <h2 className="text-2xl font-bold">Etapa de Ensino não encontrada</h2>
         <Button onClick={() => navigate('/academico/cursos')}>
           Voltar para Lista
         </Button>
@@ -81,60 +95,72 @@ export default function CourseDetails() {
     )
   }
 
-  // Handlers for Course
-  const handleUpdateCourse = (data: any) => {
-    updateCourse(course.id, data)
+  // Handlers for EtapaEnsino
+  const handleUpdateEtapaEnsino = (data: any) => {
+    updateEtapaEnsino(etapaEnsino.id, data)
     toast({
-      title: 'Curso atualizado',
-      description: 'Nome do curso alterado com sucesso.',
+      title: 'Etapa de Ensino atualizada',
+      description: 'Alterações salvas com sucesso.',
     })
   }
 
-  // Handlers for Grade
-  const openAddGradeDialog = () => {
-    setEditingGrade(null)
+  // Alias para compatibilidade
+  const handleUpdateCourse = handleUpdateEtapaEnsino
+
+  // Handlers for SerieAno
+  const openAddSerieAnoDialog = () => {
+    setEditingSerieAno(null)
     setIsGradeDialogOpen(true)
   }
 
-  const openEditGradeDialog = (grade: any) => {
-    setEditingGrade(grade)
+  // Alias para compatibilidade
+  const openAddGradeDialog = openAddSerieAnoDialog
+
+  const openEditSerieAnoDialog = (serieAno: any) => {
+    setEditingSerieAno(serieAno)
     setIsGradeDialogOpen(true)
   }
 
-  const handleGradeSubmit = (data: any) => {
-    if (editingGrade) {
-      updateGrade(course.id, editingGrade.id, data)
-      toast({ title: 'Série atualizada', description: 'Alterações salvas.' })
+  // Alias para compatibilidade
+  const openEditGradeDialog = openEditSerieAnoDialog
+
+  const handleSerieAnoSubmit = (data: any) => {
+    if (editingSerieAno) {
+      updateSerieAno(etapaEnsino.id, editingSerieAno.id, data)
+      toast({ title: 'Série/Ano atualizada', description: 'Alterações salvas.' })
     } else {
-      addGrade(course.id, data)
-      toast({ title: 'Série adicionada', description: 'Nova série criada.' })
+      addSerieAno(etapaEnsino.id, data)
+      toast({ title: 'Série/Ano adicionada', description: 'Nova série/ano criada.' })
     }
   }
 
+  // Alias para compatibilidade
+  const handleGradeSubmit = handleSerieAnoSubmit
+
   // Handlers for Subject
-  const openAddSubjectDialog = (gradeId: string) => {
-    setSelectedGradeId(gradeId)
+  const openAddSubjectDialog = (serieAnoId: string) => {
+    setSelectedSerieAnoId(serieAnoId)
     setEditingSubject(null)
     setIsSubjectDialogOpen(true)
   }
 
-  const openEditSubjectDialog = (gradeId: string, subject: any) => {
-    setSelectedGradeId(gradeId)
+  const openEditSubjectDialog = (serieAnoId: string, subject: any) => {
+    setSelectedSerieAnoId(serieAnoId)
     setEditingSubject(subject)
     setIsSubjectDialogOpen(true)
   }
 
   const handleSubjectSubmit = (data: any) => {
-    if (!selectedGradeId) return
+    if (!selectedSerieAnoId) return
 
     if (editingSubject) {
-      updateSubject(course.id, selectedGradeId, editingSubject.id, data)
+      updateSubject(etapaEnsino.id, selectedSerieAnoId, editingSubject.id, data)
       toast({
         title: 'Disciplina atualizada',
         description: 'Alterações salvas.',
       })
     } else {
-      addSubject(course.id, selectedGradeId, data)
+      addSubject(etapaEnsino.id, selectedSerieAnoId, data)
       toast({
         title: 'Disciplina adicionada',
         description: 'Disciplina criada com sucesso.',
@@ -145,8 +171,8 @@ export default function CourseDetails() {
   const handleDeleteSubject = () => {
     if (deleteSubjectData) {
       removeSubject(
-        course.id,
-        deleteSubjectData.gradeId,
+        etapaEnsino.id,
+        deleteSubjectData.serieAnoId,
         deleteSubjectData.subjectId,
       )
       toast({
@@ -174,10 +200,16 @@ export default function CourseDetails() {
           <ArrowLeft className="h-5 w-5" />
         </Button>
         <div className="flex-1">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <h2 className="text-3xl font-bold tracking-tight text-primary">
-              {course.name}
+              {etapaEnsino.name}
             </h2>
+            {etapaEnsino.codigoCenso && (
+              <Badge variant="outline" className="ml-2">
+                <Hash className="h-3 w-3 mr-1" />
+                Código INEP: {etapaEnsino.codigoCenso}
+              </Badge>
+            )}
             <Button
               variant="ghost"
               size="icon"
@@ -187,56 +219,82 @@ export default function CourseDetails() {
             </Button>
           </div>
           <p className="text-muted-foreground">
-            Estrutura curricular e regras de avaliação.
+            Estrutura curricular e regras de avaliação - Etapa de Ensino conforme Censo Escolar (INEP).
           </p>
+          {etapaEnsino.codigoCenso && (
+            <div className="mt-2 text-xs text-muted-foreground">
+              Esta etapa de ensino está cadastrada com o código oficial do Censo Escolar.
+            </div>
+          )}
         </div>
         <Button onClick={openAddGradeDialog}>
           <Plus className="mr-2 h-4 w-4" />
-          Nova Série
+          Nova Série/Ano
         </Button>
       </div>
 
       <div className="grid gap-6">
         <Card>
           <CardHeader>
-            <CardTitle>Séries e Curriculo</CardTitle>
+            <CardTitle>Séries/Anos e Currículo</CardTitle>
             <CardDescription>
-              Gerencie as séries, disciplinas e regras de avaliação.
+              Gerencie as séries/anos, disciplinas e regras de avaliação desta etapa de ensino.
             </CardDescription>
           </CardHeader>
           <CardContent>
-            {course.grades.length === 0 ? (
+            {safeLength(etapaEnsino.seriesAnos) === 0 ? (
               <div className="text-center py-8 text-muted-foreground">
-                Nenhuma série cadastrada neste curso.
+                Nenhuma série/ano cadastrada nesta etapa de ensino.
               </div>
             ) : (
               <Accordion type="single" collapsible className="w-full">
-                {course.grades.map((grade) => (
-                  <AccordionItem key={grade.id} value={grade.id}>
+                {/* Ordena séries/anos por número se disponível */}
+                {[...safeArray(etapaEnsino.seriesAnos)]
+                  .sort((a: any, b: any) => {
+                    const numA = a.numero || parseInt(a.name) || 0
+                    const numB = b.numero || parseInt(b.name) || 0
+                    return numA - numB
+                  })
+                  .map((serieAno) => (
+                  <AccordionItem key={serieAno.id} value={serieAno.id}>
                     <AccordionTrigger className="hover:no-underline group">
                       <div className="flex items-center gap-4 w-full pr-4">
-                        <span className="font-semibold text-lg">
-                          {grade.name}
-                        </span>
+                        <div className="flex items-center gap-2">
+                          <span className="font-semibold text-lg">
+                            {serieAno.name}
+                          </span>
+                          {serieAno.numero && (
+                            <Badge variant="outline" className="text-xs">
+                              Nº {serieAno.numero}
+                            </Badge>
+                          )}
+                        </div>
                         <Badge variant="secondary" className="font-normal">
-                          {grade.subjects.length} Disciplinas
+                          {safeLength(serieAno.subjects)} Disciplinas
                         </Badge>
                         <div className="ml-auto flex items-center gap-4">
                           <div className="text-sm text-muted-foreground flex items-center gap-1">
                             <FileBadge className="h-3 w-3" />
-                            {getRuleName(grade.evaluationRuleId)}
+                            {getRuleName(serieAno.evaluationRuleId)}
                           </div>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="opacity-0 group-hover:opacity-100 transition-opacity"
+                          <div
+                            role="button"
+                            tabIndex={0}
+                            className="inline-flex items-center justify-center h-10 w-10 rounded-md text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground opacity-0 group-hover:opacity-100 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                             onClick={(e) => {
                               e.stopPropagation()
-                              openEditGradeDialog(grade)
+                              openEditSerieAnoDialog(serieAno)
+                            }}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter' || e.key === ' ') {
+                                e.preventDefault()
+                                e.stopPropagation()
+                                openEditSerieAnoDialog(serieAno)
+                              }
                             }}
                           >
                             <Edit className="h-4 w-4" />
-                          </Button>
+                          </div>
                         </div>
                       </div>
                     </AccordionTrigger>
@@ -250,20 +308,20 @@ export default function CourseDetails() {
                           <Button
                             size="sm"
                             variant="outline"
-                            onClick={() => openAddSubjectDialog(grade.id)}
+                            onClick={() => openAddSubjectDialog(serieAno.id)}
                           >
                             <Plus className="mr-2 h-3 w-3" /> Adicionar
                             Disciplina
                           </Button>
                         </div>
                         <Separator />
-                        {grade.subjects.length === 0 ? (
+                        {safeLength(serieAno.subjects) === 0 ? (
                           <p className="text-sm text-muted-foreground italic">
                             Nenhuma disciplina cadastrada.
                           </p>
                         ) : (
                           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                            {grade.subjects.map((subject) => (
+                            {safeMap(serieAno.subjects, (subject) => (
                               <div
                                 key={subject.id}
                                 className="flex items-center justify-between p-3 border rounded-md bg-secondary/10 group/subject"
@@ -283,7 +341,7 @@ export default function CourseDetails() {
                                     size="icon"
                                     className="h-8 w-8"
                                     onClick={() =>
-                                      openEditSubjectDialog(grade.id, subject)
+                                      openEditSubjectDialog(serieAno.id, subject)
                                     }
                                   >
                                     <Edit className="h-3 w-3" />
@@ -294,7 +352,7 @@ export default function CourseDetails() {
                                     className="h-8 w-8 text-destructive hover:text-destructive"
                                     onClick={() =>
                                       setDeleteSubjectData({
-                                        gradeId: grade.id,
+                                        serieAnoId: serieAno.id,
                                         subjectId: subject.id,
                                       })
                                     }
@@ -320,7 +378,7 @@ export default function CourseDetails() {
         open={isCourseDialogOpen}
         onOpenChange={setIsCourseDialogOpen}
         onSubmit={handleUpdateCourse}
-        initialData={course}
+        initialData={etapaEnsino}
       />
 
       <GradeFormDialog
@@ -328,7 +386,7 @@ export default function CourseDetails() {
         onOpenChange={setIsGradeDialogOpen}
         onSubmit={handleGradeSubmit}
         evaluationRules={evaluationRules}
-        initialData={editingGrade}
+        initialData={editingSerieAno}
       />
 
       <SubjectFormDialog
@@ -336,7 +394,7 @@ export default function CourseDetails() {
         onOpenChange={setIsSubjectDialogOpen}
         onSubmit={handleSubjectSubmit}
         gradeName={
-          course.grades.find((g) => g.id === selectedGradeId)?.name || 'Série'
+          safeFind(safeArray(etapaEnsino.seriesAnos), (s) => s.id === selectedSerieAnoId)?.name || 'Série'
         }
         initialData={editingSubject}
       />

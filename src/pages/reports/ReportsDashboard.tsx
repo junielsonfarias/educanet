@@ -21,6 +21,7 @@ import {
   LayoutTemplate,
   TrendingUp,
 } from 'lucide-react'
+import { cn } from '@/lib/utils'
 
 export default function ReportsDashboard() {
   const navigate = useNavigate()
@@ -127,16 +128,30 @@ export default function ReportsDashboard() {
           {internalReports.map((report) => (
             <Card
               key={report.path}
-              className={`cursor-pointer hover:border-primary/50 transition-colors hover:shadow-md ${report.highlight ? 'border-primary/40 bg-primary/5' : ''}`}
+              className={cn(
+                "cursor-pointer relative overflow-hidden transition-all duration-300",
+                "hover:shadow-xl hover:scale-[1.02] hover:border-primary/60",
+                report.highlight 
+                  ? "border-2 border-primary/40 bg-gradient-to-br from-primary/10 via-blue-50/50 to-primary/5" 
+                  : "border hover:border-primary/30 bg-white"
+              )}
               onClick={() => navigate(report.path)}
             >
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-lg">
-                  <report.icon className="h-5 w-5 text-primary" />
-                  {report.title}
-                </CardTitle>
+              <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent opacity-0 hover:opacity-100 transition-opacity" />
+              <CardHeader className="relative z-10">
+                <div className="flex items-center gap-3 mb-2">
+                  <div className={cn(
+                    "p-3 rounded-xl",
+                    report.highlight 
+                      ? "bg-gradient-to-br from-primary to-blue-600 text-white shadow-lg" 
+                      : "bg-gradient-to-br from-primary/10 to-blue-50 text-primary"
+                  )}>
+                    <report.icon className="h-6 w-6" />
+                  </div>
+                  <CardTitle className="text-lg">{report.title}</CardTitle>
+                </div>
               </CardHeader>
-              <CardContent>
+              <CardContent className="relative z-10">
                 <CardDescription className="text-sm">
                   {report.description}
                 </CardDescription>
@@ -154,16 +169,19 @@ export default function ReportsDashboard() {
           {qeduReports.map((report) => (
             <Card
               key={report.path}
-              className="cursor-pointer hover:border-primary/50 transition-colors hover:shadow-md bg-secondary/10"
+              className="cursor-pointer relative overflow-hidden transition-all duration-300 hover:shadow-xl hover:scale-[1.02] hover:border-primary/60 border hover:border-primary/30 bg-gradient-to-br from-secondary/20 via-secondary/10 to-white"
               onClick={() => navigate(report.path)}
             >
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-lg">
-                  <report.icon className="h-5 w-5 text-primary" />
-                  {report.title}
-                </CardTitle>
+              <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent opacity-0 hover:opacity-100 transition-opacity" />
+              <CardHeader className="relative z-10">
+                <div className="flex items-center gap-3 mb-2">
+                  <div className="p-3 rounded-xl bg-gradient-to-br from-green-500/10 to-emerald-50 text-green-600">
+                    <report.icon className="h-6 w-6" />
+                  </div>
+                  <CardTitle className="text-lg">{report.title}</CardTitle>
+                </div>
               </CardHeader>
-              <CardContent>
+              <CardContent className="relative z-10">
                 <CardDescription className="text-sm">
                   {report.description}
                 </CardDescription>

@@ -1,9 +1,12 @@
 import React, { createContext, useContext, useState, useEffect } from 'react'
 import { AttendanceRecord, mockAttendance } from '@/lib/mock-data'
+import { handleError } from '@/lib/error-handling'
+import { sanitizeStoreData } from '@/lib/data-sanitizer'
 
 interface AttendanceContextType {
   attendanceRecords: AttendanceRecord[]
   addAttendance: (record: Omit<AttendanceRecord, 'id'>) => void
+  removeAttendanceRecord: (id: string) => void
   getStudentAttendance: (studentId: string) => AttendanceRecord[]
   getClassAttendance: (
     classId: string,
@@ -26,9 +29,15 @@ export const AttendanceProvider = ({
     const stored = localStorage.getItem('edu_attendance')
     if (stored) {
       try {
-        setAttendanceRecords(JSON.parse(stored))
+        const parsed = JSON.parse(stored)
+        const sanitized = sanitizeStoreData<AttendanceRecord>(parsed, {})
+        setAttendanceRecords(sanitized.length > 0 ? sanitized : mockAttendance)
       } catch (error) {
-        console.error('Failed to parse attendance from local storage:', error)
+        handleError(error as Error, {
+          showToast: false,
+          context: { action: 'loadAttendance', source: 'localStorage' },
+        })
+        setAttendanceRecords(mockAttendance)
       }
     } else {
       localStorage.setItem('edu_attendance', JSON.stringify(mockAttendance))
@@ -45,6 +54,10 @@ export const AttendanceProvider = ({
       id: Math.random().toString(36).substring(2, 11),
     }
     setAttendanceRecords((prev) => [...prev, newRecord])
+  }
+
+  const removeAttendanceRecord = (id: string) => {
+    setAttendanceRecords((prev) => prev.filter((r) => r.id !== id))
   }
 
   const getStudentAttendance = (studentId: string) => {
@@ -69,6 +82,7 @@ export const AttendanceProvider = ({
       value={{
         attendanceRecords,
         addAttendance,
+        removeAttendanceRecord,
         getStudentAttendance,
         getClassAttendance,
       }}

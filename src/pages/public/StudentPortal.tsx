@@ -19,6 +19,23 @@ export default function StudentPortal() {
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 max-w-5xl mx-auto">
         <Card className="hover:shadow-lg transition-shadow">
           <CardHeader className="text-center pb-2">
+            <div className="mx-auto bg-green-100 p-4 rounded-full mb-4 w-16 h-16 flex items-center justify-center">
+              <FileText className="h-8 w-8 text-green-600" />
+            </div>
+            <CardTitle>Matrícula Online</CardTitle>
+          </CardHeader>
+          <CardContent className="text-center">
+            <p className="text-sm text-muted-foreground mb-6">
+              Realize a matrícula do seu filho de forma rápida e prática pela internet.
+            </p>
+            <Link to="/publico/matricula-online">
+              <Button className="w-full">Acessar Matrícula Online</Button>
+            </Link>
+          </CardContent>
+        </Card>
+
+        <Card className="hover:shadow-lg transition-shadow">
+          <CardHeader className="text-center pb-2">
             <div className="mx-auto bg-blue-100 p-4 rounded-full mb-4 w-16 h-16 flex items-center justify-center">
               <FileText className="h-8 w-8 text-blue-600" />
             </div>

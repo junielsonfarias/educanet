@@ -27,10 +27,12 @@ import {
 } from '@/components/ui/select'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
+import { FormDescription } from '@/components/ui/form'
 import { EvaluationRule } from '@/lib/mock-data'
 
 const gradeSchema = z.object({
-  name: z.string().min(2, 'Nome da série deve ter pelo menos 2 caracteres'),
+  name: z.string().min(2, 'Nome da série/ano deve ter pelo menos 2 caracteres'),
+  numero: z.coerce.number().min(1).max(9, 'Número deve ser entre 1 e 9'),
   evaluationRuleId: z.string().min(1, 'Regra de avaliação é obrigatória'),
 })
 
@@ -53,6 +55,7 @@ export function GradeFormDialog({
     resolver: zodResolver(gradeSchema),
     defaultValues: {
       name: '',
+      numero: 1,
       evaluationRuleId: '',
     },
   })
@@ -62,16 +65,19 @@ export function GradeFormDialog({
       if (initialData) {
         form.reset({
           name: initialData.name,
+          numero: initialData.numero || 1,
           evaluationRuleId: initialData.evaluationRuleId || '',
         })
       } else {
         form.reset({
           name: '',
+          numero: 1,
           evaluationRuleId: '',
         })
       }
     }
-  }, [open, initialData, form])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, initialData?.id])
 
   const handleSubmit = (data: z.infer<typeof gradeSchema>) => {
     onSubmit(data)
@@ -96,25 +102,60 @@ export function GradeFormDialog({
             onSubmit={form.handleSubmit(handleSubmit)}
             className="space-y-4"
           >
-            <FormField
-              control={form.control}
-              name="name"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Nome da Série</FormLabel>
-                  <FormControl>
-                    <Input placeholder="Ex: 1º Ano" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+            <div className="grid grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="numero"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Número da Série/Ano *</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="number"
+                        min="1"
+                        max="9"
+                        placeholder="1"
+                        {...field}
+                        onChange={(e) => {
+                          const value = parseInt(e.target.value) || 1
+                          field.onChange(value)
+                          // Atualiza o nome automaticamente se estiver vazio
+                          if (!form.getValues('name')) {
+                            form.setValue('name', `${value}º Ano`)
+                          }
+                        }}
+                      />
+                    </FormControl>
+                    <FormDescription>
+                      Número para ordenação (1-9)
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="name"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Nome da Série/Ano *</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Ex: 1º Ano" {...field} />
+                    </FormControl>
+                    <FormDescription>
+                      Nome completo da série/ano
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
             <FormField
               control={form.control}
               name="evaluationRuleId"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Regra de Avaliação</FormLabel>
+                  <FormLabel>Regra de Avaliação *</FormLabel>
                   <Select
                     onValueChange={field.onChange}
                     defaultValue={field.value}
@@ -132,6 +173,9 @@ export function GradeFormDialog({
                       ))}
                     </SelectContent>
                   </Select>
+                  <FormDescription>
+                    Regra de avaliação aplicada a esta série/ano
+                  </FormDescription>
                   <FormMessage />
                 </FormItem>
               )}

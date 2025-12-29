@@ -4,7 +4,7 @@
  */
 
 import { Enrollment } from './mock-data'
-import { School, Classroom, AcademicYear } from './mock-data'
+import { School, Turma, AnoLetivo } from './mock-data'
 
 /**
  * Busca a turma relacionada a um Enrollment
@@ -13,12 +13,13 @@ import { School, Classroom, AcademicYear } from './mock-data'
 export function getClassroomFromEnrollment(
   enrollment: Enrollment,
   schools: School[],
-): Classroom | undefined {
+): Turma | undefined {
   // Prioridade 1: Usar classroomId se disponível
   if (enrollment.classroomId) {
     for (const school of schools) {
       for (const year of school.academicYears || []) {
-        const classroom = year.classes?.find(
+        const turmas = year.turmas || []
+        const classroom = turmas.find(
           (c) => c.id === enrollment.classroomId,
         )
         if (classroom) return classroom
@@ -39,7 +40,9 @@ export function getClassroomFromEnrollment(
           year.name.includes(enrollment.year.toString())
 
         if (yearMatches) {
-          const classroom = year.classes?.find(
+          // Usa turmas (com fallback para classes apenas durante migração)
+          const turmas = year.turmas || year.classes || []
+          const classroom = turmas.find(
             (c) => c.name === enrollment.grade,
           )
           if (classroom) return classroom
@@ -58,7 +61,7 @@ export function getClassroomFromEnrollment(
 export function getAcademicYearFromEnrollment(
   enrollment: Enrollment,
   schools: School[],
-): AcademicYear | undefined {
+): AnoLetivo | undefined {
   // Prioridade 1: Usar academicYearId se disponível
   if (enrollment.academicYearId) {
     for (const school of schools) {
@@ -169,7 +172,7 @@ export function validateEnrollment(
       // Validar que a turma pertence à escola e ano letivo corretos
       if (classroom && school) {
         const year = school.academicYears?.find(
-          (y) => y.classes?.some((c) => c.id === enrollment.classroomId),
+          (y) => (y.turmas || []).some((c) => c.id === enrollment.classroomId),
         )
         if (year && enrollment.academicYearId && year.id !== enrollment.academicYearId) {
           errors.push(

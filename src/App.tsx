@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import { Toaster } from '@/components/ui/toaster'
 import { Toaster as Sonner } from '@/components/ui/sonner'
 import { TooltipProvider } from '@/components/ui/tooltip'
+import ErrorBoundary from '@/components/ErrorBoundary'
 import InstitutionalHome from './pages/Index'
 import Login from './pages/Login'
 import PublicDocuments from './pages/public/PublicDocuments'
@@ -14,6 +15,7 @@ import PublicNews from './pages/public/PublicNews'
 import PublicNewsDetail from './pages/public/PublicNewsDetail'
 import Structure from './pages/public/Structure'
 import PublicQEduData from './pages/public/PublicQEduData'
+import OnlineEnrollment from './pages/public/OnlineEnrollment'
 import Dashboard from './pages/Dashboard'
 import StrategicDashboard from './pages/dashboard/StrategicDashboard'
 import AlertsDashboard from './pages/alerts/AlertsDashboard'
@@ -24,6 +26,7 @@ import StudentsList from './pages/people/StudentsList'
 import StudentDetails from './pages/people/StudentDetails'
 import TeachersList from './pages/people/TeachersList'
 import TeacherDetails from './pages/people/TeacherDetails'
+import StaffList from './pages/people/StaffList'
 import CoursesList from './pages/academic/CoursesList'
 import CourseDetails from './pages/academic/CourseDetails'
 import ClassesList from './pages/academic/ClassesList'
@@ -48,6 +51,7 @@ import EvaluationRulesList from './pages/academic/EvaluationRulesList'
 import AssessmentTypesList from './pages/academic/AssessmentTypesList'
 import DigitalClassDiary from './pages/academic/DigitalClassDiary'
 import LessonPlanning from './pages/academic/LessonPlanning'
+import ClassCouncil from './pages/academic/ClassCouncil'
 import NotFound from './pages/NotFound'
 import Layout from './components/Layout'
 import PublicLayout from './components/PublicLayout'
@@ -57,6 +61,14 @@ import WebsiteContent from './pages/settings/website/WebsiteContent'
 import NewsManager from './pages/settings/website/NewsManager'
 import DocumentsManager from './pages/settings/website/DocumentsManager'
 import BackupRestore from './pages/settings/BackupRestore'
+import EducacensoExport from './pages/settings/EducacensoExport'
+import InconsistenciesReport from './pages/settings/InconsistenciesReport'
+import SchoolDocuments from './pages/documents/SchoolDocuments'
+import NotificationsManager from './pages/communication/NotificationsManager'
+import ProtocolsManager from './pages/secretariat/ProtocolsManager'
+import ServiceQueue from './pages/secretariat/ServiceQueue'
+import AppointmentsManager from './pages/secretariat/AppointmentsManager'
+import TransfersManager from './pages/people/TransfersManager'
 import { UserProvider } from './stores/useUserStore'
 import { SchoolProvider } from './stores/useSchoolStore'
 import { StudentProvider } from './stores/useStudentStore'
@@ -71,32 +83,51 @@ import { OccurrenceProvider } from './stores/useOccurrenceStore'
 import { LessonPlanProvider } from './stores/useLessonPlanStore'
 import { AlertProvider } from './stores/useAlertStore'
 import { ReportProvider } from './stores/useReportStore'
+import { DocumentProvider } from './stores/useDocumentStore'
+import { ProtocolProvider } from './stores/useProtocolStore'
+import { NotificationProvider } from './stores/useNotificationStore'
+import { AppointmentProvider } from './stores/useAppointmentStore'
+import { QueueProvider } from './stores/useQueueStore'
+import { CouncilProvider } from './stores/useCouncilStore'
+import { AttachmentProvider } from './stores/useAttachmentStore'
+import { TransferProvider } from './stores/useTransferStore'
+import { StaffProvider } from './stores/useStaffStore'
 
 const App = () => (
-  <UserProvider>
-    <SettingsProvider>
-      <SchoolProvider>
-        <CourseProvider>
-          <ProjectProvider>
-            <StudentProvider>
-              <TeacherProvider>
-                <AssessmentProvider>
-                  <AttendanceProvider>
-                    <OccurrenceProvider>
-                      <LessonPlanProvider>
-                        <PublicContentProvider>
-                          <AlertProvider>
-                            <ReportProvider>
-                              <BrowserRouter
-                                future={{
-                                  v7_startTransition: false,
-                                  v7_relativeSplatPath: false,
-                                }}
-                              >
-                                <TooltipProvider>
-                                  <Toaster />
-                                  <Sonner />
-                                  <Routes>
+  <ErrorBoundary>
+    <UserProvider>
+      <SettingsProvider>
+        <SchoolProvider>
+          <CourseProvider>
+            <ProjectProvider>
+              <StudentProvider>
+                <TeacherProvider>
+                  <AssessmentProvider>
+                    <AttendanceProvider>
+                      <OccurrenceProvider>
+                        <LessonPlanProvider>
+                          <PublicContentProvider>
+                            <AlertProvider>
+                              <ReportProvider>
+                                <DocumentProvider>
+                                  <ProtocolProvider>
+                                    <NotificationProvider>
+                                      <AppointmentProvider>
+                                        <QueueProvider>
+                                          <CouncilProvider>
+                                            <AttachmentProvider>
+                                              <TransferProvider>
+                                                <StaffProvider>
+                                                  <BrowserRouter
+                                                    future={{
+                                                      v7_startTransition: false,
+                                                      v7_relativeSplatPath: false,
+                                                    }}
+                                                  >
+                                                    <TooltipProvider>
+                                                      <Toaster />
+                                                      <Sonner />
+                                                      <Routes>
                                     {/* Public Institutional Website Routes */}
                                     <Route element={<PublicLayout />}>
                                       <Route
@@ -146,6 +177,10 @@ const App = () => (
                                       <Route
                                         path="/publico/dados-qedu"
                                         element={<PublicQEduData />}
+                                      />
+                                      <Route
+                                        path="/publico/matricula-online"
+                                        element={<OnlineEnrollment />}
                                       />
                                     </Route>
 
@@ -198,6 +233,14 @@ const App = () => (
                                         path="/pessoas/professores/:id"
                                         element={<TeacherDetails />}
                                       />
+                                      <Route
+                                        path="/pessoas/transferencias"
+                                        element={<TransfersManager />}
+                                      />
+                                      <Route
+                                        path="/pessoas/funcionarios"
+                                        element={<StaffList />}
+                                      />
 
                                       {/* Academic Routes */}
                                       <Route
@@ -235,6 +278,10 @@ const App = () => (
                                       <Route
                                         path="/academico/planejamento"
                                         element={<LessonPlanning />}
+                                      />
+                                      <Route
+                                        path="/academico/conselho-classe"
+                                        element={<ClassCouncil />}
                                       />
 
                                       {/* Calendar */}
@@ -318,6 +365,14 @@ const App = () => (
                                         path="/configuracoes/backup"
                                         element={<BackupRestore />}
                                       />
+                                      <Route
+                                        path="/configuracoes/educacenso"
+                                        element={<EducacensoExport />}
+                                      />
+                                      <Route
+                                        path="/configuracoes/inconsistencias"
+                                        element={<InconsistenciesReport />}
+                                      />
                                       {/* Website Management */}
                                       <Route
                                         path="/configuracoes/site/conteudo"
@@ -331,12 +386,47 @@ const App = () => (
                                         path="/configuracoes/site/documentos"
                                         element={<DocumentsManager />}
                                       />
+
+                                      {/* Documents */}
+                                      <Route
+                                        path="/documentos"
+                                        element={<SchoolDocuments />}
+                                      />
+
+                                      {/* Communication */}
+                                      <Route
+                                        path="/comunicacao"
+                                        element={<NotificationsManager />}
+                                      />
+
+                                      {/* Secretariat */}
+                                      <Route
+                                        path="/secretaria/protocolos"
+                                        element={<ProtocolsManager />}
+                                      />
+                                      <Route
+                                        path="/secretaria/fila"
+                                        element={<ServiceQueue />}
+                                      />
+                                      <Route
+                                        path="/secretaria/agendamentos"
+                                        element={<AppointmentsManager />}
+                                      />
                                     </Route>
 
                                     <Route path="*" element={<NotFound />} />
-                                  </Routes>
-                                </TooltipProvider>
-                              </BrowserRouter>
+                                                    </Routes>
+                                                  </TooltipProvider>
+                                                </BrowserRouter>
+                                              </StaffProvider>
+                                            </TransferProvider>
+                                          </AttachmentProvider>
+                                        </CouncilProvider>
+                                      </QueueProvider>
+                                    </AppointmentProvider>
+                                  </NotificationProvider>
+                                </ProtocolProvider>
+                              </DocumentProvider>
                             </ReportProvider>
                           </AlertProvider>
                         </PublicContentProvider>
@@ -351,6 +441,7 @@ const App = () => (
       </SchoolProvider>
     </SettingsProvider>
   </UserProvider>
+  </ErrorBoundary>
 )
 
 export default App

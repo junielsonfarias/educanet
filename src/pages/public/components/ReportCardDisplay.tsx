@@ -50,6 +50,12 @@ import {
 import { PublicAssessmentHistory } from './PublicAssessmentHistory'
 import { PrintableReportCard } from './PrintableReportCard'
 import useSettingsStore from '@/stores/useSettingsStore'
+import {
+  safeArray,
+  safeMap,
+  safeSome,
+  safeForEach,
+} from '@/lib/array-utils'
 
 interface ReportCardDisplayProps {
   data: ReportCardData
@@ -62,13 +68,13 @@ export function ReportCardDisplay({ data }: ReportCardDisplayProps) {
   useEffect(() => {
     // Initialize available columns if not set
     const available = [
-      ...data.periodNames.map((_, i) => `period_${i}`),
+      ...safeMap(data.periodNames, (_, i) => `period_${i}`),
       'final',
       'status',
     ]
 
     if (
-      !settings.reportCardView?.visibleColumns ||
+      !settings?.reportCardView?.visibleColumns ||
       settings.reportCardView.visibleColumns.length === 0
     ) {
       updateSettings({
@@ -80,14 +86,14 @@ export function ReportCardDisplay({ data }: ReportCardDisplayProps) {
     } else {
       setVisibleColumns(settings.reportCardView.visibleColumns)
     }
-  }, [data.periodNames, settings.reportCardView, updateSettings])
+  }, [data.periodNames]) // Removido settings.reportCardView e updateSettings para evitar loops
 
   const handlePrint = () => {
     window.print()
   }
 
   const toggleColumn = (columnId: string) => {
-    const current = settings.reportCardView?.visibleColumns || []
+    const current = settings?.reportCardView?.visibleColumns || []
     let updated: string[] = []
 
     if (current.includes(columnId)) {
@@ -130,7 +136,7 @@ export function ReportCardDisplay({ data }: ReportCardDisplayProps) {
               <TableHead className="font-bold min-w-[200px]">
                 Disciplina
               </TableHead>
-              {periodNames.map((p, idx) =>
+              {safeMap(periodNames, (p, idx) =>
                 isColumnVisible(`period_${idx}`) ? (
                   <TableHead key={p} className="text-center min-w-[80px]">
                     {formatPeriodName(p)}
@@ -150,10 +156,10 @@ export function ReportCardDisplay({ data }: ReportCardDisplayProps) {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {grades.map((grade) => (
+            {safeMap(grades, (grade) => (
               <TableRow key={grade.subject}>
                 <TableCell className="font-medium">{grade.subject}</TableCell>
-                {grade.periodGrades.map((p, idx) =>
+                {safeMap(grade.periodGrades, (p, idx) =>
                   isColumnVisible(`period_${idx}`) ? (
                     <TableCell
                       key={idx}
@@ -226,15 +232,15 @@ export function ReportCardDisplay({ data }: ReportCardDisplayProps) {
     periodNames: string[],
   ) => {
     // Check if there are any recoveries to show
-    const hasRecoveries = recoveries.some((r) =>
-      r.periodGrades.some((g) => g !== null),
+    const hasRecoveries = safeSome(recoveries, (r) =>
+      safeSome(r.periodGrades, (g) => g !== null),
     )
 
     if (!hasRecoveries) return null
 
     // Check if any visible period has recoveries
-    const hasVisibleRecoveries = recoveries.some((r) =>
-      r.periodGrades.some(
+    const hasVisibleRecoveries = safeSome(recoveries, (r) =>
+      safeSome(r.periodGrades,
         (g, idx) => g !== null && isColumnVisible(`period_${idx}`),
       ),
     )
@@ -253,7 +259,7 @@ export function ReportCardDisplay({ data }: ReportCardDisplayProps) {
                 <TableHead className="font-bold min-w-[200px]">
                   Disciplina
                 </TableHead>
-                {periodNames.map((_, idx) =>
+                {safeMap(periodNames, (_, idx) =>
                   isColumnVisible(`period_${idx}`) ? (
                     <TableHead key={idx} className="text-center min-w-[100px]">
                       {idx + 1}º Recuperação
@@ -263,10 +269,10 @@ export function ReportCardDisplay({ data }: ReportCardDisplayProps) {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {recoveries.map((rec) => (
+              {safeMap(recoveries, (rec) => (
                 <TableRow key={rec.subject}>
                   <TableCell className="font-medium">{rec.subject}</TableCell>
-                  {rec.periodGrades.map((grade, idx) =>
+                  {safeMap(rec.periodGrades, (grade, idx) =>
                     isColumnVisible(`period_${idx}`) ? (
                       <TableCell key={idx} className="text-center">
                         {grade !== null ? (
@@ -289,7 +295,7 @@ export function ReportCardDisplay({ data }: ReportCardDisplayProps) {
   }
 
   const renderOtherEvaluations = (evaluationTypes: EvaluationTypeData[]) => {
-    if (evaluationTypes.length === 0) return null
+    if (!evaluationTypes || evaluationTypes.length === 0) return null
 
     return (
       <div className="space-y-6 mt-6 pt-6 border-t animate-fade-in">
@@ -298,10 +304,10 @@ export function ReportCardDisplay({ data }: ReportCardDisplayProps) {
           Outras Avaliações (Detalhamento)
         </h3>
 
-        {evaluationTypes.map((type) => {
+        {safeMap(evaluationTypes, (type) => {
           // Group by Subject
           const bySubject: Record<string, EvaluationEntry[]> = {}
-          type.entries.forEach((entry) => {
+          safeForEach(type.entries, (entry) => {
             if (!bySubject[entry.subject]) bySubject[entry.subject] = []
             bySubject[entry.subject].push(entry)
           })
@@ -384,7 +390,7 @@ export function ReportCardDisplay({ data }: ReportCardDisplayProps) {
                 <DropdownMenuContent align="end" className="w-56">
                   <DropdownMenuLabel>Colunas Visíveis</DropdownMenuLabel>
                   <DropdownMenuSeparator />
-                  {data.periodNames.map((p, idx) => (
+                  {safeMap(data.periodNames, (p, idx) => (
                     <DropdownMenuCheckboxItem
                       key={idx}
                       checked={isColumnVisible(`period_${idx}`)}
@@ -437,13 +443,13 @@ export function ReportCardDisplay({ data }: ReportCardDisplayProps) {
                   {renderOtherEvaluations(data.evaluationTypes)}
                 </div>
 
-                {data.dependencies.length > 0 && (
+                {(data.dependencies || []).length > 0 && (
                   <div className="space-y-6 pt-4 border-t">
                     <h3 className="text-lg font-semibold text-amber-700 flex items-center gap-2">
                       <span className="w-2 h-2 rounded-full bg-amber-500" />
                       Disciplinas em Dependência
                     </h3>
-                    {data.dependencies.map((dep, idx) => (
+                    {(data.dependencies || []).map((dep, idx) => (
                       <div
                         key={idx}
                         className="bg-amber-50/50 p-4 rounded-lg border"

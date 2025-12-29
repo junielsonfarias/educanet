@@ -83,7 +83,8 @@ export function DocumentFormDialog({
         })
       }
     }
-  }, [open, initialData, form])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, initialData?.id])
 
   const handleSubmit = (data: z.infer<typeof docSchema>) => {
     onSubmit(data)

@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useMemo, useCallback } from 'react'
 import {
   BarChart,
   Bar,
@@ -34,6 +34,8 @@ import useAttendanceStore from '@/stores/useAttendanceStore'
 import useAssessmentStore from '@/stores/useAssessmentStore'
 import useCourseStore from '@/stores/useCourseStore'
 import { calculateGrades } from '@/lib/grade-calculator'
+import type { Period } from '@/lib/mock-data'
+import { SafeChart } from '@/components/charts/SafeChart'
 
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8']
 
@@ -41,7 +43,7 @@ export default function StrategicDashboard() {
   const { schools } = useSchoolStore()
   const { students } = useStudentStore()
   const { assessments, assessmentTypes } = useAssessmentStore()
-  const { courses, evaluationRules } = useCourseStore()
+  const { etapasEnsino, evaluationRules } = useCourseStore()
   const { attendanceRecords } = useAttendanceStore()
 
   // 1. Overall Approval Rate Calculation
@@ -51,8 +53,8 @@ export default function StrategicDashboard() {
     let failed = 0
     let ongoing = 0
 
-    students.forEach((s) => {
-      const activeEnrollment = s.enrollments.find(
+    ;(students || []).forEach((s) => {
+      const activeEnrollment = (s.enrollments || []).find(
         (e) => e.status !== 'Transferido' && e.status !== 'Abandono',
       )
       if (activeEnrollment) {
@@ -83,9 +85,14 @@ export default function StrategicDashboard() {
   // 2. Average Performance per Subject (Aggregated)
   const subjectPerformance = useMemo(() => {
     const subjectStats: Record<string, { sum: number; count: number }> = {}
+    
+    // Early return if no data
+    if (!students || students.length === 0) {
+      return []
+    }
 
-    students.forEach((student) => {
-      const enrollment = student.enrollments.find(
+    ;(students || []).forEach((student) => {
+      const enrollment = (student.enrollments || []).find(
         (e) =>
           e.status === 'Cursando' ||
           e.status === 'Aprovado' ||
@@ -93,38 +100,43 @@ export default function StrategicDashboard() {
       )
       if (!enrollment) return
 
-      const school = schools.find((s) => s.id === enrollment.schoolId)
-      const year = school?.academicYears.find(
+      const school = (schools || []).find((s) => s.id === enrollment.schoolId)
+      const year = (school?.academicYears || []).find(
         (y) => y.name === enrollment.year.toString(),
       )
-      const classroom = year?.classes.find((c) => c.name === enrollment.grade)
+      const turmas = year?.turmas || []
+      const classroom = turmas.find((c) => c.name === enrollment.grade)
 
       if (!year || !classroom) return
 
-      const course = courses.find((c) =>
-        c.grades.some((g) => g.id === classroom.gradeId),
+      const etapaEnsino = (etapasEnsino || []).find((e) =>
+        (e.seriesAnos || []).some((s) => s.id === classroom.serieAnoId),
       )
-      const grade = course?.grades.find((g) => g.id === classroom.gradeId)
-      const rule = evaluationRules.find((r) => r.id === grade?.evaluationRuleId)
+      const serieAno = (etapaEnsino?.seriesAnos || []).find((s) => s.id === classroom.serieAnoId)
+      const rule = (evaluationRules || []).find((r) => r.id === serieAno?.evaluationRuleId)
 
-      if (!grade || !rule) return
+      if (!serieAno || !rule || !year) return
 
-      const periods = year.periods
+      // Ensure periods is always a valid array
+      let periods: Period[] = []
+      if (year && Array.isArray(year.periods)) {
+        periods = year.periods
+      }
 
-      grade.subjects.forEach((subj) => {
-        const subAssessments = assessments.filter(
+      (serieAno.subjects || []).forEach((subj) => {
+        const subAssessments = (assessments || []).filter(
           (a) =>
             a.studentId === student.id &&
             a.subjectId === subj.id &&
             a.yearId === year.id,
         )
 
-        if (subAssessments.length > 0) {
+        if (subAssessments.length > 0 && Array.isArray(periods) && periods.length > 0) {
           const calc = calculateGrades(
             subAssessments,
             rule,
             periods,
-            assessmentTypes,
+            assessmentTypes || [],
           )
           if (!subjectStats[subj.name])
             subjectStats[subj.name] = { sum: 0, count: 0 }
@@ -134,17 +146,20 @@ export default function StrategicDashboard() {
       })
     })
 
-    return Object.entries(subjectStats)
+    const result = Object.entries(subjectStats)
       .map(([name, stats]) => ({
         name,
         average: parseFloat((stats.sum / stats.count).toFixed(1)),
       }))
       .sort((a, b) => b.average - a.average)
       .slice(0, 10)
+    
+    // Ensure we always return an array
+    return Array.isArray(result) ? result : []
   }, [
     students,
     schools,
-    courses,
+    etapasEnsino,
     evaluationRules,
     assessments,
     assessmentTypes,
@@ -152,8 +167,13 @@ export default function StrategicDashboard() {
 
   // 3. High Absenteeism
   const absenteeismData = useMemo(() => {
-    const studentsWithAbsence = students.map((s) => {
-      const records = attendanceRecords.filter((r) => r.studentId === s.id)
+    // Early return if no data
+    if (!students || students.length === 0) {
+      return []
+    }
+    
+    const studentsWithAbsence = (students || []).map((s) => {
+      const records = (attendanceRecords || []).filter((r) => r.studentId === s.id)
       const total = records.length
       const absent = records.filter((r) => !r.present).length
       const percentage = total > 0 ? (absent / total) * 100 : 0
@@ -169,7 +189,8 @@ export default function StrategicDashboard() {
       .sort((a, b) => b.absencePercentage - a.absencePercentage)
       .slice(0, 5)
 
-    return highRisk
+    // Ensure we always return an array
+    return Array.isArray(highRisk) ? highRisk : []
   }, [students, attendanceRecords])
 
   // 4. Low Performance Students (Risk)
@@ -181,54 +202,66 @@ export default function StrategicDashboard() {
       failedCount: number
       subjects: Array<{ name: string; grade: number }>
     }> = []
+    
+    // Early return if no data
+    if (!students || students.length === 0) {
+      return []
+    }
 
-    students.forEach((student) => {
+    (students || []).forEach((student) => {
       // Find active enrollment
-      const enrollment = student.enrollments.find(
+      const enrollment = (student.enrollments || []).find(
         (e) => e.status === 'Cursando',
       )
       if (!enrollment) return
 
-      const school = schools.find((s) => s.id === enrollment.schoolId)
-      const year = school?.academicYears.find(
+      const school = (schools || []).find((s) => s.id === enrollment.schoolId)
+      const year = (school?.academicYears || []).find(
         (y) => y.name === enrollment.year.toString(),
       )
-      const classroom = year?.classes.find((c) => c.name === enrollment.grade)
+      const turmas = year?.turmas || []
+      const classroom = turmas.find((c) => c.name === enrollment.grade)
 
       if (!year || !classroom) return
 
       // Find structure
-      const course = courses.find((c) =>
-        c.grades.some((g) => g.id === classroom.gradeId),
+      const etapaEnsino = (etapasEnsino || []).find((e) =>
+        (e.seriesAnos || []).some((s) => s.id === classroom.serieAnoId),
       )
-      const grade = course?.grades.find((g) => g.id === classroom.gradeId)
-      const rule = evaluationRules.find((r) => r.id === grade?.evaluationRuleId)
+      const serieAno = (etapaEnsino?.seriesAnos || []).find((s) => s.id === classroom.serieAnoId)
+      const rule = (evaluationRules || []).find((r) => r.id === serieAno?.evaluationRuleId)
 
-      if (!grade || !rule) return
+      if (!serieAno || !rule || !year) return
 
-      const periods = year.periods
+      // Ensure periods is always a valid array
+      let periods: Period[] = []
+      if (year && Array.isArray(year.periods)) {
+        periods = year.periods
+      }
       let failedSubjectsCount = 0
       const subjectDetails: Array<{ name: string; grade: number }> = []
 
-      grade.subjects.forEach((subj) => {
-        const subAssessments = assessments.filter(
+      (serieAno.subjects || []).forEach((subj) => {
+        const subAssessments = (assessments || []).filter(
           (a) =>
             a.studentId === student.id &&
             a.subjectId === subj.id &&
             a.yearId === year.id,
         )
 
-        const calc = calculateGrades(
-          subAssessments,
-          rule,
-          periods,
-          assessmentTypes,
-        )
+        if (Array.isArray(periods) && periods.length > 0 && subAssessments.length > 0) {
+          const calc = calculateGrades(
+            subAssessments,
+            rule,
+            periods,
+            assessmentTypes || [],
+          )
 
-        // Check passing grade using the rule
-        if (!calc.isPassing) {
-          failedSubjectsCount++
-          subjectDetails.push({ name: subj.name, grade: calc.finalGrade })
+          // Check passing grade using the rule
+          if (!calc.isPassing) {
+            failedSubjectsCount++
+            subjectDetails.push({ name: subj.name, grade: calc.finalGrade })
+          }
         }
       })
 
@@ -244,11 +277,13 @@ export default function StrategicDashboard() {
       }
     })
 
-    return atRisk.sort((a, b) => b.failedCount - a.failedCount).slice(0, 5)
+    const result = atRisk.sort((a, b) => b.failedCount - a.failedCount).slice(0, 5)
+    // Ensure we always return an array
+    return Array.isArray(result) ? result : []
   }, [
     students,
     schools,
-    courses,
+    etapasEnsino,
     evaluationRules,
     assessments,
     assessmentTypes,
@@ -305,7 +340,7 @@ export default function StrategicDashboard() {
             <School className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{schools.length}</div>
+            <div className="text-2xl font-bold">{(schools || []).length}</div>
             <p className="text-xs text-muted-foreground">Unidades ativas</p>
           </CardContent>
         </Card>
@@ -337,39 +372,49 @@ export default function StrategicDashboard() {
             </CardDescription>
           </CardHeader>
           <CardContent className="pl-2">
-            <ResponsiveContainer width="100%" height={350}>
-              <BarChart data={subjectPerformance}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                <XAxis
-                  dataKey="name"
-                  stroke="#888888"
-                  fontSize={12}
-                  tickLine={false}
-                  axisLine={false}
-                />
-                <YAxis
-                  stroke="#888888"
-                  fontSize={12}
-                  tickLine={false}
-                  axisLine={false}
-                  domain={[0, 10]}
-                />
-                <Tooltip
-                  cursor={{ fill: 'transparent' }}
-                  contentStyle={{
-                    borderRadius: '8px',
-                    border: 'none',
-                    boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)',
-                  }}
-                />
-                <Bar
-                  dataKey="average"
-                  fill="hsl(var(--primary))"
-                  radius={[4, 4, 0, 0]}
-                  name="Média"
-                />
-              </BarChart>
-            </ResponsiveContainer>
+            <SafeChart
+              data={subjectPerformance}
+              minHeight={350}
+              validateData={(data) => 
+                Array.isArray(data) && 
+                data.length > 0 && 
+                data[0]?.name !== undefined
+              }
+            >
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={subjectPerformance}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                  <XAxis
+                    dataKey="name"
+                    stroke="#888888"
+                    fontSize={12}
+                    tickLine={false}
+                    axisLine={false}
+                  />
+                  <YAxis
+                    stroke="#888888"
+                    fontSize={12}
+                    tickLine={false}
+                    axisLine={false}
+                    domain={[0, 10]}
+                  />
+                  <Tooltip
+                    cursor={{ fill: 'transparent' }}
+                    contentStyle={{
+                      borderRadius: '8px',
+                      border: 'none',
+                      boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)',
+                    }}
+                  />
+                  <Bar
+                    dataKey="average"
+                    fill="hsl(var(--primary))"
+                    radius={[4, 4, 0, 0]}
+                    name="Média"
+                  />
+                </BarChart>
+              </ResponsiveContainer>
+            </SafeChart>
           </CardContent>
         </Card>
 
@@ -382,25 +427,35 @@ export default function StrategicDashboard() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <ResponsiveContainer width="100%" height={350}>
-              <PieChart>
-                <Pie
-                  data={approvalStats.data}
-                  cx="50%"
-                  cy="50%"
-                  innerRadius={60}
-                  outerRadius={100}
-                  paddingAngle={5}
-                  dataKey="value"
-                >
-                  {approvalStats.data.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.color} />
-                  ))}
-                </Pie>
-                <Tooltip />
-                <Legend verticalAlign="bottom" height={36} />
-              </PieChart>
-            </ResponsiveContainer>
+            <SafeChart
+              data={approvalStats.data}
+              minHeight={350}
+              validateData={(data) => 
+                Array.isArray(data) && 
+                data.length > 0 && 
+                data[0]?.value !== undefined
+              }
+            >
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={approvalStats.data}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={60}
+                    outerRadius={100}
+                    paddingAngle={5}
+                    dataKey="value"
+                  >
+                    {approvalStats.data.map((entry, index) => (
+                      <Cell key={`cell-${entry.name || index}`} fill={entry.color} />
+                    ))}
+                  </Pie>
+                  <Tooltip />
+                  <Legend verticalAlign="bottom" height={36} />
+                </PieChart>
+              </ResponsiveContainer>
+            </SafeChart>
           </CardContent>
         </Card>
       </div>
