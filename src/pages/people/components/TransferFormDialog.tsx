@@ -43,8 +43,8 @@ import { cn } from '@/lib/utils'
 import { ptBR } from 'date-fns/locale'
 import { useToast } from '@/hooks/use-toast'
 import useTransferStore from '@/stores/useTransferStore'
-import useStudentStore from '@/stores/useStudentStore'
-import useSchoolStore from '@/stores/useSchoolStore'
+import { useStudentStore } from '@/stores/useStudentStore.supabase'
+import { useSchoolStore } from '@/stores/useSchoolStore.supabase'
 import useUserStore from '@/stores/useUserStore'
 
 const transferSchema = z.object({

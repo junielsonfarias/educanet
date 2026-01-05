@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import {
   Plus,
   Edit,
@@ -17,6 +17,7 @@ import {
   CardTitle,
 } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import { Skeleton } from '@/components/ui/skeleton'
 import {
   Table,
   TableBody,
@@ -25,11 +26,10 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import useAssessmentStore from '@/stores/useAssessmentStore'
-import useCourseStore from '@/stores/useCourseStore'
+import { useAssessmentStore } from '@/stores/useAssessmentStore.supabase'
+import { useCourseStore } from '@/stores/useCourseStore.supabase'
 import { AssessmentTypeFormDialog } from './components/AssessmentTypeFormDialog'
-import { useToast } from '@/hooks/use-toast'
-import { AssessmentType } from '@/lib/mock-data'
+import { toast } from 'sonner'
 import { RequirePermission } from '@/components/RequirePermission'
 import {
   AlertDialog,
@@ -42,46 +42,62 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 
+// Tipo temporário até implementar assessment types no BD
+interface AssessmentType {
+  id: string
+  name: string
+  description?: string
+  applicableGradeIds: string[]
+  excludeFromAverage: boolean
+}
+
 export default function AssessmentTypesList() {
-  const {
-    assessmentTypes,
-    addAssessmentType,
-    updateAssessmentType,
-    deleteAssessmentType,
-  } = useAssessmentStore()
-  const { etapasEnsino } = useCourseStore()
+  const { grades, loading: gradesLoading, fetchGrades } = useAssessmentStore()
+  const { courses, loading: coursesLoading, fetchCourses } = useCourseStore()
+  
+  // TODO: Assessment types precisam ser implementadas no BD
+  // Por enquanto, usando array local temporário
+  const [assessmentTypes, setAssessmentTypes] = useState<AssessmentType[]>([])
+  const [loading, setLoading] = useState(false)
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [editingType, setEditingType] = useState<AssessmentType | null>(null)
   const [deleteId, setDeleteId] = useState<string | null>(null)
   const [searchTerm, setSearchTerm] = useState('')
-  const { toast } = useToast()
+
+  useEffect(() => {
+    fetchGrades()
+    fetchCourses()
+    // TODO: Buscar assessment types do BD quando implementado
+  }, [fetchGrades, fetchCourses])
 
   const handleCreate = (data: any) => {
-    addAssessmentType(data)
-    toast({
-      title: 'Tipo Criado',
-      description: 'O novo tipo de avaliação foi adicionado com sucesso.',
-    })
+    // TODO: Criar no BD quando implementado
+    const newType: AssessmentType = {
+      id: `type-${Date.now()}`,
+      ...data,
+    }
+    setAssessmentTypes(types => [...types, newType])
+    toast.success('Tipo de avaliação criado com sucesso.')
+    setIsDialogOpen(false)
   }
 
   const handleUpdate = (data: any) => {
     if (editingType?.id) {
-      updateAssessmentType(editingType.id, data)
-      toast({
-        title: 'Tipo Atualizado',
-        description: 'As alterações foram salvas.',
-      })
+      // TODO: Atualizar no BD quando implementado
+      setAssessmentTypes(types =>
+        types.map(t => t.id === editingType.id ? { ...editingType, ...data } : t)
+      )
+      toast.success('Tipo de avaliação atualizado com sucesso.')
+      setEditingType(null)
+      setIsDialogOpen(false)
     }
-    setEditingType(null)
   }
 
   const handleDelete = () => {
     if (deleteId) {
-      deleteAssessmentType(deleteId)
-      toast({
-        title: 'Tipo Excluído',
-        description: 'Registro removido com sucesso.',
-      })
+      // TODO: Deletar no BD quando implementado
+      setAssessmentTypes(types => types.filter(t => t.id !== deleteId))
+      toast.success('Tipo de avaliação excluído com sucesso.')
       setDeleteId(null)
     }
   }
@@ -97,11 +113,9 @@ export default function AssessmentTypesList() {
   }
 
   const getGradeNames = (gradeIds: string[]) => {
-    const allSeriesAnos = etapasEnsino.flatMap((e) =>
-      e.seriesAnos.map((s) => ({ ...s, etapaEnsinoName: e.name })),
-    )
-    const names = gradeIds.map((id) => allSeriesAnos.find((s) => s.id === id)?.name)
-    return names.filter(Boolean).join(', ')
+    // TODO: Adaptar quando courses estiverem no formato correto
+    // Por enquanto, retornar IDs
+    return gradeIds.length > 0 ? `${gradeIds.length} série(s)` : 'Nenhuma'
   }
 
   const filteredTypes = assessmentTypes.filter((type) =>
@@ -149,10 +163,19 @@ export default function AssessmentTypesList() {
             </div>
           </div>
 
-          {filteredTypes.length === 0 ? (
+          {loading || gradesLoading || coursesLoading ? (
+            <div className="space-y-4">
+              {Array.from({ length: 3 }).map((_, index) => (
+                <div key={`skeleton-${index}`} className="flex gap-4">
+                  <Skeleton className="h-12 w-full" />
+                </div>
+              ))}
+            </div>
+          ) : filteredTypes.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-10 text-muted-foreground">
               <AlertCircle className="h-10 w-10 mb-2 opacity-50" />
-              <p>Nenhum tipo de avaliação encontrado.</p>
+              <p className="mb-2">Nenhum tipo de avaliação encontrado.</p>
+              <p className="text-sm">Esta funcionalidade será implementada em breve no banco de dados.</p>
             </div>
           ) : (
             <Table>
@@ -168,7 +191,7 @@ export default function AssessmentTypesList() {
               <TableBody>
                 {filteredTypes.map((type) => (
                   <TableRow 
-                    key={type.id}
+                    key={`type-${type.id}`}
                     className="border-l-4 border-l-transparent hover:border-l-purple-500 hover:bg-gradient-to-r hover:from-purple-50/50 hover:to-transparent transition-all duration-200"
                   >
                     <TableCell className="font-medium">

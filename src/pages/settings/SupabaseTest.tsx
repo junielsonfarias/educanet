@@ -6,6 +6,10 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Loader2, CheckCircle2, XCircle, Database, Info } from 'lucide-react'
 import { checkConnection, isSupabaseConfigured } from '@/lib/supabase/helpers'
 import { supabase } from '@/lib/supabase/client'
+import { checkSupabaseEnv } from '@/lib/supabase/check-env'
+import { getCurrentUser } from '@/lib/supabase/auth'
+import { runAllTests, runAuthTests, formatTestResults, type TestResult } from '@/lib/supabase/test-integration'
+import { testStorageBuckets } from '@/lib/supabase/test-storage'
 
 interface TestResult {
   name: string
@@ -21,6 +25,8 @@ export default function SupabaseTest() {
     { name: 'Verificar Configuração', status: 'pending' },
     { name: 'Testar Conexão', status: 'pending' },
     { name: 'Verificar Cliente', status: 'pending' },
+    { name: 'Verificar Autenticação', status: 'pending' },
+    { name: 'Testar Storage Buckets', status: 'pending' },
   ])
 
   const updateTest = (index: number, updates: Partial<TestResult>) => {
@@ -38,21 +44,43 @@ export default function SupabaseTest() {
       const isConfigured = isSupabaseConfigured()
       await new Promise((resolve) => setTimeout(resolve, 500))
 
-      if (isConfigured) {
+      const envCheck = checkSupabaseEnv()
+      
+      if (envCheck.isConfigured) {
         updateTest(0, {
           status: 'success',
           message: 'Variáveis de ambiente configuradas corretamente',
           timestamp: new Date().toISOString(),
           details: {
-            url: import.meta.env.VITE_SUPABASE_URL,
-            hasAnonKey: !!import.meta.env.VITE_SUPABASE_ANON_KEY,
+            url: envCheck.url,
+            keyPrefix: envCheck.key,
+            allEnvVars: {
+              VITE_SUPABASE_URL: import.meta.env.VITE_SUPABASE_URL,
+              VITE_SUPABASE_ANON_KEY: import.meta.env.VITE_SUPABASE_ANON_KEY ? 'Configurado (oculto)' : 'Não configurado',
+            },
           },
         })
       } else {
         updateTest(0, {
           status: 'error',
-          message: 'Variáveis de ambiente não configuradas',
+          message: 'Variáveis de ambiente não configuradas corretamente',
           timestamp: new Date().toISOString(),
+          details: {
+            errors: envCheck.errors,
+            url: envCheck.url || 'Não configurado',
+            key: envCheck.key || 'Não configurado',
+            allEnvVars: {
+              VITE_SUPABASE_URL: import.meta.env.VITE_SUPABASE_URL || 'undefined',
+              VITE_SUPABASE_ANON_KEY: import.meta.env.VITE_SUPABASE_ANON_KEY ? 'Configurado (oculto)' : 'undefined',
+            },
+            instructions: [
+              '1. Crie um arquivo .env.local na raiz do projeto (ao lado de package.json)',
+              '2. Adicione as seguintes linhas:',
+              '   VITE_SUPABASE_URL=https://seu-projeto-id.supabase.co',
+              '   VITE_SUPABASE_ANON_KEY=sua-chave-anon-public-aqui',
+              '3. Reinicie o servidor (Ctrl+C e depois pnpm dev)',
+            ],
+          },
         })
         setIsLoading(false)
         return
@@ -91,6 +119,83 @@ export default function SupabaseTest() {
         updateTest(2, {
           status: 'error',
           message: 'Erro ao verificar cliente Supabase',
+          details: error,
+          timestamp: new Date().toISOString(),
+        })
+      }
+
+      // Teste 4: Verificar autenticação
+      updateTest(3, { status: 'running' })
+      await new Promise((resolve) => setTimeout(resolve, 500))
+
+      try {
+        const { user, userData } = await getCurrentUser()
+        
+        if (user) {
+          updateTest(3, {
+            status: 'success',
+            message: `Usuário autenticado: ${user.email}`,
+            details: {
+              userId: user.id,
+              email: user.email,
+              personId: userData?.person_id,
+              role: userData?.role,
+            },
+            timestamp: new Date().toISOString(),
+          })
+        } else {
+          updateTest(3, {
+            status: 'success',
+            message: 'Nenhuma sessão ativa (normal se não estiver logado)',
+            details: {
+              note: 'Faça login para testar autenticação completa',
+            },
+            timestamp: new Date().toISOString(),
+          })
+        }
+      } catch (error) {
+        updateTest(3, {
+          status: 'error',
+          message: 'Erro ao verificar autenticação',
+          details: error,
+          timestamp: new Date().toISOString(),
+        })
+      }
+
+      // Teste 5: Testar Storage Buckets
+      updateTest(4, { status: 'running' })
+      await new Promise((resolve) => setTimeout(resolve, 500))
+
+      try {
+        const storageResults = await testStorageBuckets()
+        const successCount = storageResults.filter((r) => r.success).length
+        const totalCount = storageResults.length
+
+        if (successCount === totalCount) {
+          updateTest(4, {
+            status: 'success',
+            message: `Todos os buckets estão funcionando (${successCount}/${totalCount} testes passaram)`,
+            details: {
+              results: storageResults,
+              buckets: ['avatars', 'documents', 'attachments', 'photos'],
+            },
+            timestamp: new Date().toISOString(),
+          })
+        } else {
+          updateTest(4, {
+            status: 'error',
+            message: `Alguns testes falharam (${successCount}/${totalCount} passaram)`,
+            details: {
+              results: storageResults,
+              failedTests: storageResults.filter((r) => !r.success),
+            },
+            timestamp: new Date().toISOString(),
+          })
+        }
+      } catch (error: any) {
+        updateTest(4, {
+          status: 'error',
+          message: `Erro ao testar Storage: ${error.message}`,
           details: error,
           timestamp: new Date().toISOString(),
         })

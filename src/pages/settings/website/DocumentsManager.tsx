@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import {
   Plus,
   Edit,
@@ -25,6 +25,7 @@ import {
   CardTitle,
 } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import { Skeleton } from '@/components/ui/skeleton'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -35,56 +36,91 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
-import usePublicContentStore from '@/stores/usePublicContentStore'
+import { usePublicContentStore } from '@/stores/usePublicContentStore.supabase'
 import { DocumentFormDialog } from './components/DocumentFormDialog'
-import { PublicDocument } from '@/lib/mock-data'
-import { useToast } from '@/hooks/use-toast'
+import { toast } from 'sonner'
 import { format, parseISO } from 'date-fns'
 import { RequirePermission } from '@/components/RequirePermission'
+import type { Database } from '@/lib/supabase/database.types'
+
+type PublicContentRow = Database['public']['Tables']['public_portal_content']['Row']
 
 export default function DocumentsManager() {
-  const { documents, addDocument, updateDocument, deleteDocument } =
-    usePublicContentStore()
-  const { toast } = useToast()
+  const {
+    publicContent,
+    loading,
+    fetchPublicContent,
+    addPublicContent,
+    updatePublicContent,
+    deletePublicContent,
+    publishContent,
+    unpublishContent,
+  } = usePublicContentStore()
 
   const [searchTerm, setSearchTerm] = useState('')
   const [isDialogOpen, setIsDialogOpen] = useState(false)
-  const [editingDoc, setEditingDoc] = useState<PublicDocument | null>(null)
-  const [deleteId, setDeleteId] = useState<string | null>(null)
+  const [editingDoc, setEditingDoc] = useState<PublicContentRow | null>(null)
+  const [deleteId, setDeleteId] = useState<number | null>(null)
 
-  const filteredDocs = documents.filter(
-    (doc) =>
-      doc.documentNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      doc.summary.toLowerCase().includes(searchTerm.toLowerCase()),
-  )
+  // Fetch documents on mount (filter by content_type = 'document')
+  useEffect(() => {
+    fetchPublicContent()
+  }, [fetchPublicContent])
 
-  const handleCreate = (data: any) => {
-    addDocument(data)
-    toast({
-      title: 'Documento publicado',
-      description: 'O documento está disponível no portal da transparência.',
+  // Filter only document items
+  const documents = useMemo(() => {
+    if (!Array.isArray(publicContent)) return []
+    return publicContent.filter(item => item.content_type === 'document')
+  }, [publicContent])
+
+  // Filter by search term
+  const filteredDocs = useMemo(() => {
+    return documents.filter((doc) => {
+      const documentNumber = doc.metadata?.document_number || ''
+      const summary = doc.summary || doc.content || ''
+      const term = searchTerm.toLowerCase()
+      return (
+        documentNumber.toLowerCase().includes(term) ||
+        summary.toLowerCase().includes(term)
+      )
     })
-  }
+  }, [documents, searchTerm])
 
-  const handleUpdate = (data: any) => {
-    if (editingDoc) {
-      updateDocument(editingDoc.id, data)
-      toast({
-        title: 'Documento atualizado',
-        description: 'Informações salvas com sucesso.',
+  const handleCreate = async (data: any) => {
+    try {
+      await addPublicContent({
+        ...data,
+        content_type: 'document',
       })
-      setEditingDoc(null)
+      toast.success('Documento publicado com sucesso.')
+      setIsDialogOpen(false)
+    } catch (error) {
+      toast.error('Erro ao criar documento')
     }
   }
 
-  const handleDelete = () => {
+  const handleUpdate = async (data: any) => {
+    if (editingDoc) {
+      try {
+        await updatePublicContent(editingDoc.id, data)
+        toast.success('Documento atualizado com sucesso.')
+        setEditingDoc(null)
+        setIsDialogOpen(false)
+      } catch (error) {
+        toast.error('Erro ao atualizar documento')
+      }
+    }
+  }
+
+  const handleDelete = async () => {
     if (deleteId) {
-      deleteDocument(deleteId)
-      toast({
-        title: 'Documento removido',
-        description: 'O arquivo foi removido da listagem pública.',
-      })
-      setDeleteId(null)
+      try {
+        await deletePublicContent(deleteId)
+        toast.success('Documento removido com sucesso.')
+        setDeleteId(null)
+      } catch (error) {
+        toast.error('Erro ao remover documento')
+      }
     }
   }
 
@@ -93,17 +129,23 @@ export default function DocumentsManager() {
     setIsDialogOpen(true)
   }
 
-  const openEditDialog = (doc: PublicDocument) => {
+  const openEditDialog = (doc: PublicContentRow) => {
     setEditingDoc(doc)
     setIsDialogOpen(true)
   }
 
-  const toggleStatus = (doc: PublicDocument) => {
-    updateDocument(doc.id, { active: !doc.active })
-    toast({
-      title: 'Visibilidade alterada',
-      description: `O documento agora está ${!doc.active ? 'Visível' : 'Oculto'}.`,
-    })
+  const toggleStatus = async (doc: PublicContentRow) => {
+    try {
+      if (doc.is_published) {
+        await unpublishContent(doc.id)
+        toast.success('Documento ocultado com sucesso.')
+      } else {
+        await publishContent(doc.id)
+        toast.success('Documento publicado com sucesso.')
+      }
+    } catch (error) {
+      toast.error('Erro ao alterar status do documento')
+    }
   }
 
   return (
@@ -164,75 +206,103 @@ export default function DocumentsManager() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredDocs.length === 0 ? (
+                {loading ? (
+                  // Loading skeletons
+                  Array.from({ length: 5 }).map((_, index) => (
+                    <TableRow key={`skeleton-${index}`}>
+                      <TableCell><Skeleton className="h-4 w-[120px]" /></TableCell>
+                      <TableCell><Skeleton className="h-4 w-[100px]" /></TableCell>
+                      <TableCell><Skeleton className="h-4 w-[100px]" /></TableCell>
+                      <TableCell><Skeleton className="h-4 w-[300px]" /></TableCell>
+                      <TableCell><Skeleton className="h-4 w-[80px]" /></TableCell>
+                      <TableCell><Skeleton className="h-4 w-[80px]" /></TableCell>
+                      <TableCell><Skeleton className="h-8 w-24 ml-auto" /></TableCell>
+                    </TableRow>
+                  ))
+                ) : filteredDocs.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={7} className="h-24 text-center">
                       Nenhum documento encontrado.
                     </TableCell>
                   </TableRow>
                 ) : (
-                  filteredDocs.map((doc) => (
-                    <TableRow key={doc.id}>
-                      <TableCell className="font-medium">
-                        <div className="flex items-center gap-2">
-                          <FileText className="h-4 w-4 text-muted-foreground" />
-                          {doc.documentNumber}
-                        </div>
-                      </TableCell>
-                      <TableCell>{doc.organ}</TableCell>
-                      <TableCell>
-                        {format(parseISO(doc.publishDate), 'dd/MM/yyyy')}
-                      </TableCell>
-                      <TableCell
-                        className="max-w-[300px] truncate"
-                        title={doc.summary}
-                      >
-                        {doc.summary}
-                      </TableCell>
-                      <TableCell>
-                        <a
-                          href={doc.driveLink}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="text-primary hover:underline flex items-center gap-1"
+                  filteredDocs.map((doc) => {
+                    const documentNumber = (doc.metadata as any)?.document_number || doc.title || 'N/A'
+                    const organ = (doc.metadata as any)?.organ || 'N/A'
+                    const summary = doc.summary || doc.content || 'Sem descrição'
+                    const driveLink = (doc.metadata as any)?.drive_link || doc.external_url || '#'
+
+                    return (
+                      <TableRow key={`doc-${doc.id}`}>
+                        <TableCell className="font-medium">
+                          <div className="flex items-center gap-2">
+                            <FileText className="h-4 w-4 text-muted-foreground" />
+                            {documentNumber}
+                          </div>
+                        </TableCell>
+                        <TableCell>{organ}</TableCell>
+                        <TableCell>
+                          {doc.publish_date
+                            ? format(parseISO(doc.publish_date), 'dd/MM/yyyy')
+                            : doc.created_at
+                            ? format(parseISO(doc.created_at), 'dd/MM/yyyy')
+                            : 'N/A'}
+                        </TableCell>
+                        <TableCell
+                          className="max-w-[300px] truncate"
+                          title={summary}
                         >
-                          Drive <ExternalLink className="h-3 w-3" />
-                        </a>
-                      </TableCell>
-                      <TableCell>
-                        <Badge
-                          variant={doc.active ? 'default' : 'secondary'}
-                          className="cursor-pointer"
-                          onClick={() => toggleStatus(doc)}
-                        >
-                          {doc.active ? 'Visível' : 'Oculto'}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex justify-end gap-2">
-                          <RequirePermission permission="edit:document">
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => openEditDialog(doc)}
+                          {summary}
+                        </TableCell>
+                        <TableCell>
+                          {driveLink && driveLink !== '#' ? (
+                            <a
+                              href={driveLink}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="text-primary hover:underline flex items-center gap-1"
                             >
-                              <Edit className="h-4 w-4" />
-                            </Button>
-                          </RequirePermission>
-                          <RequirePermission permission="delete:document">
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="text-destructive hover:bg-destructive/10"
-                              onClick={() => setDeleteId(doc.id)}
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </RequirePermission>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))
+                              Drive <ExternalLink className="h-3 w-3" />
+                            </a>
+                          ) : (
+                            <span className="text-muted-foreground">N/A</span>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          <Badge
+                            variant={doc.is_published ? 'default' : 'secondary'}
+                            className="cursor-pointer"
+                            onClick={() => toggleStatus(doc)}
+                          >
+                            {doc.is_published ? 'Visível' : 'Oculto'}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex justify-end gap-2">
+                            <RequirePermission permission="edit:document">
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => openEditDialog(doc)}
+                              >
+                                <Edit className="h-4 w-4" />
+                              </Button>
+                            </RequirePermission>
+                            <RequirePermission permission="delete:document">
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="text-destructive hover:bg-destructive/10"
+                                onClick={() => setDeleteId(doc.id)}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </RequirePermission>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    )
+                  })
                 )}
               </TableBody>
             </Table>

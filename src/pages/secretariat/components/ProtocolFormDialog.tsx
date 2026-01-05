@@ -28,28 +28,40 @@ import {
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
-import { Protocol, ProtocolType, ProtocolPriority } from '@/lib/mock-data'
-import useStudentStore from '@/stores/useStudentStore'
-import useSchoolStore from '@/stores/useSchoolStore'
+import { useStudentStore } from '@/stores/useStudentStore.supabase'
+import { useSchoolStore } from '@/stores/useSchoolStore.supabase'
+import { personService } from '@/lib/supabase/services'
+import { supabase } from '@/lib/supabase/client'
+import type { Database } from '@/lib/supabase/database.types'
+
+type ProtocolRow = Database['public']['Tables']['secretariat_protocols']['Row']
 
 const protocolSchema = z.object({
-  type: z.enum(['matricula', 'transferencia', 'declaracao', 'recurso', 'outros']),
-  requesterName: z.string().min(3, 'Nome deve ter pelo menos 3 caracteres'),
-  requesterCpf: z.string().min(11, 'CPF inválido'),
-  requesterPhone: z.string().min(8, 'Telefone inválido'),
-  requesterEmail: z.string().email('E-mail inválido').optional().or(z.literal('')),
-  requesterRelationship: z.enum(['pai', 'mae', 'responsavel', 'aluno', 'outro']),
-  studentId: z.string().optional(),
-  schoolId: z.string().min(1, 'Selecione uma escola'),
+  request_type: z.enum(['matricula', 'transferencia', 'declaracao', 'recurso', 'outros']),
+  requester_person_id: z.string().min(1, 'Selecione ou cadastre o solicitante'),
+  student_profile_id: z.string().optional(),
+  school_id: z.string().min(1, 'Selecione uma escola'),
   description: z.string().min(10, 'Descrição deve ter pelo menos 10 caracteres'),
   priority: z.enum(['normal', 'preferential', 'urgent']),
+  // Campos para criar pessoa se não existir
+  requesterName: z.string().min(3, 'Nome deve ter pelo menos 3 caracteres').optional(),
+  requesterCpf: z.string().min(11, 'CPF inválido').optional(),
+  requesterPhone: z.string().min(8, 'Telefone inválido').optional(),
+  requesterEmail: z.string().email('E-mail inválido').optional().or(z.literal('')),
 })
 
 interface ProtocolFormDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
-  onSave: (data: Omit<Protocol, 'id' | 'number' | 'createdAt' | 'updatedAt' | 'status' | 'history' | 'documents'>) => void
-  initialData?: Protocol | null
+  onSave: (data: {
+    requester_person_id: number
+    request_type: string
+    description: string
+    priority: string
+    student_profile_id?: number
+    school_id?: number
+  }) => void
+  initialData?: ProtocolRow | null
 }
 
 export function ProtocolFormDialog({
@@ -58,77 +70,121 @@ export function ProtocolFormDialog({
   onSave,
   initialData,
 }: ProtocolFormDialogProps) {
-  const { students } = useStudentStore()
-  const { schools } = useSchoolStore()
+  const { students, fetchStudents } = useStudentStore()
+  const { schools, fetchSchools } = useSchoolStore()
   const [selectedStudent, setSelectedStudent] = useState<string>('')
+  const [createNewPerson, setCreateNewPerson] = useState(false)
 
   const form = useForm<z.infer<typeof protocolSchema>>({
     resolver: zodResolver(protocolSchema),
     defaultValues: {
-      type: 'outros',
+      request_type: 'outros',
+      requester_person_id: '',
+      student_profile_id: '',
+      school_id: '',
+      description: '',
+      priority: 'normal',
       requesterName: '',
       requesterCpf: '',
       requesterPhone: '',
       requesterEmail: '',
-      requesterRelationship: 'responsavel',
-      studentId: '',
-      schoolId: '',
-      description: '',
-      priority: 'normal',
     },
   })
 
   useEffect(() => {
     if (open) {
+      fetchStudents()
+      fetchSchools()
+    }
+  }, [open, fetchStudents, fetchSchools])
+
+  useEffect(() => {
+    if (open) {
       if (initialData) {
         form.reset({
-          type: initialData.type,
-          requesterName: initialData.requester.name,
-          requesterCpf: initialData.requester.cpf,
-          requesterPhone: initialData.requester.phone,
-          requesterEmail: initialData.requester.email || '',
-          requesterRelationship: initialData.requester.relationship,
-          studentId: initialData.studentId || '',
-          schoolId: initialData.schoolId,
-          description: initialData.description,
-          priority: initialData.priority,
+          request_type: (initialData.request_type as any) || 'outros',
+          requester_person_id: initialData.requester_person_id?.toString() || '',
+          student_profile_id: (initialData as any).student_profile_id?.toString() || '',
+          school_id: (initialData as any).school_id?.toString() || '',
+          description: initialData.description || '',
+          priority: (initialData.priority as any) || 'normal',
+          requesterName: (initialData as any).requester?.first_name || '',
+          requesterCpf: (initialData as any).requester?.cpf || '',
+          requesterPhone: (initialData as any).requester?.phone || '',
+          requesterEmail: (initialData as any).requester?.email || '',
         })
-        setSelectedStudent(initialData.studentId || '')
+        setSelectedStudent((initialData as any).student_profile_id?.toString() || '')
+        setCreateNewPerson(false)
       } else {
         form.reset({
-          type: 'outros',
+          request_type: 'outros',
+          requester_person_id: '',
+          student_profile_id: '',
+          school_id: '',
+          description: '',
+          priority: 'normal',
           requesterName: '',
           requesterCpf: '',
           requesterPhone: '',
           requesterEmail: '',
-          requesterRelationship: 'responsavel',
-          studentId: '',
-          schoolId: '',
-          description: '',
-          priority: 'normal',
         })
-          setSelectedStudent('')
+        setSelectedStudent('')
+        setCreateNewPerson(false)
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, initialData?.id])
 
-  const handleSubmit = (data: z.infer<typeof protocolSchema>) => {
-    onSave({
-      type: data.type,
-      requester: {
-        name: data.requesterName,
-        cpf: data.requesterCpf,
-        phone: data.requesterPhone,
-        email: data.requesterEmail || undefined,
-        relationship: data.requesterRelationship,
-      },
-      studentId: data.studentId && data.studentId !== 'none' ? data.studentId : undefined,
-      schoolId: data.schoolId,
-      description: data.description,
-      priority: data.priority,
-    })
-    onOpenChange(false)
+  const handleSubmit = async (data: z.infer<typeof protocolSchema>) => {
+    try {
+      let requesterPersonId: number
+
+      if (createNewPerson && data.requesterName && data.requesterCpf) {
+        // Criar nova pessoa
+        // Buscar usuário atual para created_by
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) throw new Error('Usuário não autenticado')
+        
+        // Buscar person_id do usuário
+        const { data: authUser } = await supabase
+          .from('auth_users')
+          .select('person_id')
+          .eq('id', user.id)
+          .single()
+        
+        const createdBy = authUser?.person_id || 1 // Fallback para 1 se não encontrar
+        
+        const newPerson = await personService.create({
+          first_name: data.requesterName.split(' ')[0] || '',
+          last_name: data.requesterName.split(' ').slice(1).join(' ') || '',
+          date_of_birth: new Date().toISOString().split('T')[0], // Data padrão, pode ser ajustada
+          cpf: data.requesterCpf,
+          phone: data.requesterPhone || null,
+          email: data.requesterEmail || null,
+          type: 'Funcionario' as const, // Tipo padrão para solicitantes externos
+          created_by: createdBy,
+        })
+        if (!newPerson?.id) throw new Error('Erro ao criar pessoa')
+        requesterPersonId = newPerson.id
+      } else {
+        requesterPersonId = parseInt(data.requester_person_id)
+      }
+
+      onSave({
+        requester_person_id: requesterPersonId,
+        request_type: data.request_type,
+        description: data.description,
+        priority: data.priority,
+        student_profile_id: data.student_profile_id && data.student_profile_id !== 'none' 
+          ? parseInt(data.student_profile_id) 
+          : undefined,
+        school_id: data.school_id ? parseInt(data.school_id) : undefined,
+      })
+      onOpenChange(false)
+    } catch (error) {
+      console.error('Erro ao salvar protocolo:', error)
+      form.setError('requester_person_id', { message: 'Erro ao processar solicitante' })
+    }
   }
 
   return (
@@ -150,7 +206,7 @@ export function ProtocolFormDialog({
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <FormField
                 control={form.control}
-                name="type"
+                name="request_type"
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Tipo de Protocolo *</FormLabel>
@@ -199,7 +255,7 @@ export function ProtocolFormDialog({
 
             <FormField
               control={form.control}
-              name="schoolId"
+              name="school_id"
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Escola *</FormLabel>
@@ -211,7 +267,7 @@ export function ProtocolFormDialog({
                     </FormControl>
                     <SelectContent>
                       {schools.map((school) => (
-                        <SelectItem key={school.id} value={school.id}>
+                        <SelectItem key={school.id} value={school.id.toString()}>
                           {school.name}
                         </SelectItem>
                       ))}
@@ -222,40 +278,43 @@ export function ProtocolFormDialog({
               )}
             />
 
-            <FormField
-              control={form.control}
-              name="studentId"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Aluno (Opcional)</FormLabel>
-                  <Select
-                    onValueChange={(value) => {
-                      field.onChange(value)
-                      setSelectedStudent(value)
-                    }}
-                    defaultValue={field.value}
-                  >
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Selecione o aluno (opcional)" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      <SelectItem value="none">Nenhum aluno</SelectItem>
-                      {students.map((student) => (
-                        <SelectItem key={student.id} value={student.id}>
-                          {student.name} - {student.registration}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
             <div className="border rounded-lg p-4 space-y-4">
-              <h4 className="font-semibold">Dados do Solicitante</h4>
+              <div className="flex items-center justify-between">
+                <h4 className="font-semibold">Dados do Solicitante</h4>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCreateNewPerson(!createNewPerson)}
+                >
+                  {createNewPerson ? 'Usar pessoa existente' : 'Cadastrar nova pessoa'}
+                </Button>
+              </div>
+
+              {!createNewPerson ? (
+                <FormField
+                  control={form.control}
+                  name="requester_person_id"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Pessoa Solicitante *</FormLabel>
+                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Selecione ou cadastre o solicitante" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="">Selecione uma pessoa</SelectItem>
+                          {/* TODO: Buscar pessoas do banco via personService */}
+                          <SelectItem value="new">Cadastrar nova pessoa</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              ) : null}
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <FormField

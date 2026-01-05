@@ -26,8 +26,8 @@ import {
   ResponsiveContainer,
 } from 'recharts'
 import { School, CheckSquare, X } from 'lucide-react'
-import useSchoolStore from '@/stores/useSchoolStore'
-import useStudentStore from '@/stores/useStudentStore'
+import { useSchoolStore } from '@/stores/useSchoolStore.supabase'
+import { useStudentStore } from '@/stores/useStudentStore.supabase'
 import { SafeChart } from '@/components/charts/SafeChart'
 
 export default function ComparativeReports() {

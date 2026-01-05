@@ -24,7 +24,7 @@ import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Textarea } from '@/components/ui/textarea'
 import { AssessmentType } from '@/lib/mock-data'
-import useCourseStore from '@/stores/useCourseStore'
+import { useCourseStore } from '@/stores/useCourseStore.supabase'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Label } from '@/components/ui/label'
 

@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import {
   Users,
   Calendar,
@@ -39,28 +39,41 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { Badge } from '@/components/ui/badge'
-import { useToast } from '@/hooks/use-toast'
-import useCouncilStore from '@/stores/useCouncilStore'
-import useSchoolStore from '@/stores/useSchoolStore'
-import useStudentStore from '@/stores/useStudentStore'
-import useAssessmentStore from '@/stores/useAssessmentStore'
-import useAttendanceStore from '@/stores/useAttendanceStore'
-import useCourseStore from '@/stores/useCourseStore'
-import { getStudentsByClassroom } from '@/lib/enrollment-utils'
-import { calculateGrades } from '@/lib/grade-calculator'
+import { Skeleton } from '@/components/ui/skeleton'
+import { toast } from 'sonner'
+import { useSchoolStore } from '@/stores/useSchoolStore.supabase'
+import { useStudentStore } from '@/stores/useStudentStore.supabase'
+import { useAssessmentStore } from '@/stores/useAssessmentStore.supabase'
+import { useAttendanceStore } from '@/stores/useAttendanceStore.supabase'
+import { useCourseStore } from '@/stores/useCourseStore.supabase'
+import { classService } from '@/lib/supabase/services'
 import { CouncilFormDialog } from './components/CouncilFormDialog'
 import { CouncilDetailsDialog } from './components/CouncilDetailsDialog'
 import { RequirePermission } from '@/components/RequirePermission'
+import { EmptyState } from '@/components/ui/empty-state'
+
+// Tipo temporário até implementar councils no BD
+interface Council {
+  id: string
+  schoolId: string
+  academicYearId: string
+  classroomId: string
+  classroomName: string
+  periodName: string
+  type: 'bimestral' | 'final' | 'extraordinary'
+  status: 'scheduled' | 'in_progress' | 'completed' | 'cancelled'
+  scheduledDate: string
+}
 
 export default function ClassCouncil() {
-  const { councils, getCouncilsByClassroom, deleteCouncil } = useCouncilStore()
-  const { schools } = useSchoolStore()
-  const { students } = useStudentStore()
-  const { assessments } = useAssessmentStore()
-  const { attendanceRecords } = useAttendanceStore()
-  const { etapasEnsino, evaluationRules } = useCourseStore()
-  const { toast } = useToast()
+  const { schools, loading: schoolsLoading, fetchSchools } = useSchoolStore()
+  const { students, loading: studentsLoading, fetchStudents } = useStudentStore()
+  const { grades, loading: gradesLoading, fetchGrades } = useAssessmentStore()
+  const { attendanceRecords, loading: attendanceLoading, fetchAttendanceRecords } = useAttendanceStore()
+  const { courses, loading: coursesLoading, fetchCourses } = useCourseStore()
 
+  const [councils, setCouncils] = useState<Council[]>([])
+  const [loading, setLoading] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
   const [schoolFilter, setSchoolFilter] = useState('all')
   const [yearFilter, setYearFilter] = useState('all')
@@ -71,6 +84,16 @@ export default function ClassCouncil() {
   const [isDetailsDialogOpen, setIsDetailsDialogOpen] = useState(false)
   const [selectedCouncil, setSelectedCouncil] = useState<string | null>(null)
   const [editingCouncil, setEditingCouncil] = useState<string | null>(null)
+
+  // Fetch data on mount
+  useEffect(() => {
+    fetchSchools()
+    fetchStudents()
+    fetchGrades()
+    fetchAttendanceRecords()
+    fetchCourses()
+    // TODO: Buscar councils do BD quando implementado
+  }, [fetchSchools, fetchStudents, fetchGrades, fetchAttendanceRecords, fetchCourses])
 
   // Filtrar conselhos
   const filteredCouncils = useMemo(() => {
@@ -97,12 +120,28 @@ export default function ClassCouncil() {
     })
   }, [councils, searchTerm, schoolFilter, yearFilter, classroomFilter, typeFilter, statusFilter])
 
-  // Obter escolas e anos letivos
-  const availableSchools = schools.filter((s) => s.status === 'active')
-  const selectedSchool = availableSchools.find((s) => s.id === schoolFilter)
-  const availableYears = selectedSchool?.academicYears || []
-  const selectedYear = availableYears.find((y) => y.id === yearFilter)
-  const availableClassrooms = selectedYear?.turmas || []
+  // Obter escolas e turmas disponíveis
+  const safeSchools = Array.isArray(schools) ? schools : []
+  const availableSchools = safeSchools.filter((s) => !s.deleted_at)
+  
+  // Buscar turmas disponíveis
+  const [availableClasses, setAvailableClasses] = useState<any[]>([])
+  
+  useEffect(() => {
+    const fetchClasses = async () => {
+      if (schoolFilter !== 'all') {
+        try {
+          const classes = await classService.getBySchool(parseInt(schoolFilter))
+          setAvailableClasses(classes || [])
+        } catch {
+          // Silent fail for class filter
+        }
+      } else {
+        setAvailableClasses([])
+      }
+    }
+    fetchClasses()
+  }, [schoolFilter])
 
   const handleCreateCouncil = () => {
     setEditingCouncil(null)
@@ -119,12 +158,10 @@ export default function ClassCouncil() {
     setIsFormDialogOpen(true)
   }
 
-  const handleDeleteCouncil = (councilId: string) => {
-    deleteCouncil(councilId)
-    toast({
-      title: 'Conselho removido',
-      description: 'O conselho de classe foi removido com sucesso.',
-    })
+  const handleDeleteCouncil = async (councilId: string) => {
+    // TODO: Implementar quando councils forem adicionados ao BD
+    setCouncils(councils => councils.filter(c => c.id !== councilId))
+    toast.success('Conselho removido com sucesso.')
   }
 
   const getStatusBadge = (status: string) => {
@@ -213,7 +250,7 @@ export default function ClassCouncil() {
               <SelectContent>
                 <SelectItem value="all">Todas as Escolas</SelectItem>
                 {availableSchools.map((school) => (
-                  <SelectItem key={school.id} value={school.id}>
+                  <SelectItem key={school.id} value={school.id.toString()}>
                     {school.name}
                   </SelectItem>
                 ))}
@@ -223,33 +260,29 @@ export default function ClassCouncil() {
             <Select
               value={yearFilter}
               onValueChange={setYearFilter}
-              disabled={!selectedSchool}
+              disabled={schoolFilter === 'all'}
             >
               <SelectTrigger>
                 <SelectValue placeholder="Todos os Anos" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Todos os Anos</SelectItem>
-                {availableYears.map((year) => (
-                  <SelectItem key={year.id} value={year.id}>
-                    {year.name}
-                  </SelectItem>
-                ))}
+                {/* TODO: Buscar anos letivos quando implementado */}
               </SelectContent>
             </Select>
 
             <Select
               value={classroomFilter}
               onValueChange={setClassroomFilter}
-              disabled={!selectedYear}
+              disabled={schoolFilter === 'all'}
             >
               <SelectTrigger>
                 <SelectValue placeholder="Todas as Turmas" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Todas as Turmas</SelectItem>
-                {availableClassrooms.map((classroom) => (
-                  <SelectItem key={classroom.id} value={classroom.id}>
+                {availableClasses.map((classroom) => (
+                  <SelectItem key={classroom.id} value={classroom.id.toString()}>
                     {classroom.name}
                   </SelectItem>
                 ))}
@@ -293,31 +326,40 @@ export default function ClassCouncil() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          {filteredCouncils.length === 0 ? (
-            <div className="text-center py-12">
-              <div className="mb-4 p-4 rounded-full bg-gradient-to-br from-purple-500/10 via-purple-500/5 to-transparent inline-flex">
-                <FileText className="h-12 w-12 text-purple-600/60" />
-              </div>
-              <h3 className="text-lg font-semibold mb-2 text-foreground">Nenhum conselho encontrado</h3>
-              <p className="text-muted-foreground mb-6 max-w-md mx-auto">
-                {councils.length === 0
-                  ? 'Comece criando um novo conselho de classe.'
-                  : 'Tente ajustar os filtros para encontrar conselhos.'}
-              </p>
-              {councils.length === 0 && (
-                <RequirePermission permission="create:assessment">
-                  <Button 
-                    onClick={handleCreateCouncil}
-                    className="bg-gradient-to-r from-purple-500 via-purple-600 to-purple-500 bg-size-200 bg-pos-0 hover:bg-pos-100 text-white shadow-lg hover:shadow-xl transition-all duration-500 transform hover:scale-105 font-semibold"
-                  >
-                    <div className="p-1 rounded-md bg-white/20 mr-2">
-                      <Plus className="h-5 w-5" />
-                    </div>
-                    Criar Primeiro Conselho
-                  </Button>
-                </RequirePermission>
-              )}
+          {loading || schoolsLoading || studentsLoading ? (
+            <div className="space-y-4">
+              {Array.from({ length: 5 }).map((_, index) => (
+                <div key={`skeleton-${index}`} className="flex gap-4">
+                  <Skeleton className="h-12 w-full" />
+                </div>
+              ))}
             </div>
+          ) : filteredCouncils.length === 0 ? (
+            <EmptyState
+              icon={FileText}
+              title="Nenhum conselho encontrado"
+              description={
+                councils.length === 0
+                  ? 'Comece criando um novo conselho de classe. Esta funcionalidade será implementada em breve no banco de dados.'
+                  : 'Tente ajustar os filtros para encontrar conselhos.'
+              }
+              action={
+                councils.length === 0 ? (
+                  <RequirePermission permission="create:assessment">
+                    <Button 
+                      onClick={handleCreateCouncil}
+                      className="bg-gradient-to-r from-purple-500 via-purple-600 to-purple-500 bg-size-200 bg-pos-0 hover:bg-pos-100 text-white shadow-lg hover:shadow-xl transition-all duration-500 transform hover:scale-105 font-semibold"
+                    >
+                      <div className="p-1 rounded-md bg-white/20 mr-2">
+                        <Plus className="h-5 w-5" />
+                      </div>
+                      Criar Primeiro Conselho
+                    </Button>
+                  </RequirePermission>
+                ) : undefined
+              }
+              theme="purple"
+            />
           ) : (
             <Table>
               <TableHeader>
@@ -333,11 +375,13 @@ export default function ClassCouncil() {
               </TableHeader>
               <TableBody>
                 {filteredCouncils.map((council) => (
-                  <TableRow key={council.id}>
+                  <TableRow key={`council-${council.id}`}>
                     <TableCell>
-                      {format(new Date(council.date), "dd 'de' MMMM 'de' yyyy", {
-                        locale: ptBR,
-                      })}
+                      {council.scheduledDate
+                        ? format(new Date(council.scheduledDate), "dd 'de' MMMM 'de' yyyy", {
+                            locale: ptBR,
+                          })
+                        : 'N/A'}
                     </TableCell>
                     <TableCell className="font-medium">
                       {council.classroomName}
@@ -346,7 +390,8 @@ export default function ClassCouncil() {
                     <TableCell>{getTypeBadge(council.type)}</TableCell>
                     <TableCell>{getStatusBadge(council.status)}</TableCell>
                     <TableCell>
-                      {council.studentsAnalysis.length} aluno(s)
+                      {/* TODO: Buscar contagem real de alunos quando implementado */}
+                      N/A
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex items-center justify-end gap-2">

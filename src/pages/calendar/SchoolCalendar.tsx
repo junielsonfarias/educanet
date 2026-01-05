@@ -8,7 +8,7 @@ import {
   CardDescription,
 } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import useSchoolStore from '@/stores/useSchoolStore'
+import { useSchoolStore } from '@/stores/useSchoolStore.supabase'
 import { parseISO } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 

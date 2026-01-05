@@ -33,7 +33,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Staff } from '@/lib/mock-data'
 import { Upload, X } from 'lucide-react'
 import { fileToBase64 } from '@/lib/file-utils'
-import useSchoolStore from '@/stores/useSchoolStore'
+import { useSchoolStore } from '@/stores/useSchoolStore.supabase'
 
 const staffSchema = z.object({
   // Dados pessoais

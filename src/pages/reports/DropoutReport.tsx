@@ -18,8 +18,8 @@ import {
 } from '@/components/ui/select'
 import { ArrowLeft, AlertTriangle, Filter } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
-import useStudentStore from '@/stores/useStudentStore'
-import useSchoolStore from '@/stores/useSchoolStore'
+import { useStudentStore } from '@/stores/useStudentStore.supabase'
+import { useSchoolStore } from '@/stores/useSchoolStore.supabase'
 import { Badge } from '@/components/ui/badge'
 import { ExportActions } from '@/components/ExportActions'
 

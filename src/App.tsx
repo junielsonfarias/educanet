@@ -5,6 +5,8 @@ import { TooltipProvider } from '@/components/ui/tooltip'
 import ErrorBoundary from '@/components/ErrorBoundary'
 import InstitutionalHome from './pages/Index'
 import Login from './pages/Login'
+import ForgotPassword from './pages/ForgotPassword'
+import ResetPassword from './pages/ResetPassword'
 import PublicDocuments from './pages/public/PublicDocuments'
 import PublicDocumentDetail from './pages/public/PublicDocumentDetail'
 import StudentPortal from './pages/public/StudentPortal'
@@ -30,6 +32,7 @@ import StaffList from './pages/people/StaffList'
 import CoursesList from './pages/academic/CoursesList'
 import CourseDetails from './pages/academic/CourseDetails'
 import ClassesList from './pages/academic/ClassesList'
+import ClassDetails from './pages/academic/ClassDetails'
 import AssessmentInput from './pages/academic/AssessmentInput'
 import EvaluationAnalysis from './pages/academic/EvaluationAnalysis'
 import SchoolCalendar from './pages/calendar/SchoolCalendar'
@@ -187,6 +190,8 @@ const App = () => (
 
                                     {/* Auth Route */}
                                     <Route path="/login" element={<Login />} />
+                                    <Route path="/forgot-password" element={<ForgotPassword />} />
+                                    <Route path="/reset-password" element={<ResetPassword />} />
 
                                     {/* Admin Panel Routes */}
                                     <Route element={<Layout />}>
@@ -255,6 +260,10 @@ const App = () => (
                                       <Route
                                         path="/academico/turmas"
                                         element={<ClassesList />}
+                                      />
+                                      <Route
+                                        path="/academico/turmas/:id"
+                                        element={<ClassDetails />}
                                       />
                                       <Route
                                         path="/academico/regras-avaliacao"

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { Users, Plus, Search, Filter, CheckCircle, Clock, XCircle, Phone } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -25,20 +25,39 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { Badge } from '@/components/ui/badge'
-import { useToast } from '@/hooks/use-toast'
-import useQueueStore from '@/stores/useQueueStore'
-import { ServiceQueue, ServiceType } from '@/lib/mock-data'
+import { Skeleton } from '@/components/ui/skeleton'
+import { toast } from 'sonner'
+import { protocolService } from '@/lib/supabase/services'
 import { QueueTicketFormDialog } from './components/QueueTicketFormDialog'
 import { RequirePermission } from '@/components/RequirePermission'
 
-export default function ServiceQueue() {
-  const { queue, addTicket, updateTicket, deleteTicket } = useQueueStore()
-  const { toast } = useToast()
+// Tipo temporário até implementar service queue no BD
+interface ServiceQueue {
+  id: string
+  ticketNumber: string
+  type: 'matricula' | 'documentos' | 'informacoes' | 'outros'
+  requesterName: string
+  requesterPhone?: string
+  priority: 'normal' | 'preferential' | 'urgent'
+  status: 'waiting' | 'calling' | 'attending' | 'completed' | 'cancelled'
+  createdAt: string
+}
 
+type ServiceType = 'matricula' | 'documentos' | 'informacoes' | 'outros'
+
+export default function ServiceQueue() {
+  const [queue, setQueue] = useState<ServiceQueue[]>([])
+  const [loading, setLoading] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
   const [typeFilter, setTypeFilter] = useState<ServiceType | 'all'>('all')
   const [statusFilter, setStatusFilter] = useState<'all' | 'waiting' | 'calling' | 'attending' | 'completed' | 'cancelled'>('all')
   const [isDialogOpen, setIsDialogOpen] = useState(false)
+
+  useEffect(() => {
+    // TODO: Buscar service queue do BD quando implementado
+    // Por enquanto, usando array local temporário
+    setLoading(false)
+  }, [])
 
   // Filtrar tickets
   const filteredQueue = queue.filter((ticket) => {
@@ -69,36 +88,28 @@ export default function ServiceQueue() {
     setIsDialogOpen(true)
   }
 
-  const handleCallTicket = (id: string) => {
-    updateTicket(id, { status: 'calling' })
-    toast({
-      title: 'Senha chamada',
-      description: 'A senha foi chamada para atendimento.',
-    })
+  const handleCallTicket = async (id: string) => {
+    // TODO: Atualizar no BD quando implementado
+    setQueue(queue => queue.map(t => t.id === id ? { ...t, status: 'calling' } : t))
+    toast.success('Senha chamada para atendimento.')
   }
 
-  const handleStartAttending = (id: string) => {
-    updateTicket(id, { status: 'attending' })
-    toast({
-      title: 'Atendimento iniciado',
-      description: 'O atendimento foi iniciado.',
-    })
+  const handleStartAttending = async (id: string) => {
+    // TODO: Atualizar no BD quando implementado
+    setQueue(queue => queue.map(t => t.id === id ? { ...t, status: 'attending' } : t))
+    toast.success('Atendimento iniciado.')
   }
 
-  const handleCompleteTicket = (id: string) => {
-    updateTicket(id, { status: 'completed' })
-    toast({
-      title: 'Atendimento concluído',
-      description: 'O atendimento foi finalizado com sucesso.',
-    })
+  const handleCompleteTicket = async (id: string) => {
+    // TODO: Atualizar no BD quando implementado
+    setQueue(queue => queue.map(t => t.id === id ? { ...t, status: 'completed' } : t))
+    toast.success('Atendimento concluído com sucesso.')
   }
 
-  const handleCancelTicket = (id: string) => {
-    updateTicket(id, { status: 'cancelled' })
-    toast({
-      title: 'Senha cancelada',
-      description: 'A senha foi cancelada.',
-    })
+  const handleCancelTicket = async (id: string) => {
+    // TODO: Atualizar no BD quando implementado
+    setQueue(queue => queue.map(t => t.id === id ? { ...t, status: 'cancelled' } : t))
+    toast.success('Senha cancelada.')
   }
 
   const getStatusBadge = (status: ServiceQueue['status']) => {
@@ -299,15 +310,32 @@ export default function ServiceQueue() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {sortedQueue.length === 0 ? (
+                {loading ? (
+                  // Loading skeletons
+                  Array.from({ length: 5 }).map((_, index) => (
+                    <TableRow key={`skeleton-${index}`}>
+                      <TableCell><Skeleton className="h-4 w-[100px]" /></TableCell>
+                      <TableCell><Skeleton className="h-4 w-[100px]" /></TableCell>
+                      <TableCell><Skeleton className="h-4 w-[150px]" /></TableCell>
+                      <TableCell><Skeleton className="h-4 w-[80px]" /></TableCell>
+                      <TableCell><Skeleton className="h-4 w-[100px]" /></TableCell>
+                      <TableCell><Skeleton className="h-4 w-[80px]" /></TableCell>
+                      <TableCell><Skeleton className="h-8 w-24 ml-auto" /></TableCell>
+                    </TableRow>
+                  ))
+                ) : sortedQueue.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={7} className="text-center py-10 text-muted-foreground">
-                      Nenhuma senha encontrada.
+                      <div className="flex flex-col items-center gap-2">
+                        <Clock className="h-8 w-8 opacity-50" />
+                        <p>Nenhuma senha encontrada.</p>
+                        <p className="text-sm">Esta funcionalidade será implementada em breve no banco de dados.</p>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ) : (
                   sortedQueue.map((ticket) => (
-                    <TableRow key={ticket.id}>
+                    <TableRow key={`ticket-${ticket.id}`}>
                       <TableCell className="font-mono text-lg font-bold">
                         {ticket.ticketNumber}
                       </TableCell>
@@ -391,12 +419,18 @@ export default function ServiceQueue() {
       <QueueTicketFormDialog
         open={isDialogOpen}
         onOpenChange={setIsDialogOpen}
-        onSave={(data) => {
-          addTicket(data)
-          toast({
-            title: 'Senha criada',
-            description: 'A senha foi criada com sucesso.',
-          })
+        onSave={async (data) => {
+          // TODO: Criar no BD quando implementado
+          const newTicket: ServiceQueue = {
+            id: `ticket-${Date.now()}`,
+            ticketNumber: `S${String(queue.length + 1).padStart(4, '0')}`,
+            ...data,
+            status: 'waiting',
+            createdAt: new Date().toISOString(),
+          }
+          setQueue([...queue, newTicket])
+          toast.success('Senha criada com sucesso.')
+          setIsDialogOpen(false)
         }}
       />
     </div>

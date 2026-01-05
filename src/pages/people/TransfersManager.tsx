@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import {
   ArrowRight,
   Search,
@@ -37,27 +37,36 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { Badge } from '@/components/ui/badge'
-import { useToast } from '@/hooks/use-toast'
-import useTransferStore from '@/stores/useTransferStore'
-import useStudentStore from '@/stores/useStudentStore'
-import useSchoolStore from '@/stores/useSchoolStore'
+import { Skeleton } from '@/components/ui/skeleton'
+import { toast } from 'sonner'
+import { enrollmentService } from '@/lib/supabase/services'
+import { useStudentStore } from '@/stores/useStudentStore.supabase'
+import { useSchoolStore } from '@/stores/useSchoolStore.supabase'
 import { TransferFormDialog } from './components/TransferFormDialog'
 import { TransferDetailsDialog } from './components/TransferDetailsDialog'
 import { RequirePermission } from '@/components/RequirePermission'
 
-export default function TransfersManager() {
-  const {
-    transfers,
-    getTransfersBySchool,
-    getPendingTransfers,
-    approveTransfer,
-    rejectTransfer,
-    completeTransfer,
-  } = useTransferStore()
-  const { students } = useStudentStore()
-  const { schools } = useSchoolStore()
-  const { toast } = useToast()
+// Tipo temporário até implementar transfers no BD
+interface Transfer {
+  id: string
+  studentId: string
+  studentName: string
+  fromSchoolId: string
+  fromSchoolName: string
+  toSchoolId?: string
+  toSchoolName?: string
+  type: 'internal' | 'external'
+  status: 'pending' | 'approved' | 'rejected' | 'completed'
+  requestDate: string
+  reason?: string
+}
 
+export default function TransfersManager() {
+  const { students, loading: studentsLoading, fetchStudents } = useStudentStore()
+  const { schools, loading: schoolsLoading, fetchSchools } = useSchoolStore()
+
+  const [transfers, setTransfers] = useState<Transfer[]>([])
+  const [loading, setLoading] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
   const [schoolFilter, setSchoolFilter] = useState('all')
   const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'approved' | 'rejected' | 'completed'>('all')
@@ -67,10 +76,17 @@ export default function TransfersManager() {
   const [selectedTransfer, setSelectedTransfer] = useState<string | null>(null)
   const [editingTransfer, setEditingTransfer] = useState<string | null>(null)
 
+  // Fetch data on mount
+  useEffect(() => {
+    fetchStudents()
+    fetchSchools()
+    // TODO: Buscar transfers do BD quando implementado
+    // Por enquanto, transfers são gerenciados via enrollmentService.transferStudent
+  }, [fetchStudents, fetchSchools])
+
   // Filtrar transferências
   const filteredTransfers = useMemo(() => {
     return transfers.filter((transfer) => {
-      const student = students.find((s) => s.id === transfer.studentId)
       const matchesSearch =
         searchTerm === '' ||
         transfer.studentName.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -88,9 +104,10 @@ export default function TransfersManager() {
 
       return matchesSearch && matchesSchool && matchesStatus && matchesType
     })
-  }, [transfers, students, searchTerm, schoolFilter, statusFilter, typeFilter])
+  }, [transfers, searchTerm, schoolFilter, statusFilter, typeFilter])
 
-  const availableSchools = schools.filter((s) => s.status === 'active')
+  const safeSchools = Array.isArray(schools) ? schools : []
+  const availableSchools = safeSchools.filter((s) => !s.deleted_at)
 
   const handleCreateTransfer = () => {
     setEditingTransfer(null)
@@ -102,28 +119,28 @@ export default function TransfersManager() {
     setIsDetailsDialogOpen(true)
   }
 
-  const handleApprove = (transferId: string) => {
-    approveTransfer(transferId, 'system')
-    toast({
-      title: 'Transferência aprovada',
-      description: 'A transferência foi aprovada e a notificação foi enviada.',
-    })
+  const handleApprove = async (transferId: string) => {
+    // TODO: Implementar quando transfers forem adicionados ao BD
+    setTransfers(transfers => 
+      transfers.map(t => t.id === transferId ? { ...t, status: 'approved' } : t)
+    )
+    toast.success('Transferência aprovada com sucesso.')
   }
 
-  const handleReject = (transferId: string, reason?: string) => {
-    rejectTransfer(transferId, 'system', reason)
-    toast({
-      title: 'Transferência rejeitada',
-      description: 'A transferência foi rejeitada.',
-    })
+  const handleReject = async (transferId: string, reason?: string) => {
+    // TODO: Implementar quando transfers forem adicionados ao BD
+    setTransfers(transfers => 
+      transfers.map(t => t.id === transferId ? { ...t, status: 'rejected' } : t)
+    )
+    toast.success('Transferência rejeitada com sucesso.')
   }
 
-  const handleComplete = (transferId: string) => {
-    completeTransfer(transferId)
-    toast({
-      title: 'Transferência concluída',
-      description: 'A transferência foi marcada como concluída.',
-    })
+  const handleComplete = async (transferId: string) => {
+    // TODO: Implementar quando transfers forem adicionados ao BD
+    setTransfers(transfers => 
+      transfers.map(t => t.id === transferId ? { ...t, status: 'completed' } : t)
+    )
+    toast.success('Transferência concluída com sucesso.')
   }
 
   const getStatusBadge = (status: string) => {
@@ -217,7 +234,7 @@ export default function TransfersManager() {
               <SelectContent>
                 <SelectItem value="all">Todas as Escolas</SelectItem>
                 {availableSchools.map((school) => (
-                  <SelectItem key={school.id} value={school.id}>
+                  <SelectItem key={school.id} value={school.id.toString()}>
                     {school.name}
                   </SelectItem>
                 ))}
@@ -260,7 +277,15 @@ export default function TransfersManager() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          {filteredTransfers.length === 0 ? (
+          {loading || studentsLoading || schoolsLoading ? (
+            <div className="space-y-4">
+              {Array.from({ length: 5 }).map((_, index) => (
+                <div key={`skeleton-${index}`} className="flex gap-4">
+                  <Skeleton className="h-12 w-full" />
+                </div>
+              ))}
+            </div>
+          ) : filteredTransfers.length === 0 ? (
             <div className="text-center py-12">
               <div className="mb-4 p-4 rounded-full bg-gradient-to-br from-blue-500/10 via-blue-500/5 to-transparent inline-flex">
                 <ArrowRight className="h-12 w-12 text-blue-600/60" />
@@ -268,7 +293,7 @@ export default function TransfersManager() {
               <h3 className="text-lg font-semibold mb-2 text-foreground">Nenhuma transferência encontrada</h3>
               <p className="text-muted-foreground mb-6 max-w-md mx-auto">
                 {transfers.length === 0
-                  ? 'Comece criando uma nova transferência.'
+                  ? 'Comece criando uma nova transferência. Esta funcionalidade será implementada em breve no banco de dados.'
                   : 'Tente ajustar os filtros para encontrar transferências.'}
               </p>
               {transfers.length === 0 && (
@@ -300,24 +325,22 @@ export default function TransfersManager() {
               </TableHeader>
               <TableBody>
                 {filteredTransfers.map((transfer) => (
-                  <TableRow key={transfer.id}>
+                  <TableRow key={`transfer-${transfer.id}`}>
                     <TableCell className="font-medium">
                       {transfer.studentName}
                     </TableCell>
                     <TableCell>{transfer.fromSchoolName}</TableCell>
                     <TableCell>
-                      {transfer.type === 'internal' ? (
-                        transfer.toSchoolName || 'N/A'
-                      ) : (
-                        transfer.toSchoolExternal || 'N/A'
-                      )}
+                      {transfer.toSchoolName || 'N/A'}
                     </TableCell>
                     <TableCell>{getTypeBadge(transfer.type)}</TableCell>
                     <TableCell>{getStatusBadge(transfer.status)}</TableCell>
                     <TableCell>
-                      {format(new Date(transfer.transferDate), 'dd/MM/yyyy', {
-                        locale: ptBR,
-                      })}
+                      {transfer.requestDate
+                        ? format(new Date(transfer.requestDate), 'dd/MM/yyyy', {
+                            locale: ptBR,
+                          })
+                        : 'N/A'}
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex items-center justify-end gap-2">

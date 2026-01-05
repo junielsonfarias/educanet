@@ -34,7 +34,6 @@ export async function signIn(email: string, password: string): Promise<SignInRes
     })
 
     if (authError) {
-      console.error('[signIn] Auth error:', authError)
       return {
         success: false,
         user: null,
@@ -62,41 +61,81 @@ export async function signIn(email: string, password: string): Promise<SignInRes
       .single()
 
     if (userError) {
-      console.error('[signIn] User data error:', userError)
+      // Se o registro não existe (PGRST116 = not found, PGRST301 = no rows returned)
+      if (userError.code === 'PGRST116' || userError.code === 'PGRST301') {
+        return {
+          success: false,
+          user: authData.user,
+          person_id: null,
+          role: null,
+          error: 'Usuário não encontrado no sistema. Execute o script SQL de diagnóstico no Supabase para corrigir.',
+        }
+      }
+      
+      // Se for erro de RLS (permissão)
+      if (userError.code === '42501' || userError.message?.includes('permission denied')) {
+        return {
+          success: false,
+          user: authData.user,
+          person_id: null,
+          role: null,
+          error: 'Erro de permissão ao acessar dados do usuário. Verifique as políticas RLS.',
+        }
+      }
+      
       return {
         success: false,
         user: authData.user,
         person_id: null,
         role: null,
-        error: 'Erro ao carregar dados do usuário.',
+        error: `Erro ao carregar dados do usuário: ${userError.message} (Código: ${userError.code})`,
       }
     }
 
     // Verificar se usuário está ativo
-    if (!userData.active) {
+    if (!userData || !userData.active) {
       await supabase.auth.signOut()
       return {
         success: false,
         user: null,
         person_id: null,
         role: null,
-        error: 'Usuário inativo. Entre em contato com o administrador.',
+        error: 'Usuário inativo ou não encontrado. Entre em contato com o administrador.',
+      }
+    }
+    
+    // Verificar se person_id está vinculado
+    if (!userData.person_id) {
+      await supabase.auth.signOut()
+      return {
+        success: false,
+        user: null,
+        person_id: null,
+        role: null,
+        error: 'Usuário não vinculado a uma pessoa. Entre em contato com o administrador.',
       }
     }
 
     // 3. Buscar role do usuário
-    const { data: roleData, error: roleError } = await supabase
-      .from('user_roles')
-      .select('role:roles(name)')
-      .eq('person_id', userData.person_id)
-      .limit(1)
-      .single()
+    let role: string | null = null
+    try {
+      const { data: roleData, error: roleError } = await supabase
+        .from('user_roles')
+        .select('role:roles(name)')
+        .eq('person_id', userData.person_id)
+        .is('deleted_at', null)
+        .limit(1)
+        .maybeSingle()
 
-    if (roleError) {
-      console.error('[signIn] Role error:', roleError)
+      role = roleData?.role?.name || null
+
+      // Se não tiver role, ainda permite login mas com role padrão
+      if (!role || roleError) {
+        role = 'user' // Role padrão
+      }
+    } catch {
+      role = 'user' // Role padrão em caso de erro
     }
-
-    const role = roleData?.role?.name || 'user'
 
     // 4. Atualizar last_login
     const { error: updateError } = await supabase
@@ -104,9 +143,8 @@ export async function signIn(email: string, password: string): Promise<SignInRes
       .update({ last_login: new Date().toISOString() })
       .eq('id', authData.user.id)
 
-    if (updateError) {
-      console.error('[signIn] Update last_login error:', updateError)
-    }
+    // Ignora erro de atualização do last_login (não é crítico)
+    void updateError
 
     return {
       success: true,
@@ -114,8 +152,7 @@ export async function signIn(email: string, password: string): Promise<SignInRes
       person_id: userData.person_id,
       role,
     }
-  } catch (error) {
-    console.error('[signIn] Unexpected error:', error)
+  } catch {
     return {
       success: false,
       user: null,
@@ -134,7 +171,6 @@ export async function signOut(): Promise<{ success: boolean; error?: string }> {
     const { error } = await supabase.auth.signOut()
 
     if (error) {
-      console.error('[signOut] Error:', error)
       return {
         success: false,
         error: 'Erro ao fazer logout.',
@@ -142,8 +178,7 @@ export async function signOut(): Promise<{ success: boolean; error?: string }> {
     }
 
     return { success: true }
-  } catch (error) {
-    console.error('[signOut] Unexpected error:', error)
+  } catch {
     return {
       success: false,
       error: 'Erro inesperado ao fazer logout.',
@@ -174,17 +209,26 @@ export async function getCurrentUser(): Promise<{
       .single()
 
     if (error) {
-      console.error('[getCurrentUser] Error:', error)
       return { user, userData: null }
     }
 
     // Buscar role
-    const { data: roleData } = await supabase
-      .from('user_roles')
-      .select('role:roles(name)')
-      .eq('person_id', userData.person_id)
-      .limit(1)
-      .single()
+    let role = 'user' // Role padrão
+    try {
+      const { data: roleData } = await supabase
+        .from('user_roles')
+        .select('role:roles(name)')
+        .eq('person_id', userData.person_id)
+        .is('deleted_at', null)
+        .limit(1)
+        .maybeSingle()
+
+      if (roleData?.role?.name) {
+        role = roleData.role.name
+      }
+    } catch {
+      // Usar role padrão em caso de erro
+    }
 
     return {
       user,
@@ -192,13 +236,12 @@ export async function getCurrentUser(): Promise<{
         id: userData.id,
         email: userData.email,
         person_id: userData.person_id,
-        role: roleData?.role?.name || 'user',
+        role,
         active: userData.active,
         last_login: userData.last_login,
       },
     }
-  } catch (error) {
-    console.error('[getCurrentUser] Unexpected error:', error)
+  } catch {
     return { user: null, userData: null }
   }
 }
@@ -214,7 +257,6 @@ export async function resetPassword(email: string): Promise<{ success: boolean; 
     })
 
     if (error) {
-      console.error('[resetPassword] Error:', error)
       return {
         success: false,
         error: 'Erro ao solicitar redefinição de senha.',
@@ -222,8 +264,7 @@ export async function resetPassword(email: string): Promise<{ success: boolean; 
     }
 
     return { success: true }
-  } catch (error) {
-    console.error('[resetPassword] Unexpected error:', error)
+  } catch {
     return {
       success: false,
       error: 'Erro inesperado ao solicitar redefinição de senha.',
@@ -242,7 +283,6 @@ export async function updatePassword(newPassword: string): Promise<{ success: bo
     })
 
     if (error) {
-      console.error('[updatePassword] Error:', error)
       return {
         success: false,
         error: 'Erro ao atualizar senha.',
@@ -250,8 +290,7 @@ export async function updatePassword(newPassword: string): Promise<{ success: bo
     }
 
     return { success: true }
-  } catch (error) {
-    console.error('[updatePassword] Unexpected error:', error)
+  } catch {
     return {
       success: false,
       error: 'Erro inesperado ao atualizar senha.',
@@ -266,8 +305,7 @@ export async function hasActiveSession(): Promise<boolean> {
   try {
     const { data: { session } } = await supabase.auth.getSession()
     return !!session
-  } catch (error) {
-    console.error('[hasActiveSession] Error:', error)
+  } catch {
     return false
   }
 }

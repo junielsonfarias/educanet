@@ -12,7 +12,7 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
 import { ScrollArea } from '@/components/ui/scroll-area'
-import useSettingsStore from '@/stores/useSettingsStore'
+import { useSettingsStore } from '@/stores/useSettingsStore.supabase'
 import { DashboardLayout, DashboardWidget } from '@/lib/mock-data'
 import { GripVertical } from 'lucide-react'
 

@@ -24,10 +24,17 @@ export default function Login() {
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
 
-    const result = await login(email, password)
+    try {
+      const result = await login(email, password)
 
-    if (result.success) {
-      navigate('/dashboard')
+      if (result.success) {
+        // Pequeno delay para garantir que o estado foi atualizado
+        setTimeout(() => {
+          navigate('/dashboard')
+        }, 100)
+      }
+    } catch {
+      // O erro já foi tratado no useAuth e mostrado via toast
     }
   }
 
@@ -161,6 +168,12 @@ export default function Login() {
           </CardContent>
           
           <CardFooter className="flex flex-col gap-2 text-center relative z-10">
+            <Link
+              to="/forgot-password"
+              className="text-sm text-primary hover:underline font-medium transition-colors"
+            >
+              Esqueci minha senha
+            </Link>
             <div className="text-xs text-muted-foreground">
               <p>
                 Problemas com o acesso?{' '}

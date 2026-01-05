@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import {
   Card,
   CardContent,
@@ -23,116 +23,165 @@ import {
 } from '@/components/ui/table'
 import { Button } from '@/components/ui/button'
 import { FileDown, Filter } from 'lucide-react'
-import useSchoolStore from '@/stores/useSchoolStore'
-import useCourseStore from '@/stores/useCourseStore'
-import useStudentStore from '@/stores/useStudentStore'
-import useAssessmentStore from '@/stores/useAssessmentStore'
+import { useSchoolStore } from '@/stores/useSchoolStore.supabase'
+import { useCourseStore } from '@/stores/useCourseStore.supabase'
+import { useStudentStore } from '@/stores/useStudentStore.supabase'
+import { useAssessmentStore } from '@/stores/useAssessmentStore.supabase'
+import { useAcademicYearStore } from '@/stores/useAcademicYearStore.supabase'
+import { classService } from '@/lib/supabase/services'
+import { enrollmentService } from '@/lib/supabase/services'
 import { calculateGrades } from '@/lib/grade-calculator'
 import { ClassPerformanceOverview } from './components/ClassPerformanceOverview'
-import { getStudentsByClassroom } from '@/lib/enrollment-utils'
+import { Skeleton } from '@/components/ui/skeleton'
+import { toast } from 'sonner'
 
 export default function PerformanceReport() {
-  const { schools } = useSchoolStore()
-  const { etapasEnsino, evaluationRules } = useCourseStore()
-  const { students } = useStudentStore()
-  const { assessments, assessmentTypes } = useAssessmentStore()
+  const { schools, fetchSchools } = useSchoolStore()
+  const { courses, fetchCourses } = useCourseStore()
+  const { students, fetchStudents } = useStudentStore()
+  const { grades, fetchGrades } = useAssessmentStore()
+  const { academicYears, fetchAcademicYears } = useAcademicYearStore()
+  
+  const [loading, setLoading] = useState(false)
+  const [classes, setClasses] = useState<any[]>([])
+
+  useEffect(() => {
+    fetchSchools()
+    fetchCourses()
+    fetchStudents()
+    fetchGrades()
+    fetchAcademicYears()
+  }, [fetchSchools, fetchCourses, fetchStudents, fetchGrades, fetchAcademicYears])
 
   const [selectedSchool, setSelectedSchool] = useState<string>('')
   const [selectedYear, setSelectedYear] = useState<string>('')
 
-  const activeSchool = (schools || []).find((s) => s.id === selectedSchool)
-  const academicYears = activeSchool?.academicYears || []
-  const activeYear = academicYears.find((y) => y.id === selectedYear)
-
-  const reportData = useMemo(() => {
-    if (!activeSchool || !activeYear) return []
-
-    const data: any[] = []
-
-    const turmas = activeYear.turmas || activeYear.classes || []
-    turmas.forEach((cls) => {
-      // Find students in this class using utility function
-      const classStudents = getStudentsByClassroom(
-        students,
-        cls.id,
-        cls.name,
-        activeSchool.id,
-        activeYear.id,
-        activeYear.name,
-      )
-
-      // Find serieAno/etapaEnsino info
-      const serieAno = (etapasEnsino || [])
-        .flatMap((e) => (e.seriesAnos || []))
-        .find((s) => s.id === (cls.serieAnoId || cls.gradeId))
-
-      if (!serieAno) return
-
-      const rule = (evaluationRules || []).find((r) => r.id === serieAno.evaluationRuleId)
-      if (!rule) return
-
-      classStudents.forEach((student) => {
-        // Calculate per subject
-        const studentStats = {
-          passed: 0,
-          failed: 0,
-          total: 0,
-          avg: 0,
+  // Buscar turmas quando escola e ano são selecionados
+  useEffect(() => {
+    const fetchClasses = async () => {
+      if (selectedSchool && selectedYear) {
+        setLoading(true)
+        try {
+          const classesData = await classService.getBySchool(parseInt(selectedSchool))
+          const filteredClasses = (classesData || []).filter(
+            (c) => c.academic_year_id?.toString() === selectedYear
+          )
+          setClasses(filteredClasses)
+        } catch {
+          toast.error('Erro ao carregar turmas')
+          setClasses([])
+        } finally {
+          setLoading(false)
         }
+      } else {
+        setClasses([])
+      }
+    }
+    fetchClasses()
+  }, [selectedSchool, selectedYear])
 
-        let gradeSum = 0
+  const activeSchool = (schools || []).find((s) => s.id.toString() === selectedSchool)
+  const filteredAcademicYears = (academicYears || []).filter(
+    (y) => y.school_id?.toString() === selectedSchool
+  )
+  const activeYear = filteredAcademicYears.find((y) => y.id.toString() === selectedYear)
 
-        (serieAno.subjects || []).forEach((subject) => {
-          const subjectAssessments = assessments.filter(
-            (a) =>
-              a.studentId === student.id &&
-              a.subjectId === subject.id &&
-              a.yearId === activeYear.id,
-          )
+  const [reportData, setReportData] = useState<any[]>([])
 
-          const calculation = calculateGrades(
-            subjectAssessments,
-            rule,
-            activeYear.periods || [],
-            assessmentTypes,
-          )
+  // Buscar dados do relatório quando filtros mudarem
+  useEffect(() => {
+    const loadReportData = async () => {
+      if (!activeSchool || !activeYear || classes.length === 0) {
+        setReportData([])
+        return
+      }
 
-          if (calculation.isPassing) {
-            studentStats.passed++
-          } else {
-            studentStats.failed++
+      setLoading(true)
+      const data: any[] = []
+
+      try {
+        // Buscar matrículas para cada turma
+        for (const cls of classes) {
+          try {
+            const enrollments = await enrollmentService.getEnrollmentsByClass(cls.id)
+            const classStudents = enrollments.map(e => e.student_profile).filter(Boolean)
+
+            // Encontrar grade/subject info
+            const grade = courses.find((g) => g.id === cls.grade_id)
+            if (!grade) continue
+
+            const subjects = grade.subjects || []
+
+            for (const student of classStudents) {
+              // Buscar notas do aluno para esta turma
+              const studentGrades = grades.filter(
+                (g) =>
+                  g.student_profile_id === student.id &&
+                  g.evaluation_instance?.class_id === cls.id
+              )
+
+              // Calcular estatísticas por disciplina
+              const studentStats = {
+                passed: 0,
+                failed: 0,
+                total: 0,
+                avg: 0,
+              }
+
+              let gradeSum = 0
+
+              for (const subject of subjects) {
+                const subjectGrades = studentGrades.filter(
+                  (g) => g.evaluation_instance?.subject_id === subject.id
+                )
+
+                // Calcular média da disciplina
+                if (subjectGrades.length > 0) {
+                  const avg = subjectGrades.reduce((sum, g) => sum + (g.grade_value || 0), 0) / subjectGrades.length
+                  gradeSum += avg
+                  studentStats.total++
+
+                  // Considerar aprovado se média >= 6.0 (pode ser configurável)
+                  if (avg >= 6.0) {
+                    studentStats.passed++
+                  } else {
+                    studentStats.failed++
+                  }
+                }
+              }
+
+              if (studentStats.total > 0) {
+                studentStats.avg = gradeSum / studentStats.total
+              }
+
+              const studentName = `${student.person?.first_name || ''} ${student.person?.last_name || ''}`.trim()
+
+              data.push({
+                studentName,
+                className: cls.name,
+                passedSubjects: studentStats.passed,
+                failedSubjects: studentStats.failed,
+                overallAverage: studentStats.avg.toFixed(1),
+                rawAverage: studentStats.avg,
+                status: studentStats.failed === 0 ? 'Aprovado' : 'Em Risco',
+                subjects: subjects,
+              })
+            }
+          } catch {
+            // Skip this class on error
           }
-          studentStats.total++
-          gradeSum += calculation.finalGrade
-        })
-
-        if (studentStats.total > 0) {
-          studentStats.avg = gradeSum / studentStats.total
         }
 
-        data.push({
-          studentName: student.name,
-          className: cls.name,
-          passedSubjects: studentStats.passed,
-          failedSubjects: studentStats.failed,
-          overallAverage: studentStats.avg.toFixed(1),
-          rawAverage: studentStats.avg, // for calculation
-          status: studentStats.failed === 0 ? 'Aprovado' : 'Em Risco',
-          subjects: serieAno.subjects || [], // Pass subjects for dashboard calc
-        })
-      })
-    })
+        setReportData(data)
+      } catch {
+        toast.error('Erro ao carregar dados do relatório')
+      } finally {
+        setLoading(false)
+      }
+    }
 
-    return data
-  }, [
-    activeSchool,
-    activeYear,
-    students,
-    etapasEnsino,
-    evaluationRules,
-    assessments,
-    assessmentTypes,
-  ])
+    loadReportData()
+  }, [activeSchool, activeYear, classes, courses, grades])
 
   // Calculate Dashboard Metrics
   const dashboardStats = useMemo(() => {
@@ -197,7 +246,7 @@ export default function PerformanceReport() {
                 </SelectTrigger>
                 <SelectContent>
                   {(schools || []).map((s) => (
-                    <SelectItem key={s.id} value={s.id}>
+                    <SelectItem key={s.id} value={s.id.toString()}>
                       {s.name}
                     </SelectItem>
                   ))}
@@ -215,8 +264,8 @@ export default function PerformanceReport() {
                   <SelectValue placeholder="Selecione..." />
                 </SelectTrigger>
                 <SelectContent>
-                  {academicYears.map((y) => (
-                    <SelectItem key={y.id} value={y.id}>
+                  {filteredAcademicYears.map((y) => (
+                    <SelectItem key={y.id} value={y.id.toString()}>
                       {y.name}
                     </SelectItem>
                   ))}

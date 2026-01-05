@@ -6,8 +6,9 @@ import path from 'path'
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => ({
   server: {
-    host: '::',
+    host: 'localhost',
     port: 8080,
+    strictPort: true, // Impede que o Vite use outra porta se 8080 estiver ocupada
   },
   experimental: {
     enableNativePlugin: true

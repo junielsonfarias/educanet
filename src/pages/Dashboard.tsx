@@ -27,11 +27,15 @@ import {
   Layout,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { useState } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { DashboardCustomizer } from './dashboard/components/DashboardCustomizer'
-import useSettingsStore from '@/stores/useSettingsStore'
+import { useSettingsStore } from '@/stores/useSettingsStore.supabase'
+import { useStudentStore } from '@/stores/useStudentStore.supabase'
+import { useSchoolStore } from '@/stores/useSchoolStore.supabase'
+import { useCourseStore } from '@/stores/useCourseStore.supabase'
+import { Skeleton } from '@/components/ui/skeleton'
 
-// Mock Data
+// Mock Data - será substituído por dados reais
 const enrollmentData = [
   { month: 'Jan', alunos: 120 },
   { month: 'Fev', alunos: 1350 },
@@ -52,11 +56,89 @@ const performanceData = [
 export default function Dashboard() {
   const [customizerOpen, setCustomizerOpen] = useState(false)
   const { activeLayout } = useSettingsStore()
+  
+  // Garantir que activeLayout sempre tenha widgets
+  const safeLayout = activeLayout || { widgets: [] }
+  
+  // Supabase stores - com valores padrão para evitar undefined
+  const { students = [], fetchStudents, loading: studentsLoading = false } = useStudentStore()
+  const { schools = [], fetchSchools, loading: schoolsLoading = false } = useSchoolStore()
+  const { fetchStats: fetchCourseStats } = useCourseStore()
+  
+  // Stats state
+  const [stats, setStats] = useState({
+    totalStudents: 0,
+    totalSchools: 0,
+    totalClasses: 0,
+    approvalRate: 0,
+  })
+  const [loadingStats, setLoadingStats] = useState(true)
 
-  const widgets = activeLayout.widgets
+  // Buscar dados na inicialização
+  useEffect(() => {
+    let isMounted = true
+    
+    const loadDashboardData = async () => {
+      try {
+        setLoadingStats(true)
+        
+        // Buscar dados em paralelo
+        await Promise.all([
+          fetchStudents(),
+          fetchSchools(),
+        ])
+        
+        // Buscar estatísticas de cursos
+        const courseStats = await fetchCourseStats()
+        
+        if (isMounted) {
+          setLoadingStats(false)
+        }
+      } catch {
+        if (isMounted) {
+          setLoadingStats(false)
+        }
+      }
+    }
+    
+    loadDashboardData()
+    
+    return () => {
+      isMounted = false
+    }
+  }, [fetchStudents, fetchSchools, fetchCourseStats])
+  
+  // Atualizar stats quando os dados mudarem
+  useEffect(() => {
+    // Só atualizar quando não estiver carregando
+    if (studentsLoading || schoolsLoading || loadingStats) {
+      return
+    }
+    
+    // Garantir que são arrays válidos
+    const safeStudents = Array.isArray(students) ? students : []
+    const safeSchools = Array.isArray(schools) ? schools : []
+    
+    setStats({
+      totalStudents: safeStudents.length,
+      totalSchools: safeSchools.filter((s) => s?.deleted_at === null).length,
+      totalClasses: 0, // será atualizado com courseStats
+      approvalRate: 94.2, // cálculo real será implementado
+    })
+  }, [students, schools, studentsLoading, schoolsLoading, loadingStats])
+
+  // Memoizar widgets para evitar recálculos desnecessários
+  const widgets = useMemo(() => {
+    return Array.isArray(safeLayout?.widgets) ? safeLayout.widgets : []
+  }, [safeLayout])
 
   // Helper to get widget by key
-  const getWidget = (key: string) => widgets.find((w) => w.dataKey === key)
+  const getWidget = useMemo(() => {
+    return (key: string) => {
+      if (!key || !Array.isArray(widgets)) return null
+      return widgets.find((w) => w?.dataKey === key)
+    }
+  }, [widgets])
 
   const renderWidget = (key: string) => {
     const w = getWidget(key)
@@ -74,10 +156,21 @@ export default function Dashboard() {
               </div>
             </CardHeader>
             <CardContent className="relative z-10">
-              <div className="text-2xl font-bold text-blue-700">1,500</div>
-              <p className="text-xs text-muted-foreground">
-                +12% em relação ao mês passado
-              </p>
+              {loadingStats ? (
+                <>
+                  <Skeleton className="h-8 w-24 mb-2" />
+                  <Skeleton className="h-4 w-32" />
+                </>
+              ) : (
+                <>
+                  <div className="text-2xl font-bold text-blue-700">
+                    {stats.totalStudents.toLocaleString('pt-BR')}
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Alunos matriculados ativos
+                  </p>
+                </>
+              )}
             </CardContent>
           </Card>
         )
@@ -92,10 +185,19 @@ export default function Dashboard() {
               </div>
             </CardHeader>
             <CardContent className="relative z-10">
-              <div className="text-2xl font-bold text-primary">12</div>
-              <p className="text-xs text-muted-foreground">
-                Todas em funcionamento
-              </p>
+              {loadingStats ? (
+                <>
+                  <Skeleton className="h-8 w-16 mb-2" />
+                  <Skeleton className="h-4 w-32" />
+                </>
+              ) : (
+                <>
+                  <div className="text-2xl font-bold text-primary">{stats.totalSchools}</div>
+                  <p className="text-xs text-muted-foreground">
+                    {schools.length} escolas cadastradas
+                  </p>
+                </>
+              )}
             </CardContent>
           </Card>
         )
@@ -267,20 +369,23 @@ export default function Dashboard() {
       </div>
 
       <div className="grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-4">
-        {widgets.map((widget) => {
-          if (!widget.visible) return null
+        {Array.isArray(widgets) && widgets
+          .filter((widget) => widget && widget.visible)
+          .map((widget) => {
+            let colSpanClass = ''
+            if (widget.w === 2) colSpanClass = 'md:col-span-2'
+            if (widget.w === 3) colSpanClass = 'md:col-span-2 lg:col-span-3'
+            if (widget.w === 4) colSpanClass = 'col-span-full'
 
-          let colSpanClass = ''
-          if (widget.w === 2) colSpanClass = 'md:col-span-2'
-          if (widget.w === 3) colSpanClass = 'md:col-span-2 lg:col-span-3'
-          if (widget.w === 4) colSpanClass = 'col-span-full'
+            const widgetContent = renderWidget(widget.dataKey)
+            if (!widgetContent) return null
 
-          return (
-            <div key={widget.id} className={colSpanClass}>
-              {renderWidget(widget.dataKey)}
-            </div>
-          )
-        })}
+            return (
+              <div key={`widget-${widget.id || widget.dataKey || Math.random()}`} className={colSpanClass}>
+                {widgetContent}
+              </div>
+            )
+          })}
       </div>
 
       <DashboardCustomizer

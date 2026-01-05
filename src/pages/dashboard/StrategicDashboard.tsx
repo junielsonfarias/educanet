@@ -28,11 +28,11 @@ import {
   XCircle,
   BookOpen,
 } from 'lucide-react'
-import useSchoolStore from '@/stores/useSchoolStore'
-import useStudentStore from '@/stores/useStudentStore'
-import useAttendanceStore from '@/stores/useAttendanceStore'
-import useAssessmentStore from '@/stores/useAssessmentStore'
-import useCourseStore from '@/stores/useCourseStore'
+import { useSchoolStore } from '@/stores/useSchoolStore.supabase'
+import { useStudentStore } from '@/stores/useStudentStore.supabase'
+import { useAttendanceStore } from '@/stores/useAttendanceStore.supabase'
+import { useAssessmentStore } from '@/stores/useAssessmentStore.supabase'
+import { useCourseStore } from '@/stores/useCourseStore.supabase'
 import { calculateGrades } from '@/lib/grade-calculator'
 import type { Period } from '@/lib/mock-data'
 import { SafeChart } from '@/components/charts/SafeChart'

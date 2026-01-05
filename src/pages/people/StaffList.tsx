@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { Plus, Search, MoreHorizontal, Mail, Phone, Filter, UserCog } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -26,9 +26,9 @@ import {
   CardTitle,
 } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import useStaffStore from '@/stores/useStaffStore'
-import { Staff } from '@/lib/mock-data'
-import { useToast } from '@/hooks/use-toast'
+import { Skeleton } from '@/components/ui/skeleton'
+import { useStaffStore } from '@/stores/useStaffStore.supabase'
+import { toast } from 'sonner'
 import { StaffFormDialog } from './components/StaffFormDialog'
 import { RequirePermission } from '@/components/RequirePermission'
 import {
@@ -41,84 +41,121 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
-import useSchoolStore from '@/stores/useSchoolStore'
-
-const roleLabels: Record<Staff['role'], string> = {
-  secretary: 'Secretário(a)',
-  coordinator: 'Coordenador(a)',
-  director: 'Diretor(a)',
-  pedagogue: 'Pedagogo(a)',
-  librarian: 'Bibliotecário(a)',
-  janitor: 'Zelador(a)',
-  cook: 'Cozinheiro(a)',
-  security: 'Segurança',
-  nurse: 'Enfermeiro(a)',
-  psychologist: 'Psicólogo(a)',
-  social_worker: 'Assistente Social',
-  administrative: 'Administrativo',
-  other: 'Outro',
-}
+import { useSchoolStore } from '@/stores/useSchoolStore.supabase'
+import useUserStore from '@/stores/useUserStore'
+import type { StaffFullInfo } from '@/lib/supabase/services'
 
 export default function StaffList() {
-  const { staff, addStaff, updateStaff, deleteStaff } = useStaffStore()
-  const { schools } = useSchoolStore()
+  const { staff, loading, fetchStaff, createStaff, updateStaff, deleteStaff } = useStaffStore()
+  const { schools, fetchSchools } = useSchoolStore()
+  const { currentUser } = useUserStore()
   const [searchTerm, setSearchTerm] = useState('')
-  const [roleFilter, setRoleFilter] = useState<Staff['role'] | 'all'>('all')
   const [isDialogOpen, setIsDialogOpen] = useState(false)
-  const [editingStaff, setEditingStaff] = useState<Staff | null>(null)
-  const [deleteId, setDeleteId] = useState<string | null>(null)
+  const [editingStaff, setEditingStaff] = useState<StaffFullInfo | null>(null)
+  const [deleteId, setDeleteId] = useState<number | null>(null)
 
-  const { toast } = useToast()
+  // Fetch data on mount
+  useEffect(() => {
+    fetchStaff()
+    fetchSchools()
+  }, [fetchStaff, fetchSchools])
 
-  const filteredStaff = staff.filter((s) => {
-    const name = s.name || ''
-    const roleLabel = s.roleLabel || roleLabels[s.role] || ''
-    const term = searchTerm || ''
-    const matchesSearch =
-      name.toLowerCase().includes(term.toLowerCase()) ||
-      roleLabel.toLowerCase().includes(term.toLowerCase()) ||
-      s.email.toLowerCase().includes(term.toLowerCase())
-    const matchesRole = roleFilter === 'all' || s.role === roleFilter
-    return matchesSearch && matchesRole
-  })
-
-  const handleCreate = (data: any) => {
-    addStaff({
-      ...data,
-      roleLabel: roleLabels[data.role] || data.roleLabel || 'Outro',
+  // Filter staff
+  const filteredStaff = useMemo(() => {
+    if (!Array.isArray(staff)) return []
+    
+    return staff.filter((s) => {
+      if (!s || !s.person) return false
+      
+      const fullName = `${s.person.first_name} ${s.person.last_name}`
+      const email = s.person.email || ''
+      const position = s.position?.name || ''
+      const department = s.department?.name || ''
+      const term = searchTerm.toLowerCase()
+      
+      return (
+        fullName.toLowerCase().includes(term) ||
+        email.toLowerCase().includes(term) ||
+        position.toLowerCase().includes(term) ||
+        department.toLowerCase().includes(term) ||
+        s.functional_registration.toLowerCase().includes(term)
+      )
     })
-    toast({
-      title: 'Funcionário cadastrado',
-      description: `${data.name} adicionado com sucesso.`,
-    })
+  }, [staff, searchTerm])
+
+  const handleCreate = async (data: any) => {
+    if (!currentUser?.person_id) {
+      toast.error('Usuário não autenticado')
+      return
+    }
+
+    const personData = {
+      first_name: data.firstName,
+      last_name: data.lastName,
+      cpf: data.cpf,
+      rg: data.rg || null,
+      email: data.email || null,
+      phone: data.phone || null,
+      address: data.address || null,
+      date_of_birth: data.dateOfBirth,
+      type: 'Funcionario' as const,
+      created_by: currentUser.person_id,
+    }
+
+    const staffData = {
+      functional_registration: data.functionalRegistration,
+      position_id: data.positionId,
+      department_id: data.departmentId,
+      school_id: data.schoolId || null,
+      created_by: currentUser.person_id,
+    }
+
+    const result = await createStaff(personData, staffData)
+    if (result) {
+      setIsDialogOpen(false)
+    }
   }
 
-  const handleUpdate = (data: any) => {
-    if (editingStaff) {
-      updateStaff(editingStaff.id, {
-        ...data,
-        roleLabel: roleLabels[data.role] || data.roleLabel || 'Outro',
-      })
-      toast({
-        title: 'Funcionário atualizado',
-        description: `Os dados de ${data.name} foram atualizados.`,
-      })
+  const handleUpdate = async (data: any) => {
+    if (!editingStaff || !currentUser?.person_id) return
+
+    const personData = {
+      first_name: data.firstName,
+      last_name: data.lastName,
+      cpf: data.cpf,
+      rg: data.rg || null,
+      email: data.email || null,
+      phone: data.phone || null,
+      address: data.address || null,
+      date_of_birth: data.dateOfBirth,
+      updated_by: currentUser.person_id,
+    }
+
+    const staffData = {
+      functional_registration: data.functionalRegistration,
+      position_id: data.positionId,
+      department_id: data.departmentId,
+      school_id: data.schoolId || null,
+      updated_by: currentUser.person_id,
+    }
+
+    const result = await updateStaff(editingStaff.id, personData, staffData)
+    if (result) {
       setEditingStaff(null)
+      setIsDialogOpen(false)
     }
   }
 
-  const handleDelete = () => {
+  const handleDelete = async () => {
     if (deleteId) {
-      deleteStaff(deleteId)
-      toast({
-        title: 'Funcionário removido',
-        description: 'O funcionário foi removido do sistema.',
-      })
-      setDeleteId(null)
+      const success = await deleteStaff(deleteId)
+      if (success) {
+        setDeleteId(null)
+      }
     }
   }
 
-  const openEditDialog = (staffMember: Staff) => {
+  const openEditDialog = (staffMember: StaffFullInfo) => {
     setEditingStaff(staffMember)
     setIsDialogOpen(true)
   }
@@ -193,7 +230,20 @@ export default function StaffList() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredStaff.length === 0 ? (
+                {loading ? (
+                  // Loading skeletons
+                  Array.from({ length: 5 }).map((_, index) => (
+                    <TableRow key={`skeleton-${index}`}>
+                      <TableCell><Skeleton className="h-9 w-9 rounded-full" /></TableCell>
+                      <TableCell><Skeleton className="h-4 w-[200px]" /></TableCell>
+                      <TableCell><Skeleton className="h-4 w-[100px]" /></TableCell>
+                      <TableCell className="hidden md:table-cell"><Skeleton className="h-4 w-[150px]" /></TableCell>
+                      <TableCell className="hidden md:table-cell"><Skeleton className="h-4 w-[180px]" /></TableCell>
+                      <TableCell><Skeleton className="h-4 w-[60px]" /></TableCell>
+                      <TableCell><Skeleton className="h-8 w-8 ml-auto" /></TableCell>
+                    </TableRow>
+                  ))
+                ) : filteredStaff.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={7} className="h-24 text-center">
                       Nenhum funcionário encontrado.
@@ -201,39 +251,43 @@ export default function StaffList() {
                   </TableRow>
                 ) : (
                   filteredStaff.map((staffMember) => {
-                    if (!staffMember) return null
-                    const school = staffMember.schoolId
-                      ? schools.find((s) => s.id === staffMember.schoolId)
-                      : null
+                    if (!staffMember || !staffMember.person) return null
+                    
+                    const fullName = `${staffMember.person.first_name} ${staffMember.person.last_name}`
+                    const initials = `${staffMember.person.first_name[0]}${staffMember.person.last_name[0]}`.toUpperCase()
+                    const school = staffMember.school
+                    const isActive = !staffMember.deleted_at
+                    
                     return (
                       <TableRow
-                        key={staffMember.id}
+                        key={`staff-${staffMember.id}`}
                         className="cursor-pointer border-l-4 border-l-transparent hover:border-l-blue-500 hover:bg-gradient-to-r hover:from-blue-50/50 hover:to-transparent transition-all duration-200"
                       >
                         <TableCell>
                           <Avatar className="h-9 w-9">
                             <AvatarImage
-                              src={staffMember.photo || `https://img.usecurling.com/ppl/thumbnail?gender=male&seed=${staffMember.id}`}
+                              src={`https://img.usecurling.com/ppl/thumbnail?gender=male&seed=${staffMember.id}`}
                             />
-                            <AvatarFallback>
-                              {(staffMember.name || '')
-                                .substring(0, 2)
-                                .toUpperCase()}
-                            </AvatarFallback>
+                            <AvatarFallback>{initials}</AvatarFallback>
                           </Avatar>
                         </TableCell>
                         <TableCell className="font-medium">
                           <div className="flex flex-col">
-                            <span>{staffMember.name}</span>
+                            <span>{fullName}</span>
                             <span className="text-xs text-muted-foreground md:hidden">
-                              {staffMember.email}
+                              {staffMember.person.email || 'Sem e-mail'}
                             </span>
                           </div>
                         </TableCell>
                         <TableCell>
-                          <Badge variant="outline" className="font-normal">
-                            {staffMember.roleLabel || roleLabels[staffMember.role]}
-                          </Badge>
+                          <div className="flex flex-col gap-1">
+                            <Badge variant="outline" className="font-normal w-fit">
+                              {staffMember.position?.name || 'Sem cargo'}
+                            </Badge>
+                            <span className="text-xs text-muted-foreground">
+                              {staffMember.department?.name || 'Sem departamento'}
+                            </span>
+                          </div>
                         </TableCell>
                         <TableCell className="hidden md:table-cell">
                           {school ? (
@@ -245,32 +299,27 @@ export default function StaffList() {
                           )}
                         </TableCell>
                         <TableCell className="hidden md:table-cell">
-                          <div className="flex flex-col text-sm">
-                            <div className="flex items-center gap-1">
-                              <Mail className="h-3 w-3 text-muted-foreground" />
-                              {staffMember.email}
-                            </div>
-                            <div className="flex items-center gap-1 mt-0.5">
-                              <Phone className="h-3 w-3 text-muted-foreground" />
-                              {staffMember.phone}
-                            </div>
+                          <div className="flex flex-col text-sm gap-1">
+                            {staffMember.person.email && (
+                              <div className="flex items-center gap-1">
+                                <Mail className="h-3 w-3 text-muted-foreground" />
+                                {staffMember.person.email}
+                              </div>
+                            )}
+                            {staffMember.person.phone && (
+                              <div className="flex items-center gap-1">
+                                <Phone className="h-3 w-3 text-muted-foreground" />
+                                {staffMember.person.phone}
+                              </div>
+                            )}
+                            {!staffMember.person.email && !staffMember.person.phone && (
+                              <span className="text-muted-foreground">Sem contato</span>
+                            )}
                           </div>
                         </TableCell>
                         <TableCell>
-                          <Badge
-                            variant={
-                              staffMember.status === 'active'
-                                ? 'default'
-                                : staffMember.status === 'on_leave'
-                                ? 'secondary'
-                                : 'destructive'
-                            }
-                          >
-                            {staffMember.status === 'active'
-                              ? 'Ativo'
-                              : staffMember.status === 'on_leave'
-                              ? 'Afastado'
-                              : 'Inativo'}
+                          <Badge variant={isActive ? 'default' : 'destructive'}>
+                            {isActive ? 'Ativo' : 'Inativo'}
                           </Badge>
                         </TableCell>
                         <TableCell className="text-right">

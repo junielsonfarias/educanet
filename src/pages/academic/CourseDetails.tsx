@@ -26,7 +26,7 @@ import {
 } from '@/components/ui/accordion'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
-import useCourseStore from '@/stores/useCourseStore'
+import { useCourseStore } from '@/stores/useCourseStore.supabase'
 import { GradeFormDialog } from './components/GradeFormDialog'
 import { SubjectFormDialog } from './components/SubjectFormDialog'
 import { CourseFormDialog } from './components/CourseFormDialog'

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { Mail, MessageSquare, Bell, Plus, Search, Filter, Send, Edit, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -25,91 +25,108 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { Badge } from '@/components/ui/badge'
+import { Skeleton } from '@/components/ui/skeleton'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { useToast } from '@/hooks/use-toast'
-import useNotificationStore from '@/stores/useNotificationStore'
-import useStudentStore from '@/stores/useStudentStore'
-import { Notification, NotificationTemplate } from '@/lib/mock-data'
+import { toast } from 'sonner'
+import { useNotificationStore } from '@/stores/useNotificationStore.supabase'
+import { useStudentStore } from '@/stores/useStudentStore.supabase'
 import { NotificationFormDialog } from './components/NotificationFormDialog'
 import { TemplateFormDialog } from './components/TemplateFormDialog'
 import { RequirePermission } from '@/components/RequirePermission'
+import type { Database } from '@/lib/supabase/database.types'
+import { format, parseISO } from 'date-fns'
+
+type CommunicationRow = Database['public']['Tables']['communications']['Row']
 
 export default function NotificationsManager() {
   const {
-    notifications,
-    templates,
-    addNotification,
-    updateNotification,
-    deleteNotification,
-    addTemplate,
-    updateTemplate,
-    deleteTemplate,
-    sendNotification,
+    communications,
+    loading,
+    fetchCommunications,
+    sendCommunication,
+    updateCommunicationStatus,
+    deleteCommunication,
   } = useNotificationStore()
-  const { students } = useStudentStore()
-  const { toast } = useToast()
+  const { students, fetchStudents } = useStudentStore()
 
   const [searchTerm, setSearchTerm] = useState('')
   const [typeFilter, setTypeFilter] = useState<'all' | 'email' | 'sms' | 'push'>('all')
   const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'sent' | 'failed'>('all')
   const [isNotificationDialogOpen, setIsNotificationDialogOpen] = useState(false)
   const [isTemplateDialogOpen, setIsTemplateDialogOpen] = useState(false)
-  const [editingNotification, setEditingNotification] = useState<Notification | null>(null)
-  const [editingTemplate, setEditingTemplate] = useState<NotificationTemplate | null>(null)
+  const [editingNotification, setEditingNotification] = useState<CommunicationRow | null>(null)
+  const [editingTemplate, setEditingTemplate] = useState<any | null>(null)
+
+  // Fetch data on mount
+  useEffect(() => {
+    fetchCommunications()
+    fetchStudents()
+  }, [fetchCommunications, fetchStudents])
 
   // Filtrar notificações
-  const filteredNotifications = notifications.filter((notif) => {
-    const matchesSearch =
-      searchTerm === '' ||
-      notif.subject.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      notif.recipient.name.toLowerCase().includes(searchTerm.toLowerCase())
+  const filteredNotifications = useMemo(() => {
+    if (!Array.isArray(communications)) return []
+    
+    return communications.map((notif) => {
+      // Mapear campos do Supabase para o formato esperado pelo componente
+      const subject = notif.title || (notif as any).subject || ''
+      const channel = notif.communication_type || (notif as any).channel || 'email'
+      const status = (notif as any).status || 'pending'
+      const recipientName = notif.recipients?.[0]?.person?.first_name 
+        ? `${notif.recipients[0].person.first_name} ${notif.recipients[0].person.last_name || ''}`.trim()
+        : (notif as any).recipient_name || 'N/A'
+      const sentAt = notif.sent_date || (notif as any).sent_at || notif.created_at
+      
+      return {
+        ...notif,
+        subject,
+        channel,
+        status,
+        recipient_name: recipientName,
+        sent_at: sentAt,
+      }
+    }).filter((notif) => {
+      const matchesSearch =
+        searchTerm === '' ||
+        notif.subject.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        notif.recipient_name.toLowerCase().includes(searchTerm.toLowerCase())
 
-    const matchesType = typeFilter === 'all' || notif.channel === typeFilter
-    const matchesStatus = statusFilter === 'all' || notif.status === statusFilter
+      const matchesType = typeFilter === 'all' || notif.channel === typeFilter
+      const matchesStatus = statusFilter === 'all' || notif.status === statusFilter
 
-    return matchesSearch && matchesType && matchesStatus
-  })
+      return matchesSearch && matchesType && matchesStatus
+    })
+  }, [communications, searchTerm, typeFilter, statusFilter])
+
+  // Templates - por enquanto vazio, pode ser implementado depois
+  const templates: any[] = []
 
   const handleCreateNotification = () => {
     setEditingNotification(null)
     setIsNotificationDialogOpen(true)
   }
 
-  const handleEditNotification = (notification: Notification) => {
+  const handleEditNotification = (notification: CommunicationRow) => {
     setEditingNotification(notification)
     setIsNotificationDialogOpen(true)
   }
 
-  const handleDeleteNotification = (id: string) => {
-    deleteNotification(id)
-    toast({
-      title: 'Notificação removida',
-      description: 'A notificação foi excluída com sucesso.',
-    })
+  const handleDeleteNotification = async (id: number) => {
+    try {
+      await deleteCommunication(id)
+      toast.success('Notificação removida com sucesso.')
+    } catch (error) {
+      toast.error('Erro ao remover notificação')
+    }
   }
 
-  const handleSendNotification = async (id: string) => {
-    const notification = notifications.find((n) => n.id === id)
-    if (!notification) return
-
+  const handleSendNotification = async (id: number) => {
     try {
-      await sendNotification({
-        channel: notification.channel,
-        recipient: notification.recipient,
-        subject: notification.subject,
-        content: notification.content,
-        templateId: notification.templateId,
-      })
-      toast({
-        title: 'Notificação enviada',
-        description: 'A notificação foi enviada com sucesso.',
-      })
+      await updateCommunicationStatus(id, 'sent')
+      toast.success('Notificação enviada com sucesso.')
+      fetchCommunications()
     } catch (error) {
-      toast({
-        title: 'Erro ao enviar',
-        description: 'Não foi possível enviar a notificação.',
-        variant: 'destructive',
-      })
+      toast.error('Erro ao enviar notificação')
     }
   }
 
@@ -118,20 +135,17 @@ export default function NotificationsManager() {
     setIsTemplateDialogOpen(true)
   }
 
-  const handleEditTemplate = (template: NotificationTemplate) => {
+  const handleEditTemplate = (template: any) => {
     setEditingTemplate(template)
     setIsTemplateDialogOpen(true)
   }
 
   const handleDeleteTemplate = (id: string) => {
-    deleteTemplate(id)
-    toast({
-      title: 'Template removido',
-      description: 'O template foi excluído com sucesso.',
-    })
+    // TODO: Implementar quando templates forem adicionados ao BD
+    toast.info('Funcionalidade de templates será implementada em breve.')
   }
 
-  const getChannelIcon = (channel: Notification['channel']) => {
+  const getChannelIcon = (channel: string | null) => {
     switch (channel) {
       case 'email':
         return <Mail className="h-4 w-4" />
@@ -140,21 +154,18 @@ export default function NotificationsManager() {
       case 'push':
         return <Bell className="h-4 w-4" />
       default:
-        return null
+        return <Mail className="h-4 w-4" />
     }
   }
 
-  const getStatusBadge = (status: Notification['status']) => {
-    const variants: Record<Notification['status'], 'default' | 'secondary' | 'destructive'> = {
-      pending: 'secondary',
-      sent: 'default',
-      failed: 'destructive',
+  const getStatusBadge = (status: string | null) => {
+    const statusMap: Record<string, { variant: 'default' | 'secondary' | 'destructive', label: string }> = {
+      'pending': { variant: 'secondary', label: 'Pendente' },
+      'sent': { variant: 'default', label: 'Enviado' },
+      'failed': { variant: 'destructive', label: 'Falhou' },
     }
-    return (
-      <Badge variant={variants[status]}>
-        {status === 'pending' ? 'Pendente' : status === 'sent' ? 'Enviado' : 'Falhou'}
-      </Badge>
-    )
+    const config = status ? statusMap[status] : { variant: 'secondary' as const, label: 'Pendente' }
+    return <Badge variant={config.variant}>{config.label}</Badge>
   }
 
   return (
@@ -261,64 +272,82 @@ export default function NotificationsManager() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {filteredNotifications.length === 0 ? (
+                    {loading ? (
+                      // Loading skeletons
+                      Array.from({ length: 5 }).map((_, index) => (
+                        <TableRow key={`skeleton-${index}`}>
+                          <TableCell><Skeleton className="h-4 w-[100px]" /></TableCell>
+                          <TableCell><Skeleton className="h-4 w-[150px]" /></TableCell>
+                          <TableCell><Skeleton className="h-4 w-[300px]" /></TableCell>
+                          <TableCell><Skeleton className="h-4 w-[100px]" /></TableCell>
+                          <TableCell><Skeleton className="h-4 w-[80px]" /></TableCell>
+                          <TableCell><Skeleton className="h-8 w-24 ml-auto" /></TableCell>
+                        </TableRow>
+                      ))
+                    ) : filteredNotifications.length === 0 ? (
                       <TableRow>
                         <TableCell colSpan={6} className="text-center py-10 text-muted-foreground">
                           Nenhuma notificação encontrada.
                         </TableCell>
                       </TableRow>
                     ) : (
-                      filteredNotifications.map((notif) => (
-                        <TableRow key={notif.id}>
-                          <TableCell>
-                            <div className="flex items-center gap-2">
-                              {getChannelIcon(notif.channel)}
-                              <span className="capitalize">{notif.channel}</span>
-                            </div>
-                          </TableCell>
-                          <TableCell>{notif.recipient.name}</TableCell>
-                          <TableCell className="max-w-[300px] truncate">
-                            {notif.subject}
-                          </TableCell>
-                          <TableCell>
-                            {new Date(notif.sentAt).toLocaleDateString('pt-BR')}
-                          </TableCell>
-                          <TableCell>{getStatusBadge(notif.status)}</TableCell>
-                          <TableCell className="text-right">
-                            <div className="flex justify-end gap-2">
-                              {notif.status === 'pending' && (
-                                <RequirePermission permission="create:notification">
+                      filteredNotifications.map((notif) => {
+                        const channel = notif.channel || 'email'
+                        const status = notif.status || 'pending'
+                        const sentDate = notif.sent_at || notif.created_at
+                        
+                        return (
+                          <TableRow key={`comm-${notif.id}`}>
+                            <TableCell>
+                              <div className="flex items-center gap-2">
+                                {getChannelIcon(channel)}
+                                <span className="capitalize">{channel}</span>
+                              </div>
+                            </TableCell>
+                            <TableCell>{notif.recipient_name || 'N/A'}</TableCell>
+                            <TableCell className="max-w-[300px] truncate">
+                              {notif.subject || 'Sem assunto'}
+                            </TableCell>
+                            <TableCell>
+                              {sentDate ? format(parseISO(sentDate), 'dd/MM/yyyy') : 'N/A'}
+                            </TableCell>
+                            <TableCell>{getStatusBadge(status)}</TableCell>
+                            <TableCell className="text-right">
+                              <div className="flex justify-end gap-2">
+                                {status === 'pending' && (
+                                  <RequirePermission permission="create:notification">
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => handleSendNotification(notif.id)}
+                                    >
+                                      <Send className="h-4 w-4" />
+                                    </Button>
+                                  </RequirePermission>
+                                )}
+                                <RequirePermission permission="edit:notification">
                                   <Button
                                     variant="ghost"
                                     size="sm"
-                                    onClick={() => handleSendNotification(notif.id)}
+                                    onClick={() => handleEditNotification(notif)}
                                   >
-                                    <Send className="h-4 w-4" />
+                                    <Edit className="h-4 w-4" />
                                   </Button>
                                 </RequirePermission>
-                              )}
-                              <RequirePermission permission="edit:notification">
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => handleEditNotification(notif)}
-                                >
-                                  <Edit className="h-4 w-4" />
-                                </Button>
-                              </RequirePermission>
-                              <RequirePermission permission="delete:notification">
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => handleDeleteNotification(notif.id)}
-                                >
-                                  <Trash2 className="h-4 w-4" />
-                                </Button>
-                              </RequirePermission>
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      ))
+                                <RequirePermission permission="delete:notification">
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => handleDeleteNotification(notif.id)}
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                  </Button>
+                                </RequirePermission>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        )
+                      })
                     )}
                   </TableBody>
                 </Table>
@@ -396,21 +425,26 @@ export default function NotificationsManager() {
       <NotificationFormDialog
         open={isNotificationDialogOpen}
         onOpenChange={setIsNotificationDialogOpen}
-        onSave={(data) => {
-          if (editingNotification) {
-            updateNotification(editingNotification.id, data)
-            toast({
-              title: 'Notificação atualizada',
-              description: 'A notificação foi atualizada com sucesso.',
-            })
-          } else {
-            addNotification(data)
-            toast({
-              title: 'Notificação criada',
-              description: 'A notificação foi criada com sucesso.',
-            })
+        onSave={async (data) => {
+          try {
+            if (editingNotification) {
+              await updateCommunicationStatus(editingNotification.id, data.status || 'pending')
+              toast.success('Notificação atualizada com sucesso.')
+            } else {
+              await sendCommunication({
+                recipient_person_id: data.recipient_person_id,
+                channel: data.channel || 'email',
+                subject: data.subject,
+                content: data.content,
+                priority: data.priority || 'normal',
+              })
+              toast.success('Notificação criada com sucesso.')
+            }
+            setEditingNotification(null)
+            fetchCommunications()
+          } catch (error) {
+            toast.error('Erro ao salvar notificação')
           }
-          setEditingNotification(null)
         }}
         initialData={editingNotification}
       />
@@ -418,20 +452,9 @@ export default function NotificationsManager() {
       <TemplateFormDialog
         open={isTemplateDialogOpen}
         onOpenChange={setIsTemplateDialogOpen}
-        onSave={(data) => {
-          if (editingTemplate) {
-            updateTemplate(editingTemplate.id, data)
-            toast({
-              title: 'Template atualizado',
-              description: 'O template foi atualizado com sucesso.',
-            })
-          } else {
-            addTemplate(data)
-            toast({
-              title: 'Template criado',
-              description: 'O template foi criado com sucesso.',
-            })
-          }
+        onSave={async (data) => {
+          // TODO: Implementar quando templates forem adicionados ao BD
+          toast.info('Funcionalidade de templates será implementada em breve.')
           setEditingTemplate(null)
         }}
         initialData={editingTemplate}

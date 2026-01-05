@@ -18,8 +18,8 @@ import {
 import { ArrowLeft, ArrowRightLeft, Filter } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useNavigate } from 'react-router-dom'
-import useStudentStore from '@/stores/useStudentStore'
-import useSchoolStore from '@/stores/useSchoolStore'
+import { useStudentStore } from '@/stores/useStudentStore.supabase'
+import { useSchoolStore } from '@/stores/useSchoolStore.supabase'
 import { ExportActions } from '@/components/ExportActions'
 
 export default function TransferReport() {

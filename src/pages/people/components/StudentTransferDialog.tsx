@@ -18,7 +18,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import useSchoolStore from '@/stores/useSchoolStore'
+import { useSchoolStore } from '@/stores/useSchoolStore.supabase'
 import { Student } from '@/lib/mock-data'
 
 interface StudentTransferDialogProps {

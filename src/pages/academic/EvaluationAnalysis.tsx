@@ -33,10 +33,10 @@ import {
   School as SchoolIcon,
   Download,
 } from 'lucide-react'
-import useStudentStore from '@/stores/useStudentStore'
-import useSchoolStore from '@/stores/useSchoolStore'
-import useAssessmentStore from '@/stores/useAssessmentStore'
-import useCourseStore from '@/stores/useCourseStore'
+import { useStudentStore } from '@/stores/useStudentStore.supabase'
+import { useSchoolStore } from '@/stores/useSchoolStore.supabase'
+import { useAssessmentStore } from '@/stores/useAssessmentStore.supabase'
+import { useCourseStore } from '@/stores/useCourseStore.supabase'
 import { useToast } from '@/hooks/use-toast'
 
 export default function EvaluationAnalysis() {

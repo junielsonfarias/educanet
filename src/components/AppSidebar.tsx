@@ -38,8 +38,8 @@ import {
   SidebarMenuItem,
   SidebarRail,
 } from '@/components/ui/sidebar'
-import { Link, useLocation } from 'react-router-dom'
-import useUserStore from '@/stores/useUserStore'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
+import { useAuth } from '@/hooks/useAuth'
 import useAlertStore from '@/stores/useAlertStore'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
@@ -185,13 +185,14 @@ const secretariatItems = [
 
 export function AppSidebar() {
   const { pathname } = useLocation()
-  const { currentUser, logout } = useUserStore()
+  const navigate = useNavigate()
+  const { userData, logout } = useAuth()
   const { unreadCount } = useAlertStore()
 
   const isActive = (url: string) => pathname.startsWith(url)
 
   const canManageWebsite =
-    currentUser?.role === 'admin' || currentUser?.role === 'supervisor'
+    userData?.role === 'Admin' || userData?.role === 'Supervisor'
 
   return (
     <Sidebar>
@@ -412,7 +413,7 @@ export function AppSidebar() {
                   </Link>
                 </SidebarMenuButton>
               </SidebarMenuItem>
-              {currentUser?.role === 'admin' && (
+              {userData?.role === 'Admin' && (
                 <>
                   <SidebarMenuItem>
                     <SidebarMenuButton
@@ -553,22 +554,27 @@ export function AppSidebar() {
         <div className="flex items-center gap-3 mb-4">
           <Avatar className="h-9 w-9">
             <AvatarFallback className="bg-primary/10 text-primary">
-              {currentUser?.name.substring(0, 2).toUpperCase() || 'AD'}
+              {userData?.email?.substring(0, 2).toUpperCase() || 'AD'}
             </AvatarFallback>
           </Avatar>
           <div className="flex flex-col overflow-hidden">
             <span className="text-sm font-medium truncate">
-              {currentUser?.name || 'Admin'}
+              {userData?.email?.split('@')[0] || 'Usuário'}
             </span>
             <span className="text-xs text-muted-foreground truncate">
-              {currentUser?.email || 'admin@escola.com'}
+              {userData?.email || 'admin@escola.com'}
             </span>
           </div>
         </div>
         <Button
           variant="outline"
           className="w-full justify-start text-muted-foreground hover:text-foreground"
-          onClick={logout}
+          onClick={async () => {
+            const result = await logout()
+            if (result.success) {
+              navigate('/login')
+            }
+          }}
         >
           <LogOut className="mr-2 h-5 w-5" /> Sair
         </Button>

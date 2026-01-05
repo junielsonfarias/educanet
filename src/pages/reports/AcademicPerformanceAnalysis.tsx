@@ -49,10 +49,10 @@ import {
   Pie,
   Cell,
 } from 'recharts'
-import useStudentStore from '@/stores/useStudentStore'
-import useSchoolStore from '@/stores/useSchoolStore'
-import useAssessmentStore from '@/stores/useAssessmentStore'
-import useCourseStore from '@/stores/useCourseStore'
+import { useStudentStore } from '@/stores/useStudentStore.supabase'
+import { useSchoolStore } from '@/stores/useSchoolStore.supabase'
+import { useAssessmentStore } from '@/stores/useAssessmentStore.supabase'
+import { useCourseStore } from '@/stores/useCourseStore.supabase'
 import { calculateGrades } from '@/lib/grade-calculator'
 import { ExportActions } from '@/components/ExportActions'
 import { SafeChart } from '@/components/charts/SafeChart'

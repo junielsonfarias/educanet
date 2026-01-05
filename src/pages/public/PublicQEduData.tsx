@@ -16,7 +16,7 @@ import {
   SchoolQEduData,
   AggregatedMunicipalityData,
 } from '@/services/qedu-service'
-import useSettingsStore from '@/stores/useSettingsStore'
+import { useSettingsStore } from '@/stores/useSettingsStore.supabase'
 import { QEduAlertsDialog, AlertRule } from './components/QEduAlertsDialog'
 import { QEduOverview } from './components/QEduOverview'
 import { QEduSchoolList } from './components/QEduSchoolList'

@@ -29,11 +29,12 @@ import {
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
-import { School } from '@/lib/mock-data'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Upload, X } from 'lucide-react'
-import { fileToBase64 } from '@/lib/file-utils'
+import { Upload, X, Loader2 } from 'lucide-react'
+import { uploadFile } from '@/lib/supabase/storage'
+import { toast } from 'sonner'
 import { validateSchoolINEPCode, validateCNPJ } from '@/lib/validations'
+import type { School } from '@/lib/database-types'
 
 const educationTypesList = [
   'Educação Infantil',
@@ -48,6 +49,15 @@ const educationTypesList = [
 const schoolSchema = z.object({
   name: z.string().min(3, 'Nome deve ter pelo menos 3 caracteres'),
   code: z.string().min(2, 'Código deve ter pelo menos 2 caracteres'),
+  cnpj: z
+    .string()
+    .optional()
+    .refine(
+      (val) => !val || validateCNPJ(val).valid,
+      (val) => ({
+        message: validateCNPJ(val || '').error || 'CNPJ inválido',
+      }),
+    ),
   inepCode: z
     .string()
     .optional()
@@ -102,6 +112,7 @@ export function SchoolFormDialog({
   initialData,
 }: SchoolFormDialogProps) {
   const [logoPreview, setLogoPreview] = useState<string | null>(null)
+  const [uploading, setUploading] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const form = useForm<z.infer<typeof schoolSchema>>({
@@ -109,6 +120,7 @@ export function SchoolFormDialog({
     defaultValues: {
       name: '',
       code: '',
+      cnpj: '',
       inepCode: '',
       director: '',
       address: '',
@@ -182,16 +194,17 @@ export function SchoolFormDialog({
     if (open) {
       if (initialData) {
         form.reset({
-          name: initialData.name,
-          code: initialData.code,
-          inepCode: initialData.inepCode || '',
-          director: initialData.director,
-          address: initialData.address,
-          phone: initialData.phone,
-          email: (initialData as any).email || '',
-          website: (initialData as any).website || '',
-          status: initialData.status,
-          logo: initialData.logo || '',
+          name: initialData.trade_name || initialData.name || '',
+          code: initialData.inep_code || '',
+          cnpj: initialData.cnpj || '',
+          inepCode: initialData.inep_code || '',
+          director: '', // Diretor será vinculado separadamente
+          address: initialData.address || '',
+          phone: initialData.phone || '',
+          email: initialData.email || '',
+          website: '', // Website não está no schema atual
+          status: initialData.deleted_at ? 'inactive' : 'active',
+          logo: initialData.logo_url || '',
           administrativeDependency:
             initialData.administrativeDependency || 'Municipal',
           locationType: initialData.locationType || 'Urbana',
@@ -260,7 +273,7 @@ export function SchoolFormDialog({
             meetingRoom: 0,
           },
         })
-        setLogoPreview(initialData.logo || null)
+        setLogoPreview(initialData.logo_url || initialData.logo || null)
       } else {
         form.reset({
           name: '',
@@ -291,14 +304,32 @@ export function SchoolFormDialog({
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
-    if (file) {
-      try {
-        const base64 = await fileToBase64(file)
-        setLogoPreview(base64)
-        form.setValue('logo', base64)
-      } catch (error) {
-        console.error('Error reading file', error)
+    if (!file) return
+
+    try {
+      setUploading(true)
+      
+      // Upload to Supabase Storage
+      const filePath = `schools/${Date.now()}-${file.name}`
+      const uploadResult = await uploadFile({
+        bucket: 'photos',
+        file,
+        path: filePath,
+        upsert: true,
+      })
+
+      if (!uploadResult.success || !uploadResult.publicUrl) {
+        throw new Error(uploadResult.error || 'Erro ao fazer upload da logo')
       }
+
+      setLogoPreview(uploadResult.publicUrl)
+      form.setValue('logo', uploadResult.publicUrl)
+      toast.success('Logo carregada com sucesso!')
+    } catch (error) {
+      console.error('Erro ao fazer upload da logo:', error)
+      toast.error(error instanceof Error ? error.message : 'Erro ao fazer upload da logo')
+    } finally {
+      setUploading(false)
     }
   }
 
@@ -397,9 +428,11 @@ export function SchoolFormDialog({
                     <FormLabel>Logo da Escola</FormLabel>
                     <div
                       className="mt-2 w-32 h-32 border-2 border-dashed rounded-lg flex items-center justify-center bg-muted/20 relative cursor-pointer hover:bg-muted/40 transition-colors"
-                      onClick={() => fileInputRef.current?.click()}
+                      onClick={() => !uploading && fileInputRef.current?.click()}
                     >
-                      {logoPreview ? (
+                      {uploading ? (
+                        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                      ) : logoPreview ? (
                         <>
                           <img
                             src={logoPreview}
@@ -429,6 +462,7 @@ export function SchoolFormDialog({
                       className="hidden"
                       accept="image/*"
                       onChange={handleFileChange}
+                      disabled={uploading}
                     />
                   </div>
 
@@ -641,7 +675,23 @@ export function SchoolFormDialog({
               </TabsContent>
 
               <TabsContent value="census" className="space-y-4 py-4">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="cnpj"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>CNPJ</FormLabel>
+                        <FormControl>
+                          <Input placeholder="00.000.000/0000-00" {...field} />
+                        </FormControl>
+                        <FormDescription>
+                          CNPJ da instituição de ensino
+                        </FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
                   <FormField
                     control={form.control}
                     name="inepCode"
@@ -651,10 +701,16 @@ export function SchoolFormDialog({
                         <FormControl>
                           <Input placeholder="8 dígitos" {...field} />
                         </FormControl>
+                        <FormDescription>
+                          Código do Censo Escolar/INEP
+                        </FormDescription>
                         <FormMessage />
                       </FormItem>
                     )}
                   />
+                </div>
+                
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <FormField
                     control={form.control}
                     name="administrativeDependency"
@@ -1399,7 +1455,10 @@ export function SchoolFormDialog({
               >
                 Cancelar
               </Button>
-              <Button type="submit">Salvar</Button>
+              <Button type="submit" disabled={uploading}>
+                {uploading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                Salvar
+              </Button>
             </DialogFooter>
           </form>
         </Form>

@@ -11,6 +11,9 @@ import {
   Briefcase,
   GraduationCap,
   FileText,
+  Loader2,
+  Award,
+  Users,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
@@ -23,12 +26,10 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
-import useTeacherStore from '@/stores/useTeacherStore'
-import useSchoolStore from '@/stores/useSchoolStore'
-import useCourseStore from '@/stores/useCourseStore'
-import { useState } from 'react'
+import { Skeleton } from '@/components/ui/skeleton'
+import { useTeacherStore } from '@/stores/useTeacherStore.supabase'
+import { useState, useEffect } from 'react'
 import { TeacherFormDialog } from './components/TeacherFormDialog'
-import { TeacherAllocationDialog } from './components/TeacherAllocationDialog'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -39,25 +40,122 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
-import { useToast } from '@/hooks/use-toast'
+import { toast } from 'sonner'
 import { format } from 'date-fns'
+import { ptBR } from 'date-fns/locale'
 
 export default function TeacherDetails() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
-  const { getTeacher, updateTeacher, deleteTeacher, addAllocation } =
-    useTeacherStore()
-  const { getSchool } = useSchoolStore()
-  const { etapasEnsino } = useCourseStore()
-  const { toast } = useToast()
+  const { 
+    currentTeacher,
+    loading,
+    fetchTeacherById, 
+    updateTeacher, 
+    deleteTeacher,
+    fetchTeacherClasses,
+    fetchTeacherSubjects,
+    fetchCertifications,
+    assignToClass,
+  } = useTeacherStore()
 
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
-  const [isAllocationDialogOpen, setIsAllocationDialogOpen] = useState(false)
-  const [deleteId, setDeleteId] = useState<string | null>(null)
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+  const [classes, setClasses] = useState<any[]>([])
+  const [subjects, setSubjects] = useState<any[]>([])
+  const [certifications, setCertifications] = useState<any[]>([])
 
-  const teacher = getTeacher(id || '')
+  // Carregar dados do professor ao montar
+  useEffect(() => {
+    if (id) {
+      fetchTeacherById(parseInt(id))
+      loadAdditionalData()
+    }
+  }, [id])
 
-  if (!teacher) {
+  const loadAdditionalData = async () => {
+    if (!id) return
+    
+    const teacherId = parseInt(id)
+    const [classesData, subjectsData, certificationsData] = await Promise.all([
+      fetchTeacherClasses(teacherId),
+      fetchTeacherSubjects(teacherId),
+      fetchCertifications(teacherId),
+    ])
+    
+    setClasses(classesData)
+    setSubjects(subjectsData)
+    setCertifications(certificationsData)
+  }
+
+  const handleUpdate = async (data: any) => {
+    if (!currentTeacher) return
+    
+    try {
+      // Separar dados de person e teacher
+      const personData = {
+        first_name: data.firstName || currentTeacher.person.first_name,
+        last_name: data.lastName || currentTeacher.person.last_name,
+        email: data.email || currentTeacher.person.email,
+        phone: data.phone || currentTeacher.person.phone,
+        cpf: data.cpf || currentTeacher.person.cpf,
+      }
+
+      const teacherData = {
+        school_id: data.schoolId || currentTeacher.school_id,
+        employment_status: data.employmentStatus || currentTeacher.employment_status,
+        hire_date: data.hireDate || currentTeacher.hire_date,
+      }
+
+      await updateTeacher(currentTeacher.id, personData, teacherData)
+      setIsEditDialogOpen(false)
+    } catch (error) {
+      // Erro já tratado pelo store
+    }
+  }
+
+  const handleDelete = async () => {
+    if (!currentTeacher) return
+    
+    try {
+      await deleteTeacher(currentTeacher.id)
+      navigate('/pessoas/professores')
+    } catch (error) {
+      // Erro já tratado pelo store
+    }
+  }
+
+  // Loading state
+  if (loading && !currentTeacher) {
+    return (
+      <div className="space-y-6 animate-fade-in">
+        <div className="flex items-center gap-4">
+          <Skeleton className="h-10 w-10 rounded" />
+          <Skeleton className="h-8 w-64" />
+        </div>
+        <div className="grid gap-6 md:grid-cols-3">
+          <Card className="col-span-1">
+            <CardContent className="pt-6 flex flex-col items-center">
+              <Skeleton className="h-32 w-32 rounded-full mb-4" />
+              <Skeleton className="h-6 w-32 mb-2" />
+              <Skeleton className="h-4 w-24" />
+            </CardContent>
+          </Card>
+          <Card className="col-span-1 md:col-span-2">
+            <CardHeader>
+              <Skeleton className="h-6 w-48" />
+            </CardHeader>
+            <CardContent>
+              <Skeleton className="h-40 w-full" />
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    )
+  }
+
+  // Not found state
+  if (!currentTeacher) {
     return (
       <div className="flex flex-col items-center justify-center h-[50vh] gap-4">
         <h2 className="text-2xl font-bold">Professor não encontrado</h2>
@@ -68,79 +166,16 @@ export default function TeacherDetails() {
     )
   }
 
-  // Safely access properties
-  const allocations = Array.isArray(teacher.allocations)
-    ? teacher.allocations
-    : []
-  const name = teacher.name || 'Sem nome'
-  const subject = teacher.subject || 'N/A'
-  const email = teacher.email || 'N/A'
-  const phone = teacher.phone || 'N/A'
-  const status = teacher.status || 'inactive'
-  const cpf = teacher.cpf || 'Não informado'
-  const role = teacher.role || 'Não informado'
-  const bond = teacher.employmentBond || 'Não informado'
-  const admission = teacher.admissionDate
-    ? format(new Date(teacher.admissionDate), 'dd/MM/yyyy')
+  // Extract data safely
+  const teacher = currentTeacher
+  const person = teacher.person
+  const fullName = `${person.first_name} ${person.last_name}`.trim()
+  const initials = `${person.first_name?.[0] || ''}${person.last_name?.[0] || ''}`.toUpperCase()
+  const isActive = teacher.employment_status === 'active'
+  const school = teacher.school
+  const hireDate = teacher.hire_date 
+    ? format(new Date(teacher.hire_date), "dd 'de' MMMM 'de' yyyy", { locale: ptBR })
     : 'Não informada'
-  const academic = teacher.academicBackground || 'Não informada'
-
-  const handleUpdate = (data: any) => {
-    updateTeacher(teacher.id, data)
-    toast({
-      title: 'Professor atualizado',
-      description: 'Dados atualizados com sucesso.',
-    })
-  }
-
-  const handleDelete = () => {
-    deleteTeacher(teacher.id)
-    toast({
-      title: 'Professor excluído',
-      description: 'Registro removido com sucesso.',
-    })
-    navigate('/pessoas/professores')
-  }
-
-  const handleAddAllocation = (data: any) => {
-    addAllocation(teacher.id, data)
-    toast({
-      title: 'Alocação realizada',
-      description: 'Professor vinculado à turma com sucesso.',
-    })
-  }
-
-  const getAllocationDetails = (allocation: any) => {
-    if (!allocation)
-      return {
-        schoolName: 'N/A',
-        yearName: 'N/A',
-        className: 'N/A',
-        subjectName: 'N/A',
-      }
-
-    const school = getSchool(allocation.schoolId)
-    const year = school?.academicYears?.find(
-      (y) => y.id === allocation.academicYearId,
-    )
-    const turmas = year?.turmas || []
-    const classroom = turmas.find(
-      (c) => c.id === allocation.classroomId,
-    )
-
-    // Flatten seriesAnos to find subject
-    const safeEtapasEnsino = Array.isArray(etapasEnsino) ? etapasEnsino : []
-    const allSeriesAnos = safeEtapasEnsino.flatMap((e) => e.seriesAnos || [])
-    const allSubjects = allSeriesAnos.flatMap((s) => s.subjects || [])
-    const subject = allSubjects.find((s) => s.id === allocation.subjectId)
-
-    return {
-      schoolName: school?.name || 'Escola desconhecida',
-      yearName: year?.name || '-',
-      className: classroom?.name || 'Turma desconhecida',
-      subjectName: subject?.name || 'Regente',
-    }
-  }
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -158,10 +193,11 @@ export default function TeacherDetails() {
           </h2>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" onClick={() => setIsEditDialogOpen(true)}>
-            <Edit className="mr-2 h-4 w-4" /> Editar
+          <Button variant="outline" onClick={() => setIsEditDialogOpen(true)} disabled={loading}>
+            {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Edit className="mr-2 h-4 w-4" />}
+            Editar
           </Button>
-          <Button variant="destructive" onClick={() => setDeleteId(teacher.id)}>
+          <Button variant="destructive" onClick={() => setDeleteDialogOpen(true)} disabled={loading}>
             <Trash2 className="mr-2 h-4 w-4" /> Excluir
           </Button>
         </div>
@@ -172,19 +208,21 @@ export default function TeacherDetails() {
           <CardContent className="pt-6 flex flex-col items-center text-center">
             <Avatar className="h-32 w-32 mb-4 border-4 border-primary/10">
               <AvatarImage
-                src={`https://img.usecurling.com/ppl/medium?gender=male&seed=${teacher.id}`}
+                src={person.avatar_url || `https://img.usecurling.com/ppl/medium?gender=male&seed=${teacher.id}`}
               />
               <AvatarFallback className="text-2xl">
-                {name.substring(0, 2).toUpperCase()}
+                {initials}
               </AvatarFallback>
             </Avatar>
-            <h3 className="text-xl font-bold">{name}</h3>
-            <p className="text-sm text-muted-foreground mb-2">{role}</p>
+            <h3 className="text-xl font-bold">{fullName}</h3>
+            <p className="text-sm text-muted-foreground mb-2">
+              {school?.name || 'Sem escola vinculada'}
+            </p>
             <Badge
-              variant={status === 'active' ? 'default' : 'secondary'}
+              variant={isActive ? 'default' : 'secondary'}
               className="mt-2"
             >
-              {status === 'active' ? 'Ativo' : 'Inativo'}
+              {isActive ? 'Ativo' : 'Inativo'}
             </Badge>
           </CardContent>
         </Card>
@@ -200,100 +238,121 @@ export default function TeacherDetails() {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
               <div className="space-y-1">
                 <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                  <BookOpen className="h-4 w-4" /> Disciplina Principal
+                  <Mail className="h-4 w-4" /> E-mail
                 </span>
-                <p className="font-medium">{subject}</p>
+                <p className="font-medium">{person.email || 'Não informado'}</p>
               </div>
               <div className="space-y-1">
                 <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">
                   <Phone className="h-4 w-4" /> Telefone
                 </span>
-                <p className="font-medium">{phone}</p>
-              </div>
-              <div className="space-y-1">
-                <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                  <Mail className="h-4 w-4" /> E-mail Institucional
-                </span>
-                <p className="font-medium">{email}</p>
+                <p className="font-medium">{person.phone || 'Não informado'}</p>
               </div>
               <div className="space-y-1">
                 <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">
                   <FileText className="h-4 w-4" /> CPF
                 </span>
-                <p className="font-medium">{cpf}</p>
-              </div>
-              <div className="space-y-1">
-                <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                  <Briefcase className="h-4 w-4" /> Cargo/Função
-                </span>
-                <p className="font-medium">{role}</p>
-              </div>
-              <div className="space-y-1">
-                <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                  <Briefcase className="h-4 w-4" /> Vínculo
-                </span>
-                <p className="font-medium">{bond}</p>
+                <p className="font-medium">{person.cpf || 'Não informado'}</p>
               </div>
               <div className="space-y-1">
                 <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">
                   <Calendar className="h-4 w-4" /> Data de Admissão
                 </span>
-                <p className="font-medium">{admission}</p>
+                <p className="font-medium">{hireDate}</p>
+              </div>
+              <div className="space-y-1">
+                <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                  <Briefcase className="h-4 w-4" /> Escola
+                </span>
+                <p className="font-medium">{school?.name || 'Sem vínculo'}</p>
+              </div>
+              <div className="space-y-1">
+                <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                  <Briefcase className="h-4 w-4" /> Status
+                </span>
+                <p className="font-medium">{isActive ? 'Ativo' : 'Inativo'}</p>
               </div>
             </div>
 
             <Separator />
 
-            <div className="space-y-1">
-              <span className="text-sm font-medium text-muted-foreground flex items-center gap-2 mb-2">
-                <GraduationCap className="h-4 w-4" /> Formação Acadêmica
-              </span>
-              <p className="text-sm leading-relaxed text-justify bg-muted/20 p-3 rounded-md">
-                {academic}
-              </p>
+            {/* Disciplinas */}
+            <div className="space-y-3">
+              <h4 className="font-semibold flex items-center gap-2">
+                <BookOpen className="h-4 w-4" /> Disciplinas
+              </h4>
+              {subjects.length === 0 ? (
+                <p className="text-sm text-muted-foreground italic">
+                  Nenhuma disciplina atribuída
+                </p>
+              ) : (
+                <div className="flex flex-wrap gap-2">
+                  {subjects.map((subject: any) => (
+                    <Badge key={subject.id} variant="outline">
+                      {subject.name}
+                    </Badge>
+                  ))}
+                </div>
+              )}
             </div>
 
             <Separator />
 
-            <div className="pt-2">
-              <div className="flex justify-between items-center mb-4">
-                <h4 className="font-semibold flex items-center gap-2">
-                  <Calendar className="h-4 w-4" /> Histórico de Alocações
-                </h4>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => setIsAllocationDialogOpen(true)}
-                >
-                  <Plus className="h-3 w-3 mr-1" /> Nova Alocação
-                </Button>
-              </div>
-
-              {allocations.length === 0 ? (
-                <p className="text-sm text-muted-foreground italic text-center py-4">
-                  Nenhuma alocação registrada.
+            {/* Turmas */}
+            <div className="space-y-3">
+              <h4 className="font-semibold flex items-center gap-2">
+                <Users className="h-4 w-4" /> Turmas ({classes.length})
+              </h4>
+              {classes.length === 0 ? (
+                <p className="text-sm text-muted-foreground italic">
+                  Nenhuma turma atribuída
                 </p>
               ) : (
                 <div className="grid gap-2">
-                  {allocations.map((alloc) => {
-                    const details = getAllocationDetails(alloc)
-                    return (
-                      <div
-                        key={alloc.id}
-                        className="p-3 border rounded-md bg-secondary/20 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2"
-                      >
-                        <div className="flex flex-col">
-                          <span className="font-medium">
-                            {details.className} - {details.subjectName}
-                          </span>
-                          <span className="text-xs text-muted-foreground">
-                            {details.schoolName}
-                          </span>
-                        </div>
-                        <Badge variant="outline">{details.yearName}</Badge>
+                  {classes.map((classItem: any) => (
+                    <div
+                      key={classItem.id}
+                      className="p-3 border rounded-md bg-secondary/20 flex justify-between items-center"
+                    >
+                      <div className="flex flex-col">
+                        <span className="font-medium">{classItem.name}</span>
+                        <span className="text-xs text-muted-foreground">
+                          {classItem.school?.name || 'Escola não informada'}
+                        </span>
                       </div>
-                    )
-                  })}
+                      <Badge variant="outline">
+                        {classItem.academic_year?.name || 'Ano não informado'}
+                      </Badge>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <Separator />
+
+            {/* Certificações */}
+            <div className="space-y-3">
+              <h4 className="font-semibold flex items-center gap-2">
+                <Award className="h-4 w-4" /> Certificações ({certifications.length})
+              </h4>
+              {certifications.length === 0 ? (
+                <p className="text-sm text-muted-foreground italic">
+                  Nenhuma certificação registrada
+                </p>
+              ) : (
+                <div className="grid gap-2">
+                  {certifications.map((cert: any) => (
+                    <div
+                      key={cert.id}
+                      className="p-3 border rounded-md bg-secondary/20"
+                    >
+                      <p className="font-medium">{cert.name}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {cert.institution} - {cert.year || 'Ano não informado'}
+                      </p>
+                    </div>
+                  ))}
                 </div>
               )}
             </div>
@@ -305,24 +364,18 @@ export default function TeacherDetails() {
         open={isEditDialogOpen}
         onOpenChange={setIsEditDialogOpen}
         onSubmit={handleUpdate}
-        initialData={teacher}
-      />
-
-      <TeacherAllocationDialog
-        open={isAllocationDialogOpen}
-        onOpenChange={setIsAllocationDialogOpen}
-        onSubmit={handleAddAllocation}
+        initialData={currentTeacher}
       />
 
       <AlertDialog
-        open={!!deleteId}
-        onOpenChange={(open) => !open && setDeleteId(null)}
+        open={deleteDialogOpen}
+        onOpenChange={setDeleteDialogOpen}
       >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Excluir Professor</AlertDialogTitle>
             <AlertDialogDescription>
-              Esta ação removerá o professor do quadro de funcionários.
+              Esta ação removerá o professor do quadro de funcionários. Esta ação não pode ser desfeita.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -330,7 +383,9 @@ export default function TeacherDetails() {
             <AlertDialogAction
               onClick={handleDelete}
               className="bg-destructive hover:bg-destructive/90"
+              disabled={loading}
             >
+              {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
               Excluir Definitivamente
             </AlertDialogAction>
           </AlertDialogFooter>

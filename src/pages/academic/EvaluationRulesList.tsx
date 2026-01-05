@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Plus, Pencil, Calculator, Check, AlertCircle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
@@ -17,16 +17,36 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { Badge } from '@/components/ui/badge'
-import useCourseStore from '@/stores/useCourseStore'
-import { EvaluationRule } from '@/lib/mock-data'
+import { Skeleton } from '@/components/ui/skeleton'
+import { useCourseStore } from '@/stores/useCourseStore.supabase'
+import { toast } from 'sonner'
 import { EvaluationRuleFormDialog } from './components/EvaluationRuleFormDialog'
 import { RequirePermission } from '@/components/RequirePermission'
 
+// Tipo temporário até implementar evaluation rules no BD
+interface EvaluationRule {
+  id: string
+  name: string
+  description?: string
+  type: 'numeric' | 'descriptive'
+  passingGrade?: number
+  formula?: string
+}
+
 export default function EvaluationRulesList() {
-  const { evaluationRules, addEvaluationRule, updateEvaluationRule } =
-    useCourseStore()
+  const { courses, loading, fetchCourses } = useCourseStore()
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [selectedRule, setSelectedRule] = useState<EvaluationRule | null>(null)
+  
+  // TODO: Evaluation rules precisam ser implementadas no BD
+  // Por enquanto, usando array local temporário
+  const [evaluationRules, setEvaluationRules] = useState<EvaluationRule[]>([])
+
+  useEffect(() => {
+    fetchCourses()
+    // TODO: Buscar evaluation rules do BD quando implementado
+    // Por enquanto, manter array vazio ou carregar de system_settings
+  }, [fetchCourses])
 
   const handleAdd = () => {
     setSelectedRule(null)
@@ -40,10 +60,22 @@ export default function EvaluationRulesList() {
 
   const handleSave = (data: Omit<EvaluationRule, 'id'>) => {
     if (selectedRule) {
-      updateEvaluationRule(selectedRule.id, data)
+      // TODO: Atualizar no BD quando implementado
+      setEvaluationRules(rules => 
+        rules.map(r => r.id === selectedRule.id ? { ...selectedRule, ...data } : r)
+      )
+      toast.success('Regra atualizada com sucesso.')
     } else {
-      addEvaluationRule(data)
+      // TODO: Criar no BD quando implementado
+      const newRule: EvaluationRule = {
+        id: `rule-${Date.now()}`,
+        ...data,
+      }
+      setEvaluationRules(rules => [...rules, newRule])
+      toast.success('Regra criada com sucesso.')
     }
+    setSelectedRule(null)
+    setIsDialogOpen(false)
   }
 
   return (
@@ -97,57 +129,80 @@ export default function EvaluationRulesList() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {evaluationRules.map((rule) => (
-                  <TableRow 
-                    key={rule.id}
-                    className="border-l-4 border-l-transparent hover:border-l-purple-500 hover:bg-gradient-to-r hover:from-purple-50/50 hover:to-transparent transition-all duration-200"
-                  >
-                    <TableCell className="font-medium">
-                      <div className="flex flex-col">
-                        <span>{rule.name}</span>
-                        <span className="text-xs text-muted-foreground truncate max-w-[200px]">
-                          {rule.description}
-                        </span>
+                {loading ? (
+                  // Loading skeletons
+                  Array.from({ length: 3 }).map((_, index) => (
+                    <TableRow key={`skeleton-${index}`}>
+                      <TableCell><Skeleton className="h-4 w-[200px]" /></TableCell>
+                      <TableCell><Skeleton className="h-4 w-[100px]" /></TableCell>
+                      <TableCell><Skeleton className="h-4 w-[80px]" /></TableCell>
+                      <TableCell><Skeleton className="h-4 w-[150px]" /></TableCell>
+                      <TableCell><Skeleton className="h-8 w-20 ml-auto" /></TableCell>
+                    </TableRow>
+                  ))
+                ) : evaluationRules.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={5} className="text-center py-10 text-muted-foreground">
+                      <div className="flex flex-col items-center gap-2">
+                        <AlertCircle className="h-8 w-8 opacity-50" />
+                        <p>Nenhuma regra de avaliação configurada.</p>
+                        <p className="text-sm">Esta funcionalidade será implementada em breve.</p>
                       </div>
                     </TableCell>
-                    <TableCell>
-                      <Badge variant="outline">
-                        {rule.type === 'numeric' ? 'Numérica' : 'Descritiva'}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      {rule.type === 'numeric' ? rule.passingGrade : '-'}
-                    </TableCell>
-                    <TableCell>
-                      {rule.formula ? (
-                        <div className="flex items-center gap-2 text-sm">
-                          <Calculator className="h-4 w-4 text-muted-foreground" />
-                          <code className="bg-muted px-1.5 py-0.5 rounded text-xs font-mono">
-                            {rule.formula}
-                          </code>
-                        </div>
-                      ) : (
-                        <span className="text-muted-foreground text-sm flex items-center gap-2">
-                          {rule.type === 'numeric' && (
-                            <Check className="h-3 w-3" />
-                          )}
-                          {rule.type === 'numeric' ? 'Média Aritmética' : 'N/A'}
-                        </span>
-                      )}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <RequirePermission permission="edit:course">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleEdit(rule)}
-                        >
-                          <Pencil className="h-4 w-4 mr-2" /> Editar
-                        </Button>
-                      </RequirePermission>
-                    </TableCell>
                   </TableRow>
-                ))}
+                ) : (
+                  evaluationRules.map((rule) => (
+                    <TableRow 
+                      key={`rule-${rule.id}`}
+                      className="border-l-4 border-l-transparent hover:border-l-purple-500 hover:bg-gradient-to-r hover:from-purple-50/50 hover:to-transparent transition-all duration-200"
+                    >
+                      <TableCell className="font-medium">
+                        <div className="flex flex-col">
+                          <span>{rule.name}</span>
+                          <span className="text-xs text-muted-foreground truncate max-w-[200px]">
+                            {rule.description}
+                          </span>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="outline">
+                          {rule.type === 'numeric' ? 'Numérica' : 'Descritiva'}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        {rule.type === 'numeric' ? rule.passingGrade : '-'}
+                      </TableCell>
+                      <TableCell>
+                        {rule.formula ? (
+                          <div className="flex items-center gap-2 text-sm">
+                            <Calculator className="h-4 w-4 text-muted-foreground" />
+                            <code className="bg-muted px-1.5 py-0.5 rounded text-xs font-mono">
+                              {rule.formula}
+                            </code>
+                          </div>
+                        ) : (
+                          <span className="text-muted-foreground text-sm flex items-center gap-2">
+                            {rule.type === 'numeric' && (
+                              <Check className="h-3 w-3" />
+                            )}
+                            {rule.type === 'numeric' ? 'Média Aritmética' : 'N/A'}
+                          </span>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <RequirePermission permission="edit:course">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleEdit(rule)}
+                          >
+                            <Pencil className="h-4 w-4 mr-2" /> Editar
+                          </Button>
+                        </RequirePermission>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
               </TableBody>
             </Table>
           </CardContent>

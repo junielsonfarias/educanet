@@ -17,7 +17,7 @@ import {
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { Calendar } from '@/components/ui/calendar'
-import useSchoolStore from '@/stores/useSchoolStore'
+import { useSchoolStore } from '@/stores/useSchoolStore.supabase'
 import { parseISO } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import { Badge } from '@/components/ui/badge'

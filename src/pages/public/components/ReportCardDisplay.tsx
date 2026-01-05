@@ -49,7 +49,7 @@ import {
 } from './types'
 import { PublicAssessmentHistory } from './PublicAssessmentHistory'
 import { PrintableReportCard } from './PrintableReportCard'
-import useSettingsStore from '@/stores/useSettingsStore'
+import { useSettingsStore } from '@/stores/useSettingsStore.supabase'
 import {
   safeArray,
   safeMap,

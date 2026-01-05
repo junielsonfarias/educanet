@@ -16,8 +16,8 @@ import {
 } from '@/components/ui/select'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
-import useSchoolStore from '@/stores/useSchoolStore'
-import useCourseStore from '@/stores/useCourseStore'
+import { useSchoolStore } from '@/stores/useSchoolStore.supabase'
+import { useCourseStore } from '@/stores/useCourseStore.supabase'
 
 interface TeacherAllocationDialogProps {
   open: boolean

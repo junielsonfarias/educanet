@@ -45,13 +45,15 @@ import {
   CardTitle,
 } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import useStudentStore from '@/stores/useStudentStore'
+import { useStudentStore } from '@/stores/useStudentStore.supabase'
 import useUserStore from '@/stores/useUserStore'
 import { useNavigate } from 'react-router-dom'
 import { StudentFormDialog } from './components/StudentFormDialog'
-import { Student } from '@/lib/mock-data'
+import { Student, Enrollment } from '@/lib/mock-data'
 import { useToast } from '@/hooks/use-toast'
 import { RequirePermission } from '@/components/RequirePermission'
+import { Skeleton } from '@/components/ui/skeleton'
+import { useEffect } from 'react'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -64,8 +66,16 @@ import {
 } from '@/components/ui/alert-dialog'
 
 export default function StudentsList() {
-  const { students, addStudent, updateStudent, deleteStudent } =
+  const { students: contextStudents, addStudent, updateStudent, deleteStudent } =
     useStudentStore()
+  
+  // Supabase store
+  const { 
+    students: supabaseStudents, 
+    fetchStudents, 
+    loading: loadingSupabase 
+  } = useSupabaseStudentStore()
+  
   const { currentUser } = useUserStore()
   const [searchTerm, setSearchTerm] = useState('')
   const [gradeFilter, setGradeFilter] = useState('all')
@@ -85,6 +95,15 @@ export default function StudentsList() {
 
   const navigate = useNavigate()
   const { toast } = useToast()
+  
+  // Buscar dados do Supabase na montagem do componente
+  useEffect(() => {
+    fetchStudents()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+  
+  // Usar dados do Supabase se disponíveis, senão fallback para context
+  const students = supabaseStudents.length > 0 ? supabaseStudents : contextStudents
 
   // Permissões serão verificadas via RequirePermission
 
@@ -168,7 +187,10 @@ export default function StudentsList() {
     }))
   }
 
-  const handleCreate = (data: any, initialEnrollment: any) => {
+  const handleCreate = (
+    data: Omit<Student, 'id' | 'enrollments' | 'projectIds'>,
+    initialEnrollment: Omit<Enrollment, 'id' | 'status' | 'type'>
+  ) => {
     addStudent(data, initialEnrollment)
     toast({
       title: 'Aluno matriculado',
@@ -176,7 +198,7 @@ export default function StudentsList() {
     })
   }
 
-  const handleUpdate = (data: any) => {
+  const handleUpdate = (data: Partial<Student>) => {
     if (editingStudent) {
       updateStudent(editingStudent.id, data)
       toast({

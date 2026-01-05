@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { Plus, Search, MoreHorizontal, Mail, Phone, Filter } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { Plus, Search, MoreHorizontal, Mail, Phone, Filter, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
@@ -26,10 +26,11 @@ import {
   CardTitle,
 } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import useTeacherStore from '@/stores/useTeacherStore'
+import { Skeleton } from '@/components/ui/skeleton'
+import { useTeacherStore } from '@/stores/useTeacherStore.supabase'
 import { useNavigate } from 'react-router-dom'
 import { TeacherFormDialog } from './components/TeacherFormDialog'
-import { Teacher } from '@/lib/mock-data'
+import type { TeacherFullInfo } from '@/lib/database-types'
 import { useToast } from '@/hooks/use-toast'
 import { usePermissions } from '@/hooks/usePermissions'
 import { RequirePermission } from '@/components/RequirePermission'
@@ -45,145 +46,99 @@ import {
 } from '@/components/ui/alert-dialog'
 
 export default function TeachersList() {
-  const { teachers, addTeacher, updateTeacher, deleteTeacher } =
-    useTeacherStore()
+  const { 
+    teachers, 
+    loading, 
+    fetchTeachers, 
+    createTeacher, 
+    updateTeacher, 
+    deleteTeacher 
+  } = useTeacherStore()
   const [searchTerm, setSearchTerm] = useState('')
   const [isDialogOpen, setIsDialogOpen] = useState(false)
-  const [editingTeacher, setEditingTeacher] = useState<Teacher | null>(null)
-  const [deleteId, setDeleteId] = useState<string | null>(null)
+  const [editingTeacher, setEditingTeacher] = useState<TeacherFullInfo | null>(null)
+  const [deleteId, setDeleteId] = useState<number | null>(null)
 
   const navigate = useNavigate()
   const { toast } = useToast()
+
+  // Carregar professores ao montar
+  useEffect(() => {
+    fetchTeachers()
+  }, [fetchTeachers])
 
   // Safely ensure teachers is an array
   const safeTeachers = Array.isArray(teachers) ? teachers : []
 
   const filteredTeachers = safeTeachers.filter((teacher) => {
-    if (!teacher) return false
-    const name = teacher.name || ''
-    const subject = teacher.subject || ''
+    if (!teacher || !teacher.person) return false
+    const fullName = `${teacher.person.first_name || ''} ${teacher.person.last_name || ''}`.trim()
     const term = searchTerm || ''
     return (
-      name.toLowerCase().includes(term.toLowerCase()) ||
-      subject.toLowerCase().includes(term.toLowerCase())
+      fullName.toLowerCase().includes(term.toLowerCase()) ||
+      (teacher.person.email || '').toLowerCase().includes(term.toLowerCase())
     )
   })
 
-  const handleCreate = (data: any) => {
-    // Preparar dados com estrutura completa do Censo Escolar
-    const teacherData = {
-      ...data,
-      education: {
-        graduation: data.graduationCourse
-          ? {
-              course: data.graduationCourse,
-              institution: data.graduationInstitution || '',
-              year: data.graduationYear || new Date().getFullYear(),
-              area: data.graduationArea || '',
-            }
-          : undefined,
-        specialization: data.specializationCourse
-          ? {
-              course: data.specializationCourse,
-              institution: data.specializationInstitution || '',
-              year: data.specializationYear || new Date().getFullYear(),
-            }
-          : undefined,
-        master: data.masterCourse
-          ? {
-              course: data.masterCourse,
-              institution: data.masterInstitution || '',
-              year: data.masterYear || new Date().getFullYear(),
-            }
-          : undefined,
-        doctorate: data.doctorateCourse
-          ? {
-              course: data.doctorateCourse,
-              institution: data.doctorateInstitution || '',
-              year: data.doctorateYear || new Date().getFullYear(),
-            }
-          : undefined,
-      },
-      enabledSubjects: data.enabledSubjects || [],
-      functionalSituation: data.functionalSituation || 'efetivo',
-      contractType: data.contractType || 'estatutario',
-      experienceYears: data.experienceYears || 0,
-      workload: {
-        total: data.totalWorkload || 0,
-        bySubject: {},
-      },
-    }
-
-    addTeacher(teacherData)
-    toast({
-      title: 'Professor cadastrado',
-      description: `${data.name} adicionado com sucesso.`,
-    })
-  }
-
-  const handleUpdate = (data: any) => {
-    if (editingTeacher) {
-      // Preparar dados com estrutura completa do Censo Escolar
-      const teacherData = {
-        ...data,
-        education: {
-          graduation: data.graduationCourse
-            ? {
-                course: data.graduationCourse,
-                institution: data.graduationInstitution || '',
-                year: data.graduationYear || new Date().getFullYear(),
-                area: data.graduationArea || '',
-              }
-            : undefined,
-          specialization: data.specializationCourse
-            ? {
-                course: data.specializationCourse,
-                institution: data.specializationInstitution || '',
-                year: data.specializationYear || new Date().getFullYear(),
-              }
-            : undefined,
-          master: data.masterCourse
-            ? {
-                course: data.masterCourse,
-                institution: data.masterInstitution || '',
-                year: data.masterYear || new Date().getFullYear(),
-              }
-            : undefined,
-          doctorate: data.doctorateCourse
-            ? {
-                course: data.doctorateCourse,
-                institution: data.doctorateInstitution || '',
-                year: data.doctorateYear || new Date().getFullYear(),
-              }
-            : undefined,
-        },
-        enabledSubjects: data.enabledSubjects || [],
-        functionalSituation: data.functionalSituation || 'efetivo',
-        contractType: data.contractType || 'estatutario',
-        experienceYears: data.experienceYears || 0,
-        workload: {
-          total: data.totalWorkload || 0,
-          bySubject: editingTeacher.workload?.bySubject || {},
-        },
+  const handleCreate = async (data: any) => {
+    try {
+      // Separar dados de person e teacher
+      const personData = {
+        first_name: data.firstName || data.name?.split(' ')[0] || '',
+        last_name: data.lastName || data.name?.split(' ').slice(1).join(' ') || '',
+        email: data.email || '',
+        phone: data.phone || '',
+        date_of_birth: data.dateOfBirth || new Date().toISOString().split('T')[0],
+        cpf: data.cpf || '',
+        type: 'Professor' as const,
       }
 
-      updateTeacher(editingTeacher.id, teacherData)
-      toast({
-        title: 'Dados atualizados',
-        description: 'Informações do professor atualizadas.',
-      })
-      setEditingTeacher(null)
+      const teacherData = {
+        school_id: data.schoolId || null,
+        employment_status: data.employmentStatus || 'active',
+        hire_date: data.hireDate || new Date().toISOString().split('T')[0],
+      }
+
+      await createTeacher(personData, teacherData)
+      setIsDialogOpen(false)
+    } catch (error) {
+      // Erro já tratado pelo store
     }
   }
 
-  const handleDelete = () => {
+  const handleUpdate = async (data: any) => {
+    if (editingTeacher) {
+      try {
+        // Separar dados de person e teacher
+        const personData = {
+          first_name: data.firstName || editingTeacher.person.first_name,
+          last_name: data.lastName || editingTeacher.person.last_name,
+          email: data.email || editingTeacher.person.email,
+          phone: data.phone || editingTeacher.person.phone,
+        }
+
+        const teacherData = {
+          school_id: data.schoolId || editingTeacher.school_id,
+          employment_status: data.employmentStatus || editingTeacher.employment_status,
+        }
+
+        await updateTeacher(editingTeacher.id, personData, teacherData)
+        setIsDialogOpen(false)
+        setEditingTeacher(null)
+      } catch (error) {
+        // Erro já tratado pelo store
+      }
+    }
+  }
+
+  const handleDelete = async () => {
     if (deleteId) {
-      deleteTeacher(deleteId)
-      toast({
-        title: 'Professor removido',
-        description: 'Registro do professor excluído.',
-      })
-      setDeleteId(null)
+      try {
+        await deleteTeacher(deleteId)
+        setDeleteId(null)
+      } catch (error) {
+        // Erro já tratado pelo store
+      }
     }
   }
 
@@ -192,7 +147,7 @@ export default function TeachersList() {
     setIsDialogOpen(true)
   }
 
-  const openEditDialog = (teacher: Teacher) => {
+  const openEditDialog = (teacher: TeacherFullInfo) => {
     setEditingTeacher(teacher)
     setIsDialogOpen(true)
   }
@@ -259,15 +214,30 @@ export default function TeachersList() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredTeachers.length === 0 ? (
+                {loading ? (
+                  Array.from({ length: 5 }).map((_, i) => (
+                    <TableRow key={i}>
+                      <TableCell><Skeleton className="h-9 w-9 rounded-full" /></TableCell>
+                      <TableCell><Skeleton className="h-4 w-32" /></TableCell>
+                      <TableCell><Skeleton className="h-4 w-24" /></TableCell>
+                      <TableCell className="hidden md:table-cell"><Skeleton className="h-4 w-40" /></TableCell>
+                      <TableCell><Skeleton className="h-6 w-16" /></TableCell>
+                      <TableCell className="text-right"><Skeleton className="h-8 w-8" /></TableCell>
+                    </TableRow>
+                  ))
+                ) : filteredTeachers.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={6} className="h-24 text-center">
-                      Nenhum professor encontrado.
+                      {searchTerm ? 'Nenhum professor encontrado com os filtros aplicados.' : 'Nenhum professor cadastrado.'}
                     </TableCell>
                   </TableRow>
                 ) : (
                   filteredTeachers.map((teacher) => {
-                    if (!teacher) return null
+                    if (!teacher || !teacher.person) return null
+                    const fullName = `${teacher.person.first_name || ''} ${teacher.person.last_name || ''}`.trim()
+                    const initials = `${teacher.person.first_name?.[0] || ''}${teacher.person.last_name?.[0] || ''}`.toUpperCase()
+                    const isActive = teacher.employment_status === 'active'
+                    
                     return (
                       <TableRow
                         key={teacher.id}
@@ -282,51 +252,49 @@ export default function TeachersList() {
                               src={`https://img.usecurling.com/ppl/thumbnail?gender=male&seed=${teacher.id}`}
                             />
                             <AvatarFallback>
-                              {(teacher.name || '')
-                                .substring(0, 2)
-                                .toUpperCase()}
+                              {initials}
                             </AvatarFallback>
                           </Avatar>
                         </TableCell>
                         <TableCell className="font-medium">
                           <div className="flex flex-col">
-                            <span>{teacher.name}</span>
+                            <span>{fullName}</span>
                             <span className="text-xs text-muted-foreground md:hidden">
-                              {teacher.email}
+                              {teacher.person.email}
                             </span>
                           </div>
                         </TableCell>
                         <TableCell>
                           <Badge variant="outline" className="font-normal">
-                            {teacher.subject}
+                            {teacher.school?.name || 'Sem escola'}
                           </Badge>
                         </TableCell>
                         <TableCell className="hidden md:table-cell">
                           <div className="flex flex-col text-sm">
                             <div className="flex items-center gap-1">
                               <Mail className="h-3 w-3 text-muted-foreground" />
-                              {teacher.email}
+                              {teacher.person.email || 'Sem email'}
                             </div>
                             <div className="flex items-center gap-1 mt-0.5">
                               <Phone className="h-3 w-3 text-muted-foreground" />
-                              {teacher.phone}
+                              {teacher.person.phone || 'Sem telefone'}
                             </div>
                           </div>
                         </TableCell>
                         <TableCell>
                           <Badge
                             className={`flex items-center gap-1.5 px-2.5 py-1 font-medium ${
-                              teacher.status === 'active'
+                              isActive
                                 ? 'bg-gradient-to-r from-green-500 to-emerald-600 text-white shadow-md'
                                 : 'bg-gradient-to-r from-gray-400 to-gray-500 text-white'
                             }`}
                           >
                             <div
                               className={`h-2 w-2 rounded-full ${
-                                teacher.status === 'active' ? 'bg-white' : 'bg-white/80'
+                                isActive ? 'bg-white' : 'bg-white/80'
                               }`}
                             />
-                            {teacher.status === 'active' ? 'Ativo' : 'Inativo'}
+                            {isActive ? 'Ativo' : 'Inativo'}
                           </Badge>
                         </TableCell>
                         <TableCell className="text-right">

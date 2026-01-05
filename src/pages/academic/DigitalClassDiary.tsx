@@ -52,13 +52,18 @@ import {
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { useToast } from '@/hooks/use-toast'
-import useSchoolStore from '@/stores/useSchoolStore'
-import useStudentStore from '@/stores/useStudentStore'
-import useAttendanceStore from '@/stores/useAttendanceStore'
+import { toast as sonnerToast } from 'sonner'
+import { useSchoolStore } from '@/stores/useSchoolStore.supabase'
+import { useStudentStore } from '@/stores/useStudentStore.supabase'
+import { useAttendanceStore } from '@/stores/useAttendanceStore.supabase'
 import useOccurrenceStore from '@/stores/useOccurrenceStore'
-import useCourseStore from '@/stores/useCourseStore'
-import { getStudentsByClassroom } from '@/lib/enrollment-utils'
+import { useCourseStore } from '@/stores/useCourseStore.supabase'
+import { 
+  classService, 
+  enrollmentService, 
+  lessonService 
+} from '@/lib/supabase/services'
+import { useAuth } from '@/hooks/useAuth'
 
 const formSchema = z.object({
   schoolId: z.string().min(1, 'Escola é obrigatória'),
@@ -68,12 +73,21 @@ const formSchema = z.object({
 })
 
 export default function DigitalClassDiary() {
-  const { schools } = useSchoolStore()
-  const { students } = useStudentStore()
-  const { addAttendance, getClassAttendance } = useAttendanceStore()
+  const { schools, fetchSchools } = useSchoolStore()
+  const { students, fetchStudents } = useStudentStore()
+  const { 
+    attendances, 
+    loading: attendanceLoading,
+    fetchClassAttendance,
+    recordAttendanceBatch 
+  } = useAttendanceStore()
   const { addOccurrence, getClassOccurrences } = useOccurrenceStore()
-  const { etapasEnsino } = useCourseStore()
-  const { toast } = useToast()
+  const { courses, subjects, fetchCourses, fetchSubjects } = useCourseStore()
+  const { userData } = useAuth()
+  
+  const [classes, setClasses] = useState<any[]>([])
+  const [classesLoading, setClassesLoading] = useState(false)
+  const [enrollments, setEnrollments] = useState<any[]>([])
 
   const [selectedStudents, setSelectedStudents] = useState<string[]>([]) // IDs of PRESENT students
   const [justifications, setJustifications] = useState<Record<string, string>>(
@@ -98,32 +112,75 @@ export default function DigitalClassDiary() {
   const date = form.watch('date')
   const subjectId = form.watch('subjectId')
 
-  // Derived Data
-  const selectedSchool = schools.find((s) => s.id === schoolId)
-  // Find year that is active
-  const activeYear = selectedSchool?.academicYears.find(
-    (y) => y.status === 'active',
-  )
-  const turmas = activeYear?.turmas || activeYear?.classes || []
-  const selectedClass = turmas.find((c) => c.id === classId)
+  // Carregar dados iniciais
+  useEffect(() => {
+    fetchSchools()
+    fetchStudents()
+    fetchCourses()
+    fetchSubjects()
+  }, [fetchSchools, fetchStudents, fetchCourses, fetchSubjects])
 
-  // Find subjects for class
-  const classSerieAno = etapasEnsino
-    .flatMap((e) => e.seriesAnos)
-    .find((s) => s.id === (selectedClass?.serieAnoId || selectedClass?.gradeId))
-  const subjects = classSerieAno?.subjects || []
+  // Buscar turmas quando escola é selecionada
+  useEffect(() => {
+    const fetchClasses = async () => {
+      if (schoolId) {
+        setClassesLoading(true)
+        try {
+          const classesData = await classService.getBySchool(parseInt(schoolId))
+          setClasses(classesData || [])
+        } catch {
+          sonnerToast.error('Erro ao carregar turmas')
+          setClasses([])
+        } finally {
+          setClassesLoading(false)
+        }
+      } else {
+        setClasses([])
+      }
+    }
+    fetchClasses()
+  }, [schoolId])
 
+  // Buscar matrículas quando turma é selecionada
+  useEffect(() => {
+    const fetchEnrollments = async () => {
+      if (classId) {
+        try {
+          const enrollmentsData = await enrollmentService.getEnrollmentsByClass(parseInt(classId))
+          setEnrollments(enrollmentsData || [])
+        } catch {
+          setEnrollments([])
+        }
+      } else {
+        setEnrollments([])
+      }
+    }
+    fetchEnrollments()
+  }, [classId])
+
+  // Filtrar disciplinas por curso da turma
+  const selectedClass = classes.find((c) => c.id.toString() === classId)
+  const filteredSubjects = useMemo(() => {
+    if (!selectedClass?.course_id) return subjects || []
+    return (subjects || []).filter((s) => s.course_id === selectedClass.course_id)
+  }, [subjects, selectedClass])
+
+  // Alunos da turma
   const classStudents = useMemo(() => {
-    if (!selectedClass || !selectedSchool || !activeYear) return []
-    return getStudentsByClassroom(
-      students,
-      selectedClass.id,
-      selectedClass.name,
-      selectedSchool.id,
-      activeYear.id,
-      activeYear.name,
-    ).sort((a, b) => a.name.localeCompare(b.name))
-  }, [students, selectedClass, selectedSchool, activeYear])
+    if (!enrollments.length) return []
+    return enrollments
+      .map((enrollment) => {
+        const student = students.find((s) => s.id === enrollment.student_id)
+        if (!student) return null
+        return {
+          id: student.id.toString(),
+          name: `${student.person?.first_name || ''} ${student.person?.last_name || ''}`.trim(),
+          studentProfileId: student.id,
+        }
+      })
+      .filter(Boolean)
+      .sort((a: any, b: any) => a.name.localeCompare(b.name))
+  }, [enrollments, students])
 
   const classOccurrences = useMemo(() => {
     if (!classId) return []
@@ -139,41 +196,66 @@ export default function DigitalClassDiary() {
 
   // Load attendance data when context changes
   useEffect(() => {
-    if (!classId || !date) return
-
-    const dateStr = format(date, 'yyyy-MM-dd')
-    const existingRecords = getClassAttendance(
-      classId,
-      subjectId || 'general',
-      dateStr,
-    )
-
-    if (existingRecords && existingRecords.length > 0) {
-      // Load existing state
-      const presentIds = existingRecords
-        .filter((r) => r.present)
-        .map((r) => r.studentId)
-      const justificationMap: Record<string, string> = {}
-      existingRecords.forEach((r) => {
-        if (!r.present && r.justification) {
-          justificationMap[r.studentId] = r.justification
-        }
-      })
-
-      setSelectedStudents(presentIds)
-      setJustifications(justificationMap)
-      toast({
-        title: 'Dados Carregados',
-        description: `Frequência de ${dateStr} carregada.`,
-      })
-    } else {
-      // Default: All present if loaded fresh
-      if (classStudents.length > 0) {
-        setSelectedStudents(classStudents.map((s) => s.id))
+    const loadAttendance = async () => {
+      if (!classId || !date) {
+        setSelectedStudents([])
         setJustifications({})
+        return
+      }
+
+      const dateStr = format(date, 'yyyy-MM-dd')
+      
+      try {
+        // Buscar aulas da turma na data
+        const lessons = await lessonService.getByClass(parseInt(classId))
+        const lessonForDate = lessons.find((l) => {
+          const lessonDate = l.lesson_date ? new Date(l.lesson_date).toISOString().split('T')[0] : null
+          return lessonDate === dateStr && 
+                 (!subjectId || l.class_teacher_subject?.subject_id?.toString() === subjectId)
+        })
+
+        if (lessonForDate) {
+          // Buscar frequências da aula
+          await fetchClassAttendance(parseInt(classId), { 
+            date: dateStr,
+            subjectId: subjectId ? parseInt(subjectId) : undefined
+          })
+
+          // Mapear frequências para estado
+          const presentIds: string[] = []
+          const justificationMap: Record<string, string> = {}
+          
+          attendances.forEach((attendance) => {
+            const studentId = attendance.student_profile_id?.toString()
+            if (!studentId) return
+            
+            if (attendance.status === 'Presente') {
+              presentIds.push(studentId)
+            } else if (attendance.notes) {
+              justificationMap[studentId] = attendance.notes
+            }
+          })
+
+          setSelectedStudents(presentIds)
+          setJustifications(justificationMap)
+        } else {
+          // Default: All present if no lesson exists
+          if (classStudents.length > 0) {
+            setSelectedStudents(classStudents.map((s) => s.id))
+            setJustifications({})
+          }
+        }
+      } catch {
+        // Default: All present on error
+        if (classStudents.length > 0) {
+          setSelectedStudents(classStudents.map((s) => s.id))
+          setJustifications({})
+        }
       }
     }
-  }, [classId, date, subjectId, getClassAttendance, classStudents, toast])
+
+    loadAttendance()
+  }, [classId, date, subjectId, classStudents, fetchClassAttendance, attendances])
 
   const togglePresence = (studentId: string) => {
     if (selectedStudents.includes(studentId)) {
@@ -191,34 +273,78 @@ export default function DigitalClassDiary() {
     setJustifications((prev) => ({ ...prev, [id]: val }))
   }
 
-  const handleSaveAttendance = (data: z.infer<typeof formSchema>) => {
-    if (!activeYear) return
+  const handleSaveAttendance = async (data: z.infer<typeof formSchema>) => {
+    if (!classId || !date) {
+      sonnerToast.error('Selecione turma e data')
+      return
+    }
 
     const dateStr = format(data.date, 'yyyy-MM-dd')
 
-    // In a real app, we should probably update existing records instead of just adding
-    // but the store `addAttendance` currently just appends.
-    // For this mock implementation, we'll append, but the `useEffect` above reads the matching records.
-    // Ideally the store should handle upsert.
-
-    classStudents.forEach((student) => {
-      const isPresent = selectedStudents.includes(student.id)
-      addAttendance({
-        studentId: student.id,
-        schoolId: data.schoolId,
-        yearId: activeYear.id,
-        classroomId: data.classId,
-        subjectId: data.subjectId || 'general',
-        date: dateStr, // Use date string YYYY-MM-DD
-        present: isPresent,
-        justification: !isPresent ? justifications[student.id] : undefined,
+    try {
+      // Buscar ou criar aula para esta turma/disciplina/data
+      let lessonId: number | null = null
+      
+      // Buscar aulas existentes
+      const lessons = await lessonService.getByClass(parseInt(classId))
+      const existingLesson = lessons.find((l) => {
+        const lessonDate = l.lesson_date ? new Date(l.lesson_date).toISOString().split('T')[0] : null
+        return lessonDate === dateStr && 
+               (!subjectId || l.class_teacher_subject?.subject_id?.toString() === subjectId)
       })
-    })
 
-    toast({
-      title: 'Frequência Registrada',
-      description: `Presença salva para ${dateStr}`,
-    })
+      if (existingLesson) {
+        lessonId = existingLesson.id
+      } else {
+        // Criar nova aula
+        // TODO: Buscar class_teacher_subject_id baseado em classId e subjectId
+        // Por enquanto, criar aula básica
+        const newLesson = await lessonService.create({
+          class_id: parseInt(classId),
+          subject_id: subjectId ? parseInt(subjectId) : null,
+          lesson_date: dateStr,
+          start_time: '08:00:00',
+          end_time: '09:00:00',
+          class_teacher_subject_id: null, // TODO: Implementar busca de class_teacher_subject
+        })
+        lessonId = newLesson?.id || null
+      }
+
+      if (!lessonId) {
+        sonnerToast.error('Não foi possível criar ou encontrar a aula')
+        return
+      }
+
+      // Preparar registros de frequência
+      const attendanceRecords = classStudents.map((student) => {
+        const isPresent = selectedStudents.includes(student.id)
+        const justification = !isPresent ? justifications[student.id] : undefined
+        
+        return {
+          lesson_id: lessonId!,
+          student_profile_id: student.studentProfileId,
+          attendance_status: isPresent 
+            ? 'Presente' as const
+            : justification 
+              ? 'Justificado' as const
+              : 'Ausente' as const,
+          notes: justification,
+        }
+      })
+
+      // Registrar frequências em lote
+      await recordAttendanceBatch(attendanceRecords)
+
+      sonnerToast.success(`Frequência registrada para ${dateStr}`)
+      
+      // Recarregar frequências
+      await fetchClassAttendance(parseInt(classId), { 
+        date: dateStr,
+        subjectId: subjectId ? parseInt(subjectId) : undefined
+      })
+    } catch (error: any) {
+      sonnerToast.error(error?.message || 'Erro ao salvar frequência')
+    }
   }
 
   const handleSaveOccurrence = () => {
@@ -282,8 +408,8 @@ export default function DigitalClassDiary() {
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        {schools.map((s) => (
-                          <SelectItem key={s.id} value={s.id}>
+                        {(schools || []).map((s) => (
+                          <SelectItem key={s.id} value={s.id.toString()}>
                             {s.name}
                           </SelectItem>
                         ))}
@@ -309,11 +435,17 @@ export default function DigitalClassDiary() {
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        {turmas.map((c) => (
-                          <SelectItem key={c.id} value={c.id}>
-                            {c.name}
-                          </SelectItem>
-                        ))}
+                        {classesLoading ? (
+                          <div className="flex justify-center p-2">
+                            <Clock className="h-4 w-4 animate-spin" />
+                          </div>
+                        ) : (
+                          classes.map((c) => (
+                            <SelectItem key={c.id} value={c.id.toString()}>
+                              {c.name}
+                            </SelectItem>
+                          ))
+                        )}
                       </SelectContent>
                     </Select>
                   </FormItem>
@@ -336,8 +468,8 @@ export default function DigitalClassDiary() {
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        {subjects.map((s) => (
-                          <SelectItem key={s.id} value={s.id}>
+                        {filteredSubjects.map((s) => (
+                          <SelectItem key={s.id} value={s.id.toString()}>
                             {s.name}
                           </SelectItem>
                         ))}

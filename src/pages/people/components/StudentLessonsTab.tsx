@@ -17,8 +17,8 @@ import { Badge } from '@/components/ui/badge'
 import { CheckCircle2, Circle } from 'lucide-react'
 import { Student } from '@/lib/mock-data'
 import useLessonPlanStore from '@/stores/useLessonPlanStore'
-import useSchoolStore from '@/stores/useSchoolStore'
-import useCourseStore from '@/stores/useCourseStore'
+import { useSchoolStore } from '@/stores/useSchoolStore.supabase'
+import { useCourseStore } from '@/stores/useCourseStore.supabase'
 import { format, parseISO } from 'date-fns'
 
 interface StudentLessonsTabProps {

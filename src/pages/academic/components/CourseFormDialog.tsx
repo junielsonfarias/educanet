@@ -47,6 +47,7 @@ const courseSchema = z.object({
         message: validateEtapaEnsinoCode(val).error || 'Código do Censo Escolar inválido',
       }),
     ),
+  duration_months: z.coerce.number().min(1, 'Duração mínima é 1 mês').optional(),
 })
 
 interface CourseFormDialogProps {
@@ -67,6 +68,7 @@ export function CourseFormDialog({
     defaultValues: {
       name: '',
       codigoCenso: '',
+      duration_months: undefined,
     },
   })
 
@@ -76,11 +78,13 @@ export function CourseFormDialog({
         form.reset({
           name: initialData.name,
           codigoCenso: initialData.codigoCenso || '',
+          duration_months: initialData.duration_months || undefined,
         })
       } else {
         form.reset({
           name: '',
           codigoCenso: '',
+          duration_months: undefined,
         })
       }
     }
@@ -158,6 +162,28 @@ export function CourseFormDialog({
                   </FormControl>
                   <FormDescription>
                     Nome descritivo da etapa de ensino
+                  </FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="duration_months"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Duração (meses)</FormLabel>
+                  <FormControl>
+                    <Input
+                      type="number"
+                      placeholder="Ex: 12"
+                      {...field}
+                      value={field.value || ''}
+                      onChange={(e) => field.onChange(parseInt(e.target.value) || undefined)}
+                    />
+                  </FormControl>
+                  <FormDescription>
+                    Duração prevista em meses para conclusão da etapa (opcional)
                   </FormDescription>
                   <FormMessage />
                 </FormItem>

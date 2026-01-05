@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { FileText, Plus, Search, Filter, Eye, Edit, CheckCircle, XCircle, Clock } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -25,85 +25,132 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { Badge } from '@/components/ui/badge'
-import { useToast } from '@/hooks/use-toast'
-import useProtocolStore from '@/stores/useProtocolStore'
-import useStudentStore from '@/stores/useStudentStore'
-import useSchoolStore from '@/stores/useSchoolStore'
-import { Protocol, ProtocolStatus, ProtocolType } from '@/lib/mock-data'
+import { Skeleton } from '@/components/ui/skeleton'
+import { toast } from 'sonner'
+import { protocolService } from '@/lib/supabase/services'
+import { useStudentStore } from '@/stores/useStudentStore.supabase'
+import { useSchoolStore } from '@/stores/useSchoolStore.supabase'
 import { ProtocolFormDialog } from './components/ProtocolFormDialog'
 import { ProtocolDetailsDialog } from './components/ProtocolDetailsDialog'
 import { RequirePermission } from '@/components/RequirePermission'
+import type { Database } from '@/lib/supabase/database.types'
+
+type ProtocolRow = Database['public']['Tables']['secretariat_protocols']['Row']
+type ProtocolWithDetails = ProtocolRow & {
+  requester?: {
+    id: number
+    first_name: string
+    last_name: string
+    email?: string | null
+    phone?: string | null
+  }
+  assigned_to_person?: {
+    id: number
+    first_name: string
+    last_name: string
+  } | null
+}
+
+type ProtocolStatus = 'Aberto' | 'Em_Analise' | 'Resolvido' | 'Cancelado'
+type ProtocolType = 'matricula' | 'transferencia' | 'declaracao' | 'recurso' | 'outros'
 
 export default function ProtocolsManager() {
-  const {
-    protocols,
-    addProtocol,
-    updateProtocol,
-    deleteProtocol,
-  } = useProtocolStore()
-  const { students } = useStudentStore()
-  const { schools } = useSchoolStore()
-  const { toast } = useToast()
-
+  const { students, fetchStudents } = useStudentStore()
+  const { schools, fetchSchools } = useSchoolStore()
+  
+  const [protocols, setProtocols] = useState<ProtocolWithDetails[]>([])
+  const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
   const [typeFilter, setTypeFilter] = useState<ProtocolType | 'all'>('all')
   const [statusFilter, setStatusFilter] = useState<ProtocolStatus | 'all'>('all')
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [isDetailsDialogOpen, setIsDetailsDialogOpen] = useState(false)
-  const [selectedProtocol, setSelectedProtocol] = useState<Protocol | null>(null)
-  const [editingProtocol, setEditingProtocol] = useState<Protocol | null>(null)
+  const [selectedProtocol, setSelectedProtocol] = useState<ProtocolWithDetails | null>(null)
+  const [editingProtocol, setEditingProtocol] = useState<ProtocolWithDetails | null>(null)
+
+  // Fetch data on mount
+  useEffect(() => {
+    fetchProtocols()
+    fetchStudents()
+    fetchSchools()
+  }, [fetchStudents, fetchSchools])
+
+  const fetchProtocols = async () => {
+    setLoading(true)
+    try {
+      const data = await protocolService.getAll()
+      // Buscar informações completas para cada protocolo
+      const protocolsWithDetails = await Promise.all(
+        (data || []).map(async (protocol: any) => {
+          const fullInfo = await protocolService.getProtocolFullInfo(protocol.id)
+          return fullInfo || protocol
+        })
+      )
+      setProtocols(protocolsWithDetails.filter(Boolean))
+    } catch (error) {
+      console.error('Erro ao buscar protocolos:', error)
+      toast.error('Erro ao carregar protocolos')
+    } finally {
+      setLoading(false)
+    }
+  }
 
   // Filtrar protocolos
-  const filteredProtocols = protocols.filter((protocol) => {
-    const matchesSearch =
-      searchTerm === '' ||
-      protocol.number.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      protocol.requester.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      protocol.description.toLowerCase().includes(searchTerm.toLowerCase())
+  const filteredProtocols = useMemo(() => {
+    if (!Array.isArray(protocols)) return []
+    
+    return protocols.filter((protocol) => {
+      const requesterName = protocol.requester
+        ? `${protocol.requester.first_name} ${protocol.requester.last_name}`
+        : ''
+      
+      const matchesSearch =
+        searchTerm === '' ||
+        protocol.protocol_number?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        requesterName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        protocol.description?.toLowerCase().includes(searchTerm.toLowerCase())
 
-    const matchesType = typeFilter === 'all' || protocol.type === typeFilter
-    const matchesStatus = statusFilter === 'all' || protocol.status === statusFilter
+      const matchesType = typeFilter === 'all' || protocol.request_type === typeFilter
+      const matchesStatus = statusFilter === 'all' || protocol.status === statusFilter
 
-    return matchesSearch && matchesType && matchesStatus
-  })
+      return matchesSearch && matchesType && matchesStatus
+    })
+  }, [protocols, searchTerm, typeFilter, statusFilter])
 
   const handleCreateProtocol = () => {
     setEditingProtocol(null)
     setIsDialogOpen(true)
   }
 
-  const handleViewProtocol = (protocol: Protocol) => {
+  const handleViewProtocol = (protocol: ProtocolWithDetails) => {
     setSelectedProtocol(protocol)
     setIsDetailsDialogOpen(true)
   }
 
-  const handleEditProtocol = (protocol: Protocol) => {
+  const handleEditProtocol = (protocol: ProtocolWithDetails) => {
     setEditingProtocol(protocol)
     setIsDialogOpen(true)
   }
 
-  const handleUpdateStatus = (id: string, status: ProtocolStatus) => {
-    updateProtocol(id, { status })
-    toast({
-      title: 'Status atualizado',
-      description: `Protocolo ${status === 'completed' ? 'concluído' : 'atualizado'} com sucesso.`,
-    })
+  const handleUpdateStatus = async (id: number, status: ProtocolStatus) => {
+    try {
+      await protocolService.updateStatus(id, status)
+      toast.success(`Protocolo ${status === 'Resolvido' ? 'concluído' : 'atualizado'} com sucesso.`)
+      fetchProtocols()
+    } catch (error) {
+      toast.error('Erro ao atualizar status do protocolo')
+    }
   }
 
-  const getStatusBadge = (status: ProtocolStatus) => {
-    const variants: Record<ProtocolStatus, 'default' | 'secondary' | 'destructive' | 'outline'> = {
-      pending: 'secondary',
-      in_progress: 'default',
-      completed: 'default',
-      cancelled: 'destructive',
+  const getStatusBadge = (status: string) => {
+    const statusMap: Record<string, { variant: 'default' | 'secondary' | 'destructive' | 'outline', label: string }> = {
+      'Aberto': { variant: 'secondary', label: 'Aberto' },
+      'Em_Analise': { variant: 'default', label: 'Em Análise' },
+      'Resolvido': { variant: 'default', label: 'Resolvido' },
+      'Cancelado': { variant: 'destructive', label: 'Cancelado' },
     }
-    const labels: Record<ProtocolStatus, string> = {
-      pending: 'Pendente',
-      in_progress: 'Em Andamento',
-      completed: 'Concluído',
-      cancelled: 'Cancelado',
-    }
-    return <Badge variant={variants[status]}>{labels[status]}</Badge>
+    const config = statusMap[status] || { variant: 'outline' as const, label: status }
+    return <Badge variant={config.variant}>{config.label}</Badge>
   }
 
   const getTypeLabel = (type: ProtocolType): string => {
@@ -117,18 +164,14 @@ export default function ProtocolsManager() {
     return labels[type] || type
   }
 
-  const getPriorityBadge = (priority: Protocol['priority']) => {
-    const variants: Record<Protocol['priority'], 'default' | 'secondary' | 'destructive'> = {
-      normal: 'default',
-      preferential: 'secondary',
-      urgent: 'destructive',
+  const getPriorityBadge = (priority: string | null | undefined) => {
+    const priorityMap: Record<string, { variant: 'default' | 'secondary' | 'destructive', label: string }> = {
+      'normal': { variant: 'default', label: 'Normal' },
+      'preferential': { variant: 'secondary', label: 'Preferencial' },
+      'urgent': { variant: 'destructive', label: 'Urgente' },
     }
-    const labels: Record<Protocol['priority'], string> = {
-      normal: 'Normal',
-      preferential: 'Preferencial',
-      urgent: 'Urgente',
-    }
-    return <Badge variant={variants[priority]}>{labels[priority]}</Badge>
+    const config = priority ? priorityMap[priority.toLowerCase()] : { variant: 'default' as const, label: 'Normal' }
+    return <Badge variant={config.variant}>{config.label}</Badge>
   }
 
   return (
@@ -198,10 +241,10 @@ export default function ProtocolsManager() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Todos os status</SelectItem>
-                <SelectItem value="pending">Pendente</SelectItem>
-                <SelectItem value="in_progress">Em Andamento</SelectItem>
-                <SelectItem value="completed">Concluído</SelectItem>
-                <SelectItem value="cancelled">Cancelado</SelectItem>
+                <SelectItem value="Aberto">Aberto</SelectItem>
+                <SelectItem value="Em_Analise">Em Análise</SelectItem>
+                <SelectItem value="Resolvido">Resolvido</SelectItem>
+                <SelectItem value="Cancelado">Cancelado</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -221,7 +264,21 @@ export default function ProtocolsManager() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredProtocols.length === 0 ? (
+                {loading ? (
+                  // Loading skeletons
+                  Array.from({ length: 5 }).map((_, index) => (
+                    <TableRow key={`skeleton-${index}`}>
+                      <TableCell><Skeleton className="h-4 w-[120px]" /></TableCell>
+                      <TableCell><Skeleton className="h-4 w-[100px]" /></TableCell>
+                      <TableCell><Skeleton className="h-4 w-[150px]" /></TableCell>
+                      <TableCell><Skeleton className="h-4 w-[120px]" /></TableCell>
+                      <TableCell><Skeleton className="h-4 w-[80px]" /></TableCell>
+                      <TableCell><Skeleton className="h-4 w-[80px]" /></TableCell>
+                      <TableCell><Skeleton className="h-4 w-[100px]" /></TableCell>
+                      <TableCell><Skeleton className="h-8 w-24 ml-auto" /></TableCell>
+                    </TableRow>
+                  ))
+                ) : filteredProtocols.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={8} className="text-center py-10 text-muted-foreground">
                       Nenhum protocolo encontrado.
@@ -229,41 +286,37 @@ export default function ProtocolsManager() {
                   </TableRow>
                 ) : (
                   filteredProtocols.map((protocol) => {
-                    const student = protocol.studentId
-                      ? students.find((s) => s.id === protocol.studentId)
-                      : undefined
-                    const school = schools.find((s) => s.id === protocol.schoolId)
+                    const requesterName = protocol.requester
+                      ? `${protocol.requester.first_name} ${protocol.requester.last_name}`
+                      : 'N/A'
 
                     return (
-                      <TableRow key={protocol.id}>
+                      <TableRow key={`protocol-${protocol.id}`}>
                         <TableCell className="font-mono text-sm font-semibold">
-                          {protocol.number}
+                          {protocol.protocol_number || `PROT-${protocol.id}`}
                         </TableCell>
-                        <TableCell>{getTypeLabel(protocol.type)}</TableCell>
+                        <TableCell>{getTypeLabel(protocol.request_type as ProtocolType)}</TableCell>
                         <TableCell>
                           <div className="flex flex-col">
-                            <span className="font-medium">{protocol.requester.name}</span>
-                            <span className="text-xs text-muted-foreground">
-                              {protocol.requester.relationship}
-                            </span>
+                            <span className="font-medium">{requesterName}</span>
+                            {protocol.requester?.email && (
+                              <span className="text-xs text-muted-foreground">
+                                {protocol.requester.email}
+                              </span>
+                            )}
                           </div>
                         </TableCell>
                         <TableCell>
-                          {student ? (
-                            <div className="flex flex-col">
-                              <span>{student.name}</span>
-                              <span className="text-xs text-muted-foreground">
-                                {student.registration}
-                              </span>
-                            </div>
-                          ) : (
-                            <span className="text-muted-foreground">N/A</span>
-                          )}
+                          <span className="text-muted-foreground">N/A</span>
                         </TableCell>
-                        <TableCell>{getPriorityBadge(protocol.priority)}</TableCell>
-                        <TableCell>{getStatusBadge(protocol.status)}</TableCell>
                         <TableCell>
-                          {new Date(protocol.createdAt).toLocaleDateString('pt-BR')}
+                          {getPriorityBadge(protocol.priority || 'normal')}
+                        </TableCell>
+                        <TableCell>{getStatusBadge(protocol.status || 'Aberto')}</TableCell>
+                        <TableCell>
+                          {protocol.opening_date
+                            ? new Date(protocol.opening_date).toLocaleDateString('pt-BR')
+                            : 'N/A'}
                         </TableCell>
                         <TableCell className="text-right">
                           <div className="flex justify-end gap-2">
@@ -274,7 +327,7 @@ export default function ProtocolsManager() {
                             >
                               <Eye className="h-4 w-4" />
                             </Button>
-                            {protocol.status !== 'completed' && protocol.status !== 'cancelled' && (
+                            {protocol.status !== 'Resolvido' && protocol.status !== 'Cancelado' && (
                               <>
                                 <RequirePermission permission="edit:protocol">
                                   <Button
@@ -285,23 +338,23 @@ export default function ProtocolsManager() {
                                     <Edit className="h-4 w-4" />
                                   </Button>
                                 </RequirePermission>
-                                {protocol.status === 'pending' && (
+                                {protocol.status === 'Aberto' && (
                                   <RequirePermission permission="edit:protocol">
                                     <Button
                                       variant="ghost"
                                       size="sm"
-                                      onClick={() => handleUpdateStatus(protocol.id, 'in_progress')}
+                                      onClick={() => handleUpdateStatus(protocol.id, 'Em_Analise')}
                                     >
                                       <Clock className="h-4 w-4" />
                                     </Button>
                                   </RequirePermission>
                                 )}
-                                {protocol.status === 'in_progress' && (
+                                {protocol.status === 'Em_Analise' && (
                                   <RequirePermission permission="edit:protocol">
                                     <Button
                                       variant="ghost"
                                       size="sm"
-                                      onClick={() => handleUpdateStatus(protocol.id, 'completed')}
+                                      onClick={() => handleUpdateStatus(protocol.id, 'Resolvido')}
                                     >
                                       <CheckCircle className="h-4 w-4" />
                                     </Button>
@@ -324,21 +377,27 @@ export default function ProtocolsManager() {
       <ProtocolFormDialog
         open={isDialogOpen}
         onOpenChange={setIsDialogOpen}
-        onSave={(data) => {
-          if (editingProtocol) {
-            updateProtocol(editingProtocol.id, data)
-            toast({
-              title: 'Protocolo atualizado',
-              description: 'O protocolo foi atualizado com sucesso.',
-            })
-          } else {
-            addProtocol(data)
-            toast({
-              title: 'Protocolo criado',
-              description: 'O protocolo foi criado com sucesso.',
-            })
+        onSave={async (data) => {
+          try {
+            if (editingProtocol) {
+              await protocolService.update(editingProtocol.id, data)
+              toast.success('Protocolo atualizado com sucesso.')
+            } else {
+              await protocolService.createProtocol({
+                requester_person_id: data.requester_person_id,
+                request_type: data.request_type,
+                description: data.description,
+                priority: data.priority,
+                student_profile_id: data.student_profile_id,
+                school_id: data.school_id,
+              })
+              toast.success('Protocolo criado com sucesso.')
+            }
+            setEditingProtocol(null)
+            fetchProtocols()
+          } catch (error) {
+            toast.error('Erro ao salvar protocolo')
           }
-          setEditingProtocol(null)
         }}
         initialData={editingProtocol}
       />

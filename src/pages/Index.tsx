@@ -17,32 +17,67 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Link } from 'react-router-dom'
 import usePublicContentStore from '@/stores/usePublicContentStore'
-import useSettingsStore from '@/stores/useSettingsStore'
+import { usePublicContentStore as useSupabasePublicContentStore } from '@/stores/usePublicContentStore.supabase'
+import { useSettingsStore } from '@/stores/useSettingsStore.supabase'
 import { format, parseISO } from 'date-fns'
 import { ServiceCard } from '@/lib/mock-data'
 import { HeroCarousel } from '@/components/public/HeroCarousel'
+import { useEffect, useMemo } from 'react'
+import { Skeleton } from '@/components/ui/skeleton'
 
 export default function InstitutionalHome() {
-  const { news, documents, getContent } = usePublicContentStore()
+  // Context store (mantém hero section e configurações)
+  const { news: contextNews, documents: contextDocuments, getContent } = usePublicContentStore()
   const { settings } = useSettingsStore()
+  
+  // Supabase store (dados do banco)
+  const { 
+    publishedContents, 
+    fetchPublishedContents, 
+    loading 
+  } = useSupabasePublicContentStore()
 
   const semedInfo = getContent('semed_info')
+  
+  // Buscar conteúdos publicados do Supabase
+  useEffect(() => {
+    fetchPublishedContents({
+      contentType: 'Noticia',
+      limit: 3,
+      featuredOnly: false
+    })
+  }, [])
 
-  const activeNews = news
-    .filter((n) => n.active)
-    .sort(
-      (a, b) =>
-        new Date(b.publishDate).getTime() - new Date(a.publishDate).getTime(),
-    )
-    .slice(0, 3)
+  // Usar dados do Supabase se disponíveis, senão fallback para context
+  const activeNews = useMemo(() => {
+    if (publishedContents.length > 0) {
+      return publishedContents.slice(0, 3)
+    }
+    if (!Array.isArray(contextNews)) return []
+    return contextNews
+      .filter((n) => n && n.active)
+      .sort(
+        (a, b) =>
+          new Date(b.publishDate).getTime() - new Date(a.publishDate).getTime(),
+      )
+      .slice(0, 3)
+  }, [publishedContents, contextNews])
 
-  const activeDocuments = documents
-    .filter((d) => d.active)
-    .sort(
-      (a, b) =>
-        new Date(b.publishDate).getTime() - new Date(a.publishDate).getTime(),
-    )
-    .slice(0, 5)
+  const activeDocuments = useMemo(() => {
+    if (!Array.isArray(contextDocuments)) return []
+    return contextDocuments
+      .filter((d) => d && d.active)
+      .sort(
+        (a, b) =>
+          new Date(b.publishDate).getTime() - new Date(a.publishDate).getTime(),
+      )
+      .slice(0, 5)
+  }, [contextDocuments])
+
+  // Memoizar serviceCards para evitar recálculos
+  const serviceCards = useMemo(() => {
+    return Array.isArray(settings?.serviceCards) ? settings.serviceCards : []
+  }, [settings?.serviceCards])
 
   // Helper to get icon component
   const getIcon = (iconName: string) => {
@@ -246,9 +281,11 @@ export default function InstitutionalHome() {
             </div>
 
             <div className="grid gap-6">
-              {activeNews.length > 0 ? (
-                activeNews.map((post) => (
-                  <Link to={`/publico/noticias/${post.id}`} key={post.id}>
+              {Array.isArray(activeNews) && activeNews.length > 0 ? (
+                activeNews
+                  .filter((post) => post && post.id)
+                  .map((post) => (
+                    <Link to={`/publico/noticias/${post.id}`} key={`news-${post.id}`}>
                     <Card className="group overflow-hidden border-2 border-transparent hover:border-primary/50 transition-all duration-300 hover:shadow-xl hover:-translate-y-1 cursor-pointer h-full bg-gradient-to-br from-white to-primary/5">
                       <div className="flex flex-col md:flex-row h-full">
                         <div className="md:w-1/3 h-48 md:h-auto bg-muted relative overflow-hidden">
@@ -314,11 +351,13 @@ export default function InstitutionalHome() {
 
             <Card>
               <CardContent className="p-0">
-                {activeDocuments.length > 0 ? (
+                {Array.isArray(activeDocuments) && activeDocuments.length > 0 ? (
                   <ul className="divide-y">
-                    {activeDocuments.map((doc) => (
-                      <li
-                        key={doc.id}
+                    {activeDocuments
+                      .filter((doc) => doc && doc.id)
+                      .map((doc) => (
+                        <li
+                          key={`doc-${doc.id}`}
                         className="group p-4 hover:bg-muted/30 transition-colors"
                       >
                         <Link
@@ -429,21 +468,28 @@ export default function InstitutionalHome() {
                 </div>
 
                 <div className="grid grid-cols-2 gap-3 mb-6">
-                  {[1, 2, 3, 4].map((i) => (
-                    <div
-                      key={i}
-                      className="aspect-square rounded-lg overflow-hidden relative group cursor-pointer"
-                    >
-                      <img
-                        src={`https://img.usecurling.com/p/400/400?q=school%20activity%20${i}`}
-                        className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
-                        alt={`Post ${i}`}
-                      />
-                      <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                        <Facebook className="text-white h-8 w-8 drop-shadow-lg" />
+                  {[1, 2, 3, 4]
+                    .map((i) => {
+                      const card = serviceCards[i - 1]
+                      if (!card || !card.active) return null
+                      return { index: i, card }
+                    })
+                    .filter((item) => item !== null)
+                    .map((item) => (
+                      <div
+                        key={`service-${item.index}`}
+                        className="aspect-square rounded-lg overflow-hidden relative group cursor-pointer"
+                      >
+                        <img
+                          src={`https://img.usecurling.com/p/400/400?q=school%20activity%20${item.index}`}
+                          className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
+                          alt={`Post ${item.index}`}
+                        />
+                        <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                          <Facebook className="text-white h-8 w-8 drop-shadow-lg" />
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    ))}
                 </div>
 
                 <div className="flex justify-center gap-4">

@@ -28,10 +28,10 @@ import {
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
-import { EtapaEnsino, School, SerieAno } from '@/lib/mock-data'
 import { useEffect, useMemo } from 'react'
-import useTeacherStore from '@/stores/useTeacherStore'
+import { useTeacherStore } from '@/stores/useTeacherStore.supabase'
 import { validateModalidadeCode, validateTipoRegimeCode } from '@/lib/validations'
+import type { School } from '@/lib/database-types'
 import {
   safeArray,
   safeFind,
@@ -80,7 +80,7 @@ interface ClassroomDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   onSubmit: (data: any) => void
-  etapasEnsino: EtapaEnsino[]
+  etapasEnsino?: any[] // Etapas de ensino (opcional, pode ser carregado do Supabase)
   schools?: School[] // Optional, used when creating from ClassesList
   initialData?: any // For editing
 }
@@ -98,13 +98,20 @@ export function ClassroomDialog({
   open,
   onOpenChange,
   onSubmit,
-  etapasEnsino: etapasEnsinoProp,
+  etapasEnsino: etapasEnsinoProp = [],
   schools,
   initialData,
 }: ClassroomDialogProps) {
-  const { teachers } = useTeacherStore()
+  const { teachers, loading: teachersLoading, fetchTeachers } = useTeacherStore()
   
   const etapasEnsino = etapasEnsinoProp || []
+  
+  // Carregar professores se necessário
+  useEffect(() => {
+    if (open && teachers.length === 0 && !teachersLoading) {
+      fetchTeachers()
+    }
+  }, [open, teachers.length, teachersLoading, fetchTeachers])
   
   const form = useForm<z.infer<typeof classroomSchema>>({
     resolver: zodResolver(classroomSchema),
@@ -651,13 +658,21 @@ export function ClassroomDialog({
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      {(teachers || [])
-                        .filter((t) => Boolean(t) && Boolean(t.id) && t.status === 'active')
-                        .map((teacher) => (
-                          <SelectItem key={teacher.id} value={teacher.id}>
-                            {teacher.name} - {teacher.subject}
-                          </SelectItem>
-                        ))}
+                      {teachers
+                        .filter((t) => {
+                          if (!t || !t.person) return false
+                          return t.employment_status === 'active'
+                        })
+                        .map((teacher) => {
+                          const teacherName = teacher.person 
+                            ? `${teacher.person.first_name} ${teacher.person.last_name}`
+                            : 'Professor'
+                          return (
+                            <SelectItem key={teacher.id} value={teacher.id.toString()}>
+                              {teacherName}
+                            </SelectItem>
+                          )
+                        })}
                     </SelectContent>
                   </Select>
                   <FormDescription>

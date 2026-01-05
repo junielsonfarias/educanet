@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useMemo, useEffect } from 'react'
 import {
   Card,
   CardContent,
@@ -16,10 +16,10 @@ import {
 } from '@/components/ui/table'
 import { Badge } from '@/components/ui/badge'
 import { CalendarDays, CheckCircle2, XCircle } from 'lucide-react'
-import useAttendanceStore from '@/stores/useAttendanceStore'
-import useSchoolStore from '@/stores/useSchoolStore'
-import useCourseStore from '@/stores/useCourseStore'
+import { useAttendanceStore } from '@/stores/useAttendanceStore.supabase'
+import { useCourseStore } from '@/stores/useCourseStore.supabase'
 import { format, parseISO } from 'date-fns'
+import { Skeleton } from '@/components/ui/skeleton'
 
 interface StudentAttendanceCardProps {
   studentId: string
@@ -28,38 +28,61 @@ interface StudentAttendanceCardProps {
 export function StudentAttendanceCard({
   studentId,
 }: StudentAttendanceCardProps) {
-  const { getStudentAttendance } = useAttendanceStore()
-  const { schools } = useSchoolStore()
-  const { etapasEnsino } = useCourseStore()
+  const { 
+    attendances, 
+    loading, 
+    fetchStudentAttendance 
+  } = useAttendanceStore()
+  const { subjects } = useCourseStore()
 
-  const attendanceRecords = getStudentAttendance(studentId)
+  useEffect(() => {
+    if (studentId) {
+      fetchStudentAttendance(parseInt(studentId))
+    }
+  }, [studentId, fetchStudentAttendance])
 
   const stats = useMemo(() => {
-    const total = attendanceRecords.length
-    const present = attendanceRecords.filter((r) => r.present).length
-    const absent = total - present
+    const total = attendances.length
+    const present = attendances.filter((r) => r.status === 'Presente').length
+    const absent = attendances.filter((r) => 
+      r.status === 'Ausente' || r.status === 'Justificado'
+    ).length
     const percentage = total > 0 ? (present / total) * 100 : 100
 
     return { total, present, absent, percentage }
-  }, [attendanceRecords])
+  }, [attendances])
 
   const enrichedRecords = useMemo(() => {
-    return attendanceRecords
+    return attendances
       .map((record) => {
-        const school = schools.find((s) => s.id === record.schoolId)
-        // Find subject
-        const allSeriesAnos = etapasEnsino.flatMap((e) => e.seriesAnos)
-        const allSubjects = allSeriesAnos.flatMap((s) => s.subjects)
-        const subject = allSubjects.find((s) => s.id === record.subjectId)
+        const subject = subjects.find((s) => 
+          s.id === record.lesson?.class_teacher_subject?.subject_id
+        )
 
         return {
-          ...record,
-          schoolName: school?.name || 'N/A',
-          subjectName: subject?.name || 'Geral',
+          id: record.id,
+          date: record.lesson?.lesson_date || record.attendance_date || '',
+          subjectName: subject?.name || record.lesson?.class_teacher_subject?.subject?.name || 'Geral',
+          schoolName: record.lesson?.class_teacher_subject?.class?.school?.name || 'N/A',
+          present: record.status === 'Presente',
+          justification: record.notes || undefined,
         }
       })
       .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-  }, [attendanceRecords, schools, etapasEnsino])
+  }, [attendances, subjects])
+
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <div className="grid gap-4 md:grid-cols-3">
+          <Skeleton className="h-24" />
+          <Skeleton className="h-24" />
+          <Skeleton className="h-24" />
+        </div>
+        <Skeleton className="h-64" />
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-6">

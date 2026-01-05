@@ -15,14 +15,39 @@ import {
 } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { ArrowRight, History } from 'lucide-react'
-import { Assessment, AssessmentType, Subject, Period } from '@/lib/mock-data'
 import { format, parseISO } from 'date-fns'
 
+interface AssessmentItem {
+  id: string | number
+  date: string
+  subjectId?: string | number
+  periodId?: string | number
+  assessmentTypeId?: string
+  value: number | string
+  category?: string
+  relatedAssessmentId?: string | number
+}
+
+interface SubjectItem {
+  id: string | number
+  name: string
+}
+
+interface PeriodItem {
+  id: string | number
+  name: string
+}
+
+interface AssessmentTypeItem {
+  id: string
+  name: string
+}
+
 interface StudentAssessmentHistoryProps {
-  assessments: Assessment[]
-  assessmentTypes: AssessmentType[]
-  subjects: Subject[]
-  periods: Period[]
+  assessments: AssessmentItem[]
+  assessmentTypes?: AssessmentTypeItem[]
+  subjects: SubjectItem[]
+  periods: PeriodItem[]
 }
 
 export function StudentAssessmentHistory({
@@ -32,18 +57,22 @@ export function StudentAssessmentHistory({
   periods,
 }: StudentAssessmentHistoryProps) {
   // Flatten and link recovery assessments
-  const historyData = assessments
+  const historyData = (assessments || [])
     .filter((a) => (a.category || 'regular') === 'regular') // Base list on regular assessments
     .map((assessment) => {
-      const type = assessmentTypes.find(
+      const type = (assessmentTypes || []).find(
         (t) => t.id === assessment.assessmentTypeId,
       )
-      const subject = subjects.find((s) => s.id === assessment.subjectId)
-      const period = periods.find((p) => p.id === assessment.periodId)
+      const subject = subjects.find((s) => 
+        s.id?.toString() === assessment.subjectId?.toString()
+      )
+      const period = periods.find((p) => 
+        p.id?.toString() === assessment.periodId?.toString()
+      )
 
       // Find linked recovery
       const recovery = assessments.find(
-        (r) => r.relatedAssessmentId === assessment.id,
+        (r) => r.relatedAssessmentId?.toString() === assessment.id?.toString(),
       )
 
       return {
@@ -52,12 +81,12 @@ export function StudentAssessmentHistory({
         subjectName: subject?.name || 'Disciplina Desconhecida',
         periodName: period?.name || 'Período Desconhecido',
         typeName: type?.name || 'Avaliação',
-        originalGrade: Number(assessment.value),
+        originalGrade: Number(assessment.value) || 0,
         recoveryGrade: recovery ? Number(recovery.value) : null,
         recoveryDate: recovery ? recovery.date : null,
         finalGrade: recovery
-          ? Math.max(Number(assessment.value), Number(recovery.value)) // Assuming standard strategy for display
-          : Number(assessment.value),
+          ? Math.max(Number(assessment.value) || 0, Number(recovery.value) || 0) // Assuming standard strategy for display
+          : Number(assessment.value) || 0,
         isRecovered: !!recovery,
       }
     })

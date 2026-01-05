@@ -29,8 +29,8 @@ import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { Appointment, AppointmentType } from '@/lib/mock-data'
-import useStudentStore from '@/stores/useStudentStore'
-import useSchoolStore from '@/stores/useSchoolStore'
+import { useStudentStore } from '@/stores/useStudentStore.supabase'
+import { useSchoolStore } from '@/stores/useSchoolStore.supabase'
 
 const appointmentSchema = z.object({
   type: z.enum(['matricula', 'documentos', 'informacoes', 'reuniao', 'outros']),

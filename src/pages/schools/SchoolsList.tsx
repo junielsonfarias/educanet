@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import {
   Plus,
   Search,
@@ -25,6 +25,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { Badge } from '@/components/ui/badge'
+import { Skeleton } from '@/components/ui/skeleton'
 import {
   Card,
   CardContent,
@@ -43,57 +44,101 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 import { Link, useNavigate } from 'react-router-dom'
-import useSchoolStore from '@/stores/useSchoolStore'
+import { useSchoolStore } from '@/stores/useSchoolStore.supabase'
 import { SchoolFormDialog } from './components/SchoolFormDialog'
-import { School } from '@/lib/mock-data'
+import type { School } from '@/lib/database-types'
 import { useToast } from '@/hooks/use-toast'
 import { usePermissions } from '@/hooks/usePermissions'
 import { RequirePermission } from '@/components/RequirePermission'
 
 export default function SchoolsList() {
-  const { schools, addSchool, updateSchool, deleteSchool } = useSchoolStore()
+  const { 
+    schools, 
+    loading, 
+    fetchSchools, 
+    createSchool, 
+    updateSchool, 
+    deleteSchool 
+  } = useSchoolStore()
   const [searchTerm, setSearchTerm] = useState('')
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [editingSchool, setEditingSchool] = useState<School | null>(null)
-  const [deleteId, setDeleteId] = useState<string | null>(null)
+  const [deleteId, setDeleteId] = useState<number | null>(null)
 
   const navigate = useNavigate()
   const { toast } = useToast()
   const { hasPermission } = usePermissions()
 
-  const filteredSchools = schools.filter(
-    (school) =>
-      school.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      school.code.toLowerCase().includes(searchTerm.toLowerCase()),
+  // Carregar escolas ao montar
+  useEffect(() => {
+    fetchSchools()
+  }, [fetchSchools])
+
+  // Safely ensure schools is an array
+  const safeSchools = Array.isArray(schools) ? schools : []
+
+  const filteredSchools = safeSchools.filter(
+    (school) => {
+      if (!school) return false
+      const name = school.name || ''
+      const inepCode = school.inep_code || ''
+      const term = searchTerm || ''
+      return (
+        name.toLowerCase().includes(term.toLowerCase()) ||
+        inepCode.toLowerCase().includes(term.toLowerCase())
+      )
+    }
   )
 
-  const handleCreate = (data: any) => {
-    addSchool(data)
-    toast({
-      title: 'Escola criada',
-      description: `${data.name} foi adicionada com sucesso.`,
-    })
-  }
-
-  const handleUpdate = (data: any) => {
-    if (editingSchool) {
-      updateSchool(editingSchool.id, data)
-      toast({
-        title: 'Escola atualizada',
-        description: 'Dados atualizados com sucesso.',
-      })
-      setEditingSchool(null)
+  const handleCreate = async (data: any) => {
+    try {
+      const schoolData: Partial<School> = {
+        name: data.name || '',
+        address: data.address || '',
+        phone: data.phone || '',
+        email: data.email || '',
+        cnpj: data.cnpj || '',
+        inep_code: data.inepCode || data.code || '',
+        student_capacity: data.studentCapacity || null,
+      }
+      
+      await createSchool(schoolData)
+      setIsDialogOpen(false)
+    } catch (error) {
+      // Erro já tratado pelo store
     }
   }
 
-  const handleDelete = () => {
+  const handleUpdate = async (data: any) => {
+    if (editingSchool) {
+      try {
+        const schoolData: Partial<School> = {
+          name: data.name || editingSchool.name,
+          address: data.address || editingSchool.address,
+          phone: data.phone || editingSchool.phone,
+          email: data.email || editingSchool.email,
+          cnpj: data.cnpj || editingSchool.cnpj,
+          inep_code: data.inepCode || data.code || editingSchool.inep_code,
+          student_capacity: data.studentCapacity || editingSchool.student_capacity,
+        }
+        
+        await updateSchool(editingSchool.id, schoolData)
+        setIsDialogOpen(false)
+        setEditingSchool(null)
+      } catch (error) {
+        // Erro já tratado pelo store
+      }
+    }
+  }
+
+  const handleDelete = async () => {
     if (deleteId) {
-      deleteSchool(deleteId)
-      toast({
-        title: 'Escola removida',
-        description: 'A escola foi removida do sistema.',
-      })
-      setDeleteId(null)
+      try {
+        await deleteSchool(deleteId)
+        setDeleteId(null)
+      } catch (error) {
+        // Erro já tratado pelo store
+      }
     }
   }
 
@@ -171,111 +216,128 @@ export default function SchoolsList() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredSchools.length === 0 ? (
+                {loading ? (
+                  Array.from({ length: 5 }).map((_, i) => (
+                    <TableRow key={i}>
+                      <TableCell><Skeleton className="h-4 w-20" /></TableCell>
+                      <TableCell><Skeleton className="h-4 w-48" /></TableCell>
+                      <TableCell className="hidden md:table-cell"><Skeleton className="h-4 w-32" /></TableCell>
+                      <TableCell className="hidden lg:table-cell"><Skeleton className="h-4 w-24" /></TableCell>
+                      <TableCell><Skeleton className="h-6 w-16" /></TableCell>
+                      <TableCell className="text-right"><Skeleton className="h-8 w-8" /></TableCell>
+                    </TableRow>
+                  ))
+                ) : filteredSchools.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={6} className="h-24 text-center">
-                      Nenhuma escola encontrada.
+                      {searchTerm ? 'Nenhuma escola encontrada com os filtros aplicados.' : 'Nenhuma escola cadastrada.'}
                     </TableCell>
                   </TableRow>
                 ) : (
-                  filteredSchools.map((school) => (
-                    <TableRow
-                      key={school.id}
-                      className="cursor-pointer border-l-4 border-l-transparent hover:border-l-primary hover:bg-gradient-to-r hover:from-primary/5 hover:to-transparent transition-all duration-200"
-                      onClick={() => navigate(`/escolas/${school.id}`)}
-                    >
-                      <TableCell
-                        className="font-medium"
-                        onClick={(e) => e.stopPropagation()}
+                  filteredSchools.map((school) => {
+                    if (!school) return null
+                    const isActive = !school.deleted_at
+                    
+                    return (
+                      <TableRow
+                        key={school.id}
+                        className="cursor-pointer border-l-4 border-l-transparent hover:border-l-primary hover:bg-gradient-to-r hover:from-primary/5 hover:to-transparent transition-all duration-200"
+                        onClick={() => navigate(`/escolas/${school.id}`)}
                       >
-                        <Link
-                          to={`/escolas/${school.id}`}
-                          className="hover:underline"
+                        <TableCell
+                          className="font-medium"
+                          onClick={(e) => e.stopPropagation()}
                         >
-                          {school.code}
-                        </Link>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex flex-col">
-                          <span className="font-medium">{school.name}</span>
-                          <span className="text-xs text-muted-foreground md:hidden flex items-center gap-1 mt-1">
-                            <MapPin className="h-3 w-3" /> {school.address}
-                          </span>
-                        </div>
-                      </TableCell>
-                      <TableCell className="hidden md:table-cell">
-                        {school.director}
-                      </TableCell>
-                      <TableCell className="hidden lg:table-cell">
-                        <div className="flex items-center gap-1 text-sm">
-                          <Phone className="h-3 w-3 text-muted-foreground" />
-                          {school.phone}
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <Badge
-                          className={`flex items-center gap-1.5 px-2.5 py-1 font-medium ${
-                            school.status === 'active'
-                              ? 'bg-gradient-to-r from-green-500 to-emerald-600 text-white shadow-md'
-                              : 'bg-gradient-to-r from-gray-400 to-gray-500 text-white'
-                          }`}
-                        >
-                          <div
-                            className={`h-2 w-2 rounded-full ${
-                              school.status === 'active' ? 'bg-white' : 'bg-white/80'
+                          <Link
+                            to={`/escolas/${school.id}`}
+                            className="hover:underline"
+                          >
+                            {school.inep_code || `#${school.id}`}
+                          </Link>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex flex-col">
+                            <span className="font-medium">{school.name}</span>
+                            <span className="text-xs text-muted-foreground md:hidden flex items-center gap-1 mt-1">
+                              <MapPin className="h-3 w-3" /> {school.address || 'Sem endereço'}
+                            </span>
+                          </div>
+                        </TableCell>
+                        <TableCell className="hidden md:table-cell">
+                          {/* Diretor será carregado separadamente se necessário */}
+                          <span className="text-muted-foreground">-</span>
+                        </TableCell>
+                        <TableCell className="hidden lg:table-cell">
+                          <div className="flex items-center gap-1 text-sm">
+                            <Phone className="h-3 w-3 text-muted-foreground" />
+                            {school.phone || 'Sem telefone'}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <Badge
+                            className={`flex items-center gap-1.5 px-2.5 py-1 font-medium ${
+                              isActive
+                                ? 'bg-gradient-to-r from-green-500 to-emerald-600 text-white shadow-md'
+                                : 'bg-gradient-to-r from-gray-400 to-gray-500 text-white'
                             }`}
-                          />
-                          {school.status === 'active' ? 'Ativa' : 'Inativa'}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button
-                              variant="ghost"
-                              className="h-8 w-8 p-0"
-                              onClick={(e) => e.stopPropagation()}
-                            >
-                              <span className="sr-only">Abrir menu</span>
-                              <MoreHorizontal className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuLabel>Ações</DropdownMenuLabel>
-                            <DropdownMenuItem
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                navigate(`/escolas/${school.id}`)
-                              }}
-                            >
-                              Ver Detalhes
-                            </DropdownMenuItem>
-                            <RequirePermission permission="edit:school">
+                          >
+                            <div
+                              className={`h-2 w-2 rounded-full ${
+                                isActive ? 'bg-white' : 'bg-white/80'
+                              }`}
+                            />
+                            {isActive ? 'Ativa' : 'Inativa'}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                className="h-8 w-8 p-0"
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                <span className="sr-only">Abrir menu</span>
+                                <MoreHorizontal className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuLabel>Ações</DropdownMenuLabel>
                               <DropdownMenuItem
                                 onClick={(e) => {
                                   e.stopPropagation()
-                                  openEditDialog(school)
+                                  navigate(`/escolas/${school.id}`)
                                 }}
                               >
-                                Editar Dados
+                                Ver Detalhes
                               </DropdownMenuItem>
-                            </RequirePermission>
-                            <RequirePermission permission="delete:school">
-                              <DropdownMenuItem
-                                className="text-destructive focus:text-destructive"
-                                onClick={(e) => {
-                                  e.stopPropagation()
-                                  setDeleteId(school.id)
-                                }}
-                              >
-                                Excluir
-                              </DropdownMenuItem>
-                            </RequirePermission>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </TableCell>
-                    </TableRow>
-                  ))
+                              <RequirePermission permission="edit:school">
+                                <DropdownMenuItem
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    openEditDialog(school)
+                                  }}
+                                >
+                                  Editar Dados
+                                </DropdownMenuItem>
+                              </RequirePermission>
+                              <RequirePermission permission="delete:school">
+                                <DropdownMenuItem
+                                  className="text-destructive focus:text-destructive"
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    setDeleteId(school.id)
+                                  }}
+                                >
+                                  Excluir
+                                </DropdownMenuItem>
+                              </RequirePermission>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </TableCell>
+                      </TableRow>
+                    )
+                  })
                 )}
               </TableBody>
             </Table>

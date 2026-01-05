@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import * as z from 'zod'
@@ -38,11 +38,14 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
-import useLessonPlanStore from '@/stores/useLessonPlanStore'
+import { Skeleton } from '@/components/ui/skeleton'
+import { useLessonStore } from '@/stores/useLessonStore.supabase'
 import useUserStore from '@/stores/useUserStore'
-import useSchoolStore from '@/stores/useSchoolStore'
-import useCourseStore from '@/stores/useCourseStore'
-import { useToast } from '@/hooks/use-toast'
+import { useSchoolStore } from '@/stores/useSchoolStore.supabase'
+import { useCourseStore } from '@/stores/useCourseStore.supabase'
+import { useAcademicYearStore } from '@/stores/useAcademicYearStore.supabase'
+import { classService } from '@/lib/supabase/services'
+import { toast } from 'sonner'
 import { RequirePermission } from '@/components/RequirePermission'
 
 const planSchema = z.object({
@@ -59,13 +62,21 @@ const planSchema = z.object({
 })
 
 export default function LessonPlanning() {
-  const { lessonPlans, addLessonPlan } = useLessonPlanStore()
+  const { lessons, loading: lessonsLoading, fetchLessons, addLesson } = useLessonStore()
   const { currentUser } = useUserStore()
-  const { schools } = useSchoolStore()
-  const { etapasEnsino } = useCourseStore()
-  const { toast } = useToast()
+  const { schools, loading: schoolsLoading, fetchSchools } = useSchoolStore()
+  const { courses, loading: coursesLoading, fetchCourses } = useCourseStore()
+  const { academicYears, loading: yearsLoading, fetchAcademicYears } = useAcademicYearStore()
 
   const [open, setOpen] = useState(false)
+  const [availableClasses, setAvailableClasses] = useState<any[]>([])
+
+  useEffect(() => {
+    fetchSchools()
+    fetchCourses()
+    fetchAcademicYears()
+    fetchLessons()
+  }, [fetchSchools, fetchCourses, fetchAcademicYears, fetchLessons])
 
   const form = useForm<z.infer<typeof planSchema>>({
     resolver: zodResolver(planSchema),
@@ -85,69 +96,73 @@ export default function LessonPlanning() {
   const selectedClassId = form.watch('classroomId')
 
   // Dynamic Options
-  const activeYears = useMemo(() => {
-    if (!selectedSchoolId) return []
-    const school = schools.find((s) => s.id === selectedSchoolId)
-    // Filter only active years? Or allow planning for future/past? Let's show all for flexibility
-    return school?.academicYears || []
-  }, [schools, selectedSchoolId])
+  const safeSchools = Array.isArray(schools) ? schools : []
+  const safeAcademicYears = Array.isArray(academicYears) ? academicYears : []
 
-  const availableClasses = useMemo(() => {
-    if (!selectedYearId || !selectedSchoolId) return []
-    const school = schools.find((s) => s.id === selectedSchoolId)
-    const year = school?.academicYears.find((y) => y.id === selectedYearId)
-    const turmas = year?.turmas || []
-    return turmas
-  }, [schools, selectedSchoolId, selectedYearId])
+  // Buscar turmas quando escola e ano são selecionados
+  useEffect(() => {
+    const fetchClasses = async () => {
+      if (selectedSchoolId && selectedYearId) {
+        try {
+          const classes = await classService.getBySchool(parseInt(selectedSchoolId))
+          setAvailableClasses(classes || [])
+        } catch {
+          setAvailableClasses([])
+        }
+      } else {
+        setAvailableClasses([])
+      }
+    }
+    fetchClasses()
+  }, [selectedSchoolId, selectedYearId])
 
+  // Buscar disciplinas quando turma é selecionada
   const availableSubjects = useMemo(() => {
-    if (!selectedClassId || !selectedYearId || !selectedSchoolId) return []
-    const school = schools.find((s) => s.id === selectedSchoolId)
-    const year = school?.academicYears.find((y) => y.id === selectedYearId)
-    const turmas = year?.turmas || []
-    const classroom = turmas.find((c) => c.id === selectedClassId)
-
-    if (!classroom) return []
-
-    // Find serieAno and subjects
-    const etapaEnsino = etapasEnsino.find((e) =>
-      e.seriesAnos.some((s) => s.id === classroom.serieAnoId),
-    )
-    const serieAno = etapaEnsino?.seriesAnos.find((s) => s.id === classroom.serieAnoId)
-    return serieAno?.subjects || []
-  }, [schools, selectedSchoolId, selectedYearId, selectedClassId, etapasEnsino])
+    if (!selectedClassId) return []
+    const selectedClass = availableClasses.find((c) => c.id.toString() === selectedClassId)
+    if (!selectedClass) return []
+    
+    // TODO: Buscar disciplinas da turma quando implementado
+    // Por enquanto, retornar array vazio
+    return []
+  }, [selectedClassId, availableClasses])
 
   // Filter plans for current user
+  const safeLessons = Array.isArray(lessons) ? lessons : []
   const myPlans = useMemo(() => {
     if (!currentUser) return []
     // Admin sees all
-    if (currentUser.role === 'admin') return lessonPlans
+    if (currentUser.role === 'admin') return safeLessons
     // Teachers see their own
-    return lessonPlans.filter((p) => p.teacherId === currentUser.id)
-  }, [lessonPlans, currentUser])
+    return safeLessons.filter((p) => p.teacher_id === currentUser.id)
+  }, [safeLessons, currentUser])
 
-  const onSubmit = (values: z.infer<typeof planSchema>) => {
+  const onSubmit = async (values: z.infer<typeof planSchema>) => {
     if (!currentUser) {
-      toast({
-        variant: 'destructive',
-        title: 'Erro',
-        description: 'Usuário não identificado.',
-      })
+      toast.error('Usuário não identificado.')
       return
     }
 
-    addLessonPlan({
-      ...values,
-      teacherId: currentUser.id,
-      status: 'draft',
-      attachments: [],
-    })
-    setOpen(false)
-    form.reset()
-    toast({
-      title: 'Plano Salvo',
-      description: 'O plano de aula foi criado com sucesso.',
-    })
+    try {
+      await addLesson({
+        class_id: parseInt(values.classroomId),
+        subject_id: parseInt(values.subjectId),
+        teacher_id: currentUser.id,
+        lesson_date: values.date,
+        topic: values.topic,
+        objectives: values.objectives,
+        methodology: values.methodology,
+        resources: values.resources || null,
+        evaluation: values.evaluation || null,
+        status: 'draft',
+      })
+      setOpen(false)
+      form.reset()
+      toast.success('Plano de aula criado com sucesso.')
+      fetchLessons()
+    } catch {
+      toast.error('Erro ao criar plano de aula.')
+    }
   }
 
   return (
@@ -210,8 +225,8 @@ export default function LessonPlanning() {
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
-                            {schools.map((s) => (
-                              <SelectItem key={s.id} value={s.id}>
+                            {safeSchools.map((s) => (
+                              <SelectItem key={s.id} value={s.id.toString()}>
                                 {s.name}
                               </SelectItem>
                             ))}
@@ -243,8 +258,8 @@ export default function LessonPlanning() {
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
-                            {activeYears.map((y) => (
-                              <SelectItem key={y.id} value={y.id}>
+                            {safeAcademicYears.map((y) => (
+                              <SelectItem key={y.id} value={y.id.toString()}>
                                 {y.name}
                               </SelectItem>
                             ))}
@@ -276,7 +291,7 @@ export default function LessonPlanning() {
                           </FormControl>
                           <SelectContent>
                             {availableClasses.map((c) => (
-                              <SelectItem key={c.id} value={c.id}>
+                              <SelectItem key={c.id} value={c.id.toString()}>
                                 {c.name}
                               </SelectItem>
                             ))}

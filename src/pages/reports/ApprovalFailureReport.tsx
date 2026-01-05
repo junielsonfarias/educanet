@@ -24,7 +24,7 @@ import {
 import { ArrowLeft, Loader2, AlertCircle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useNavigate } from 'react-router-dom'
-import useSettingsStore from '@/stores/useSettingsStore'
+import { useSettingsStore } from '@/stores/useSettingsStore.supabase'
 import {
   fetchApprovalFailureRates,
   getMunicipalityName,

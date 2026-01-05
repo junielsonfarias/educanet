@@ -45,8 +45,8 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog'
-import useStudentStore from '@/stores/useStudentStore'
-import useSchoolStore from '@/stores/useSchoolStore'
+import { useStudentStore } from '@/stores/useStudentStore.supabase'
+import { useSchoolStore } from '@/stores/useSchoolStore.supabase'
 import useReportStore, { CustomReportConfig } from '@/stores/useReportStore'
 import { ExportActions } from '@/components/ExportActions'
 import { useToast } from '@/hooks/use-toast'

@@ -18,10 +18,10 @@ import {
 import { Label } from '@/components/ui/label'
 import { Checkbox } from '@/components/ui/checkbox'
 import { useToast } from '@/hooks/use-toast'
-import useSchoolStore from '@/stores/useSchoolStore'
-import useStudentStore from '@/stores/useStudentStore'
-import useTeacherStore from '@/stores/useTeacherStore'
-import useCourseStore from '@/stores/useCourseStore'
+import { useSchoolStore } from '@/stores/useSchoolStore.supabase'
+import { useStudentStore } from '@/stores/useStudentStore.supabase'
+import { useTeacherStore } from '@/stores/useTeacherStore.supabase'
+import { useCourseStore } from '@/stores/useCourseStore.supabase'
 import {
   exportEducacenso,
   downloadEducacensoFile,

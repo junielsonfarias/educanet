@@ -11,6 +11,7 @@ import {
 import { SidebarTrigger } from '@/components/ui/sidebar'
 import { Link, useNavigate } from 'react-router-dom'
 import { useLocation } from 'react-router-dom'
+import { useAuth } from '@/hooks/useAuth'
 import useAlertStore from '@/stores/useAlertStore'
 import { GlobalSearch } from './GlobalSearch'
 import { useState, useEffect } from 'react'
@@ -18,6 +19,7 @@ import { useState, useEffect } from 'react'
 export function Header() {
   const location = useLocation()
   const navigate = useNavigate()
+  const { userData, logout } = useAuth()
   const { unreadCount } = useAlertStore()
   const [searchOpen, setSearchOpen] = useState(false)
 
@@ -109,9 +111,11 @@ export function Header() {
           <DropdownMenuContent className="w-56" align="end" forceMount>
             <DropdownMenuLabel className="font-normal">
               <div className="flex flex-col space-y-1">
-                <p className="text-sm font-medium leading-none">Ana Diretora</p>
+                <p className="text-sm font-medium leading-none">
+                  {userData?.email?.split('@')[0] || 'Usuário'}
+                </p>
                 <p className="text-xs leading-none text-muted-foreground">
-                  ana.diretora@edu.gov
+                  {userData?.email || 'admin@escola.com'}
                 </p>
               </div>
             </DropdownMenuLabel>
@@ -121,8 +125,15 @@ export function Header() {
             </DropdownMenuItem>
             <DropdownMenuItem>Configurações</DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem>
-              <Link to="/">Sair</Link>
+            <DropdownMenuItem
+              onClick={async () => {
+                const result = await logout()
+                if (result.success) {
+                  navigate('/login')
+                }
+              }}
+            >
+              Sair
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>

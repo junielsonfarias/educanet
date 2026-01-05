@@ -40,10 +40,10 @@ import {
   AlertTriangle,
 } from 'lucide-react'
 import { Student, EvaluationRule } from '@/lib/mock-data'
-import useAssessmentStore from '@/stores/useAssessmentStore'
-import useSchoolStore from '@/stores/useSchoolStore'
-import useCourseStore from '@/stores/useCourseStore'
-import useSettingsStore from '@/stores/useSettingsStore'
+import { useAssessmentStore } from '@/stores/useAssessmentStore.supabase'
+import { useSchoolStore } from '@/stores/useSchoolStore.supabase'
+import { useCourseStore } from '@/stores/useCourseStore.supabase'
+import { useSettingsStore } from '@/stores/useSettingsStore.supabase'
 import {
   getClassroomFromEnrollment,
   getAcademicYearFromEnrollment,

@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo, useCallback, memo } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import * as z from 'zod'
-import { Loader2, Save, Filter, AlertCircle, RefreshCw } from 'lucide-react'
+import { Loader2, Save, Filter, AlertCircle } from 'lucide-react'
 import {
   Card,
   CardContent,
@@ -29,30 +29,33 @@ import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { Badge } from '@/components/ui/badge'
-import { useToast } from '@/hooks/use-toast'
-import useSchoolStore from '@/stores/useSchoolStore'
-import useCourseStore from '@/stores/useCourseStore'
-import useStudentStore from '@/stores/useStudentStore'
-import useAssessmentStore from '@/stores/useAssessmentStore'
+import { Skeleton } from '@/components/ui/skeleton'
+import { toast } from 'sonner'
+import { useSchoolStore } from '@/stores/useSchoolStore.supabase'
+import { useCourseStore } from '@/stores/useCourseStore.supabase'
+import { useStudentStore } from '@/stores/useStudentStore.supabase'
+import { useAssessmentStore } from '@/stores/useAssessmentStore.supabase'
+import { useAcademicYearStore } from '@/stores/useAcademicYearStore.supabase'
+import { useAcademicPeriodStore } from '@/stores/useAcademicPeriodStore.supabase'
+import { 
+  classService, 
+  evaluationInstanceService,
+  enrollmentService 
+} from '@/lib/supabase/services'
 import { cn } from '@/lib/utils'
 import { RequirePermission } from '@/components/RequirePermission'
 
 // --- Storage Key for Persistence ---
-const STORAGE_KEY = 'edu_assessment_filters_v2'
+const STORAGE_KEY = 'edu_assessment_filters_v3_supabase'
 
 // --- Validation Schema ---
 const filterSchema = z.object({
   schoolId: z.string().min(1, 'Selecione a escola'),
   academicYearId: z.string().min(1, 'Selecione o ano letivo'),
-  gradeId: z.string().min(1, 'Selecione o curso/série'), // Maps to 'Curso e Série'
-  shift: z.string().min(1, 'Selecione o turno'),
+  academicPeriodId: z.string().min(1, 'Selecione o período'),
+  courseId: z.string().min(1, 'Selecione o curso'),
   classId: z.string().min(1, 'Selecione a turma'),
-  periodId: z.string().min(1, 'Selecione o período'),
   subjectId: z.string().min(1, 'Selecione a disciplina'),
-  category: z
-    .enum(['regular', 'recuperation', 'external_exam'])
-    .default('regular'),
-  assessmentTypeId: z.string().optional(),
 })
 
 type FilterValues = z.infer<typeof filterSchema>
@@ -70,14 +73,12 @@ const StudentRow = memo(
     value: string | number
     max: number
     isNumeric: boolean
-    onChange: (id: string, val: string | number) => void
+    onChange: (id: number, val: string | number) => void
   }) => {
-    // Local state for smooth typing
     const [localValue, setLocalValue] = useState<string | number>(
       value !== undefined ? value : '',
     )
 
-    // Sync local state when prop value changes (e.g. initial load or reset)
     useEffect(() => {
       setLocalValue(value !== undefined ? value : '')
     }, [value])
@@ -88,10 +89,6 @@ const StudentRow = memo(
       const val = e.target.value
       setLocalValue(val)
 
-      // Debounce the update to parent to keep UI responsive
-      // However, for immediate feedback in simple inputs, direct update usually works if list isn't huge.
-      // For 50+ items, we can defer.
-      // Here passing directly for simplicity but relying on memo to block other rows rerender.
       if (isNumeric) {
         const num = parseFloat(val)
         onChange(student.id, isNaN(num) ? '' : num)
@@ -100,12 +97,15 @@ const StudentRow = memo(
       }
     }
 
+    const studentName = `${student.first_name} ${student.last_name}`
+    const studentRegistration = student.registration_number || 'N/A'
+
     return (
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-3 border rounded-lg bg-card hover:bg-accent/5 transition-colors">
         <div className="flex flex-col">
-          <span className="font-semibold text-sm">{student.name}</span>
+          <span className="font-semibold text-sm">{studentName}</span>
           <span className="text-xs text-muted-foreground">
-            Matrícula: {student.registration}
+            Matrícula: {studentRegistration}
           </span>
         </div>
         <div className="w-full sm:w-[150px]">
@@ -146,16 +146,34 @@ const StudentRow = memo(
 StudentRow.displayName = 'StudentRow'
 
 export default function AssessmentInput() {
-  const { schools } = useSchoolStore()
-  const { etapasEnsino, evaluationRules } = useCourseStore()
-  const { students } = useStudentStore()
-  const { assessments, addAssessment, assessmentTypes } = useAssessmentStore()
-  const { toast } = useToast()
+  const { schools, loading: schoolsLoading, fetchSchools } = useSchoolStore()
+  const { courses, subjects, loading: coursesLoading, fetchCourses, fetchSubjects } = useCourseStore()
+  const { students, loading: studentsLoading, fetchStudents } = useStudentStore()
+  const { 
+    grades, 
+    loading: gradesLoading, 
+    saveGrade,
+    fetchClassGrades 
+  } = useAssessmentStore()
+  const { academicYears, loading: yearsLoading, fetchAcademicYears } = useAcademicYearStore()
+  const { academicPeriods, loading: periodsLoading, fetchAcademicPeriods } = useAcademicPeriodStore()
 
-  const [studentGrades, setStudentGrades] = useState<
-    Record<string, number | string>
-  >({})
+  const [studentGrades, setStudentGrades] = useState<Record<number, number | string>>({})
   const [loading, setLoading] = useState(false)
+  const [classes, setClasses] = useState<any[]>([])
+  const [classesLoading, setClassesLoading] = useState(false)
+  const [evaluationInstances, setEvaluationInstances] = useState<any[]>([])
+  const [enrollments, setEnrollments] = useState<any[]>([])
+
+  // Carregar dados iniciais
+  useEffect(() => {
+    fetchSchools()
+    fetchCourses()
+    fetchSubjects()
+    fetchAcademicYears()
+    fetchAcademicPeriods()
+    fetchStudents()
+  }, [fetchSchools, fetchCourses, fetchSubjects, fetchAcademicYears, fetchAcademicPeriods, fetchStudents])
 
   // Load saved filters
   const defaultValues: FilterValues = useMemo(() => {
@@ -165,13 +183,10 @@ export default function AssessmentInput() {
       : {
           schoolId: '',
           academicYearId: '',
-          gradeId: '',
-          shift: '',
+          academicPeriodId: '',
+          courseId: '',
           classId: '',
-          periodId: '',
           subjectId: '',
-          category: 'regular',
-          assessmentTypeId: '',
         }
   }, [])
 
@@ -183,13 +198,10 @@ export default function AssessmentInput() {
   // --- Watchers ---
   const schoolId = form.watch('schoolId')
   const academicYearId = form.watch('academicYearId')
-  const gradeId = form.watch('gradeId')
-  const shift = form.watch('shift')
+  const academicPeriodId = form.watch('academicPeriodId')
+  const courseId = form.watch('courseId')
   const classId = form.watch('classId')
   const subjectId = form.watch('subjectId')
-  const periodId = form.watch('periodId')
-  const category = form.watch('category')
-  const assessmentTypeId = form.watch('assessmentTypeId')
 
   // --- Persistent Storage ---
   useEffect(() => {
@@ -197,333 +209,264 @@ export default function AssessmentInput() {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(value))
     })
     return () => subscription.unsubscribe()
-    // form.watch é estável, mas incluímos para garantir que o subscription seja recriado se necessário
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [form])
 
-  // --- Derived Options with Memoization ---
+  // --- Safe Arrays ---
+  const safeSchools = Array.isArray(schools) ? schools : []
+  const safeAcademicYears = Array.isArray(academicYears) ? academicYears : []
+  const safeCourses = Array.isArray(courses) ? courses : []
+  const safeSubjects = Array.isArray(subjects) ? subjects : []
+  const safeStudents = Array.isArray(students) ? students : []
+  const safeGrades = Array.isArray(grades) ? grades : []
 
-  const selectedSchool = useMemo(
-    () => schools.find((s) => s.id === schoolId),
-    [schools, schoolId],
-  )
-
-  const academicYears = useMemo(
-    () => selectedSchool?.academicYears || [],
-    [selectedSchool],
-  )
-
-  const selectedYear = useMemo(
-    () => academicYears.find((y) => y.id === academicYearId),
-    [academicYears, academicYearId],
-  )
-
-  // Derive available Grades (Series/Anos) from turmas in the selected year
-  const availableGrades = useMemo(() => {
-    if (!selectedYear) return []
-    const turmas = selectedYear.turmas || []
-    const serieAnoIds = new Set(
-      turmas.map((c: any) => c.serieAnoId).filter(Boolean),
+  // --- Derived Options ---
+  
+  // Filtrar períodos por ano letivo
+  const filteredPeriods = useMemo(() => {
+    if (!academicYearId) return []
+    return (Array.isArray(academicPeriods) ? academicPeriods : []).filter(
+      (p) => p.academic_year_id?.toString() === academicYearId
     )
-    const flattenSeriesAnos = (etapasEnsino || []).flatMap((e) =>
-      (e.seriesAnos || []).map((s) => ({ ...s, etapaEnsinoName: e.name })),
-    )
-    return flattenSeriesAnos.filter((s) => serieAnoIds.has(s.id))
-  }, [selectedYear, etapasEnsino])
+  }, [academicPeriods, academicYearId])
 
-  // Derive available Shifts based on selected Grade
-  const availableShifts = useMemo(() => {
-    if (!selectedYear || !gradeId) return []
-    const turmas = selectedYear.turmas || []
-    const classesInGrade = turmas.filter(
-      (c: any) => c.serieAnoId === gradeId,
-    )
-    const shifts = new Set(classesInGrade.map((c: any) => c.shift))
-    return Array.from(shifts)
-  }, [selectedYear, gradeId])
-
-  // Derive available Classes based on Grade AND Shift
-  const availableClasses = useMemo(() => {
-    if (!selectedYear || !gradeId || !shift) return []
-    const turmas = selectedYear.turmas || []
-    return turmas.filter(
-      (c: any) =>
-        c.serieAnoId === gradeId && c.shift === shift,
-    )
-  }, [selectedYear, gradeId, shift])
-
-  // Derive Periods
-  const periods = useMemo(() => selectedYear?.periods || [], [selectedYear])
-
-  // Derive Subjects from Grade structure
-  const currentGradeStructure = useMemo(
-    () => availableGrades.find((g) => g.id === gradeId),
-    [availableGrades, gradeId],
-  )
-  const subjects = useMemo(
-    () => currentGradeStructure?.subjects || [],
-    [currentGradeStructure],
-  )
-
-  // Evaluation Rule for the selected Grade
-  const evaluationRule = useMemo(
-    () =>
-      evaluationRules.find(
-        (r) => r.id === currentGradeStructure?.evaluationRuleId,
-      ),
-    [evaluationRules, currentGradeStructure],
-  )
-
-  // Available Assessment Types
-  const availableAssessmentTypes = useMemo(() => {
-    if (!currentGradeStructure) return []
-
-    // Filter by grade/serieAno
-    const gradeTypes = assessmentTypes.filter((t) =>
-      (t.applicableSerieAnoIds || t.applicableGradeIds || []).includes(currentGradeStructure.id),
-    )
-
-    // Filter by category
-    if (category === 'external_exam') {
-      // External exams: excludeFromAverage === true
-      return gradeTypes.filter((t) => t.excludeFromAverage === true)
-    } else {
-      // Regular and Recuperation: Include types that usually count towards average (excludeFromAverage === false or undefined)
-      // Using !t.excludeFromAverage ensures false or undefined are included.
-      return gradeTypes.filter((t) => !t.excludeFromAverage)
-    }
-  }, [assessmentTypes, currentGradeStructure, category])
-
-  // --- Reset Effects for Dependent Fields ---
-
+  // Buscar turmas quando escola e ano são selecionados
   useEffect(() => {
-    if (schoolId) {
-      // Keep year if valid, else reset
-      const validYear = academicYears.find((y) => y.id === academicYearId)
-      if (!validYear) form.setValue('academicYearId', '')
-    } else {
-      form.setValue('academicYearId', '')
+    const fetchClasses = async () => {
+      if (schoolId && academicYearId) {
+        setClassesLoading(true)
+        try {
+          const classesData = await classService.getBySchool(parseInt(schoolId))
+          // Filtrar turmas pelo ano letivo
+          const filteredClasses = (classesData || []).filter(
+            (c) => c.academic_year_id?.toString() === academicYearId
+          )
+          setClasses(filteredClasses)
+        } catch {
+          toast.error('Erro ao carregar turmas')
+          setClasses([])
+        } finally {
+          setClassesLoading(false)
+        }
+      } else {
+        setClasses([])
+      }
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    fetchClasses()
   }, [schoolId, academicYearId])
 
-  useEffect(() => {
-    const validGrade = availableGrades.find((g) => g.id === gradeId)
-    if (!validGrade) form.setValue('gradeId', '')
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [gradeId])
+  // Filtrar turmas por curso
+  const filteredClasses = useMemo(() => {
+    if (!courseId) return classes
+    return classes.filter((c) => c.course_id?.toString() === courseId)
+  }, [classes, courseId])
 
+  // --- Reset Effects for Dependent Fields ---
   useEffect(() => {
-    if (!availableShifts.includes(shift)) form.setValue('shift', '')
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [shift])
-
-  useEffect(() => {
-    const validClass = availableClasses.find((c) => c.id === classId)
-    if (!validClass) form.setValue('classId', '')
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [classId])
-
-  useEffect(() => {
-    const validSubject = subjects.find((s) => s.id === subjectId)
-    if (!validSubject) form.setValue('subjectId', '')
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [subjectId])
-
-  // Reset assessment type if not in the new available list
-  useEffect(() => {
-    if (assessmentTypeId && availableAssessmentTypes.length > 0) {
-      const exists = availableAssessmentTypes.find(
-        (t) => t.id === assessmentTypeId,
-      )
-      if (!exists) form.setValue('assessmentTypeId', '')
+    if (schoolId) {
+      const validYear = safeAcademicYears.find((y) => y.id.toString() === academicYearId)
+      if (!validYear && academicYearId) form.setValue('academicYearId', '')
+    } else {
+      if (academicYearId) form.setValue('academicYearId', '')
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [assessmentTypeId])
+  }, [schoolId, academicYearId, safeAcademicYears, form])
+
+  useEffect(() => {
+    if (academicYearId) {
+      const validPeriod = filteredPeriods.find((p) => p.id.toString() === academicPeriodId)
+      if (!validPeriod && academicPeriodId) form.setValue('academicPeriodId', '')
+    } else {
+      if (academicPeriodId) form.setValue('academicPeriodId', '')
+    }
+  }, [academicYearId, academicPeriodId, filteredPeriods, form])
+
+  useEffect(() => {
+    if (courseId) {
+      const validClass = filteredClasses.find((c) => c.id.toString() === classId)
+      if (!validClass && classId) form.setValue('classId', '')
+    } else {
+      if (classId) form.setValue('classId', '')
+    }
+  }, [courseId, classId, filteredClasses, form])
+
+  useEffect(() => {
+    const validSubject = safeSubjects.find((s) => s.id.toString() === subjectId)
+    if (!validSubject && subjectId) form.setValue('subjectId', '')
+  }, [subjectId, safeSubjects, form])
 
   // --- Load Grades Data ---
-
-  const loadData = useCallback(() => {
-    if (!classId || !subjectId || !periodId) return
+  const loadData = useCallback(async () => {
+    if (!classId || !subjectId || !academicPeriodId) return
 
     setLoading(true)
-    // Simulate slight network delay for realism if desired, but keeping it snappy
-    setTimeout(() => {
-      const currentGrades: Record<string, number | string> = {}
+    try {
+      // Buscar matrículas da turma
+      const enrollmentsData = await enrollmentService.getEnrollmentsByClass(parseInt(classId))
+      setEnrollments(enrollmentsData || [])
 
-      // Find students currently enrolled in this class
-      // Filter by school and active enrollment
-      const targetClass = availableClasses.find((c) => c.id === classId)
+      // Buscar notas existentes
+      await fetchClassGrades(parseInt(classId))
 
-      const classStudents = (students || []).filter((s) => {
-        const enrollment = (s.enrollments || []).find((e) => e.status === 'Cursando')
-        // Match Logic: School Match AND Grade Match.
-        // Note: Enrollment.grade is usually the Class Name.
-        return (
-          enrollment &&
-          enrollment.schoolId === schoolId &&
-          targetClass &&
-          enrollment.grade === targetClass.name
+      // Inicializar studentGrades com notas existentes
+      const currentGrades: Record<number, number | string> = {}
+      
+      enrollmentsData?.forEach((enrollment: any) => {
+        const studentProfileId = enrollment.student_profile_id || enrollment.student_id
+        if (!studentProfileId) return
+
+        // Buscar nota do aluno
+        const grade = safeGrades.find(
+          (g) =>
+            g.student_profile_id === studentProfileId &&
+            g.evaluation_instance?.class_teacher_subject?.class_id?.toString() === classId &&
+            g.evaluation_instance?.class_teacher_subject?.subject_id?.toString() === subjectId
         )
-      })
-
-      classStudents.forEach((student) => {
-        const assessment = assessments.find(
-          (a) =>
-            a.studentId === student.id &&
-            a.classroomId === classId &&
-            a.subjectId === subjectId &&
-            a.periodId === periodId &&
-            (a.category || 'regular') === category &&
-            (assessmentTypeId ? a.assessmentTypeId === assessmentTypeId : true),
-        )
-        if (assessment) {
-          currentGrades[student.id] = assessment.value
+        
+        if (grade) {
+          currentGrades[studentProfileId] = grade.grade_value || ''
         }
       })
+
       setStudentGrades(currentGrades)
+    } catch {
+      toast.error('Erro ao carregar notas')
+    } finally {
       setLoading(false)
-    }, 300)
-  }, [
-    classId,
-    subjectId,
-    periodId,
-    category,
-    assessmentTypeId,
-    students,
-    assessments,
-    availableClasses,
-    schoolId,
-  ])
+    }
+  }, [classId, subjectId, academicPeriodId, fetchClassGrades, safeGrades])
 
   // Trigger load when filters are complete
   useEffect(() => {
-    // Check if all necessary filters are present
-    // If assessmentType is required (e.g. for specific types), check it too.
-    // Requirement: "Upon selection of all necessary filters... automatically load"
-    // If Types are available but none selected, we might not load grades yet or load generic?
-    // Assuming we need Type if availableTypes > 0.
-
     const basicFilters =
       schoolId &&
       academicYearId &&
-      gradeId &&
-      shift &&
+      academicPeriodId &&
+      courseId &&
       classId &&
-      periodId &&
       subjectId
-    const typeNeeded = availableAssessmentTypes.length > 0
 
-    if (basicFilters && (!typeNeeded || assessmentTypeId)) {
+    if (basicFilters) {
       loadData()
     } else {
       setStudentGrades({})
+      setEnrollments([])
     }
-  }, [
-    schoolId,
-    academicYearId,
-    gradeId,
-    shift,
-    classId,
-    periodId,
-    subjectId,
-    category,
-    assessmentTypeId,
-    availableAssessmentTypes,
-    loadData,
-  ])
+  }, [schoolId, academicYearId, academicPeriodId, courseId, classId, subjectId, loadData])
 
   const handleGradeChange = useCallback(
-    (studentId: string, value: string | number) => {
+    (studentId: number, value: string | number) => {
       setStudentGrades((prev) => ({ ...prev, [studentId]: value }))
     },
     [],
   )
 
-  const handleSave = () => {
+  const handleSave = async () => {
     const values = form.getValues()
-    const targetClass = availableClasses.find((c) => c.id === values.classId)
 
-    const classStudents = (students || []).filter((s) => {
-      const enrollment = (s.enrollments || []).find((e) => e.status === 'Cursando')
-      return (
-        enrollment &&
-        enrollment.schoolId === values.schoolId &&
-        targetClass &&
-        enrollment.grade === targetClass.name
-      )
-    })
-
+    setLoading(true)
     let savedCount = 0
-    classStudents.forEach((student) => {
-      const value = studentGrades[student.id]
-      if (value !== undefined && value !== '') {
-        // logic for linking recoveries
-        let relatedAssessmentId: string | undefined = undefined
 
-        if (values.category === 'recuperation' && values.assessmentTypeId) {
-          const related = assessments.find(
-            (a) =>
-              a.studentId === student.id &&
-              a.periodId === values.periodId &&
-              a.subjectId === values.subjectId &&
-              a.assessmentTypeId === values.assessmentTypeId &&
-              (a.category || 'regular') === 'regular',
-          )
-          if (related) relatedAssessmentId = related.id
-        }
+    try {
+      // Buscar instâncias de avaliação existentes para esta turma
+      const classIdNum = parseInt(values.classId)
+      const existingInstances = await evaluationInstanceService.getByClass(classIdNum)
+      
+      // Filtrar por disciplina se possível
+      const instancesForSubject = existingInstances.filter((inst) => {
+        const cts = inst.class_teacher_subject
+        return cts?.subject_id?.toString() === values.subjectId
+      })
 
-        addAssessment({
-          studentId: student.id,
-          schoolId: values.schoolId,
-          yearId: values.academicYearId,
-          classroomId: values.classId,
-          periodId: values.periodId,
-          subjectId: values.subjectId,
-          type: evaluationRule?.type || 'numeric',
-          category: values.category,
-          value: value,
-          date: new Date().toISOString().split('T')[0],
-          assessmentTypeId: values.assessmentTypeId || undefined,
-          relatedAssessmentId,
-        })
-        savedCount++
+      // Usar a primeira instância encontrada ou criar uma nova se necessário
+      let evaluationInstanceId: number | null = null
+      
+      if (instancesForSubject.length > 0) {
+        // Usar a instância mais recente para esta disciplina
+        evaluationInstanceId = instancesForSubject[0]?.id || null
+      } else if (existingInstances.length > 0) {
+        // Usar a primeira instância da turma (pode ser de outra disciplina)
+        evaluationInstanceId = existingInstances[0]?.id || null
       }
-    })
 
-    toast({
-      title: 'Diário Salvo',
-      description: `${savedCount} registros de avaliação atualizados com sucesso.`,
-    })
+      // Se não houver instância, criar uma nova
+      // TODO: Implementar criação de instância de avaliação quando class_teacher_subject estiver disponível
+      if (!evaluationInstanceId) {
+        toast.warning(
+          'Instância de avaliação não encontrada. ' +
+          'Por favor, crie uma alocação de professor para esta turma/disciplina primeiro.'
+        )
+        return
+      }
+
+      for (const enrollment of enrollments) {
+        const studentProfileId = enrollment.student_profile_id || enrollment.student_id
+        if (!studentProfileId) continue
+
+        const value = studentGrades[studentProfileId]
+        if (value === undefined || value === '') continue
+
+        try {
+          const gradeValue = typeof value === 'number' ? value : parseFloat(value as string)
+          
+          if (isNaN(gradeValue)) {
+            continue
+          }
+
+          const gradeData = {
+            evaluation_instance_id: evaluationInstanceId!,
+            student_profile_id: studentProfileId,
+            grade_value: gradeValue,
+            notes: typeof value === 'string' && isNaN(parseFloat(value)) ? value : undefined,
+          }
+
+          // O saveGrade já verifica se existe e atualiza automaticamente
+          await saveGrade(gradeData)
+          savedCount++
+        } catch {
+          toast.error(`Erro ao salvar nota do aluno ${studentProfileId}`)
+        }
+      }
+
+      if (savedCount > 0) {
+        toast.success(`${savedCount} nota(s) salva(s) com sucesso!`)
+        await loadData() // Recarregar dados
+      } else {
+        toast.warning('Nenhuma nota foi salva.')
+      }
+    } catch {
+      toast.error('Erro ao salvar notas')
+    } finally {
+      setLoading(false)
+    }
   }
 
   // Filtered students for rendering
   const filteredStudents = useMemo(() => {
-    if (!classId) return []
-    const targetClass = availableClasses.find((c) => c.id === classId)
-    if (!targetClass) return []
+    if (!classId || !enrollments.length) return []
 
-    return (students || [])
-      .filter((s) => {
-        const enrollment = (s.enrollments || []).find((e) => e.status === 'Cursando')
-        return (
-          enrollment &&
-          enrollment.schoolId === schoolId &&
-          enrollment.grade === targetClass.name
-        )
+    return enrollments
+      .map((enrollment) => {
+        const studentProfileId = enrollment.student_profile_id || enrollment.student_id
+        const student = safeStudents.find((s) => s.id === studentProfileId)
+        return student
       })
-      .sort((a, b) => a.name.localeCompare(b.name))
-  }, [students, classId, availableClasses, schoolId])
+      .filter(Boolean)
+      .sort((a: any, b: any) => {
+        const nameA = `${a.first_name || a.person?.first_name || ''} ${a.last_name || a.person?.last_name || ''}`
+        const nameB = `${b.first_name || b.person?.first_name || ''} ${b.last_name || b.person?.last_name || ''}`
+        return nameA.localeCompare(nameB)
+      })
+  }, [enrollments, safeStudents, classId])
 
   const isConfigComplete =
     schoolId &&
     academicYearId &&
-    gradeId &&
-    shift &&
+    academicPeriodId &&
+    courseId &&
     classId &&
-    periodId &&
-    subjectId &&
-    (!availableAssessmentTypes.length || assessmentTypeId)
+    subjectId
+
+  const isNumeric = true // TODO: buscar do tipo de avaliação
+  const maxGrade = 10 // TODO: buscar da regra de avaliação
 
   return (
     <div className="space-y-6 animate-fade-in pb-10">
@@ -533,7 +476,7 @@ export default function AssessmentInput() {
           Lançamento de Avaliações
         </h2>
         <p className="text-muted-foreground">
-          Registro dinâmico de notas por turma, turno e disciplina.
+          Registro dinâmico de notas por turma e disciplina.
         </p>
       </div>
 
@@ -551,7 +494,7 @@ export default function AssessmentInput() {
         <CardContent>
           <Form {...form}>
             <form className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {/* 1. School */}
                 <FormField
                   control={form.control}
@@ -562,6 +505,7 @@ export default function AssessmentInput() {
                       <Select
                         onValueChange={field.onChange}
                         value={field.value}
+                        disabled={schoolsLoading}
                       >
                         <FormControl>
                           <SelectTrigger>
@@ -569,13 +513,14 @@ export default function AssessmentInput() {
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          {schools.map((s) => (
-                            <SelectItem key={s.id} value={s.id}>
+                          {safeSchools.map((s) => (
+                            <SelectItem key={s.id} value={s.id.toString()}>
                               {s.name}
                             </SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
+                      <FormMessage />
                     </FormItem>
                   )}
                 />
@@ -590,7 +535,7 @@ export default function AssessmentInput() {
                       <Select
                         onValueChange={field.onChange}
                         value={field.value}
-                        disabled={!schoolId}
+                        disabled={!schoolId || yearsLoading}
                       >
                         <FormControl>
                           <SelectTrigger>
@@ -598,28 +543,29 @@ export default function AssessmentInput() {
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          {academicYears.map((y) => (
-                            <SelectItem key={y.id} value={y.id}>
+                          {safeAcademicYears.map((y) => (
+                            <SelectItem key={y.id} value={y.id.toString()}>
                               {y.name}
                             </SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
+                      <FormMessage />
                     </FormItem>
                   )}
                 />
 
-                {/* 3. Course/Series (Grade) */}
+                {/* 3. Academic Period */}
                 <FormField
                   control={form.control}
-                  name="gradeId"
+                  name="academicPeriodId"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Curso e Série</FormLabel>
+                      <FormLabel>Período</FormLabel>
                       <Select
                         onValueChange={field.onChange}
                         value={field.value}
-                        disabled={!academicYearId}
+                        disabled={!academicYearId || periodsLoading}
                       >
                         <FormControl>
                           <SelectTrigger>
@@ -627,31 +573,29 @@ export default function AssessmentInput() {
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          {availableGrades.map((g) => (
-                            <SelectItem key={g.id} value={g.id}>
-                              {g.name}{' '}
-                              <span className="text-muted-foreground text-xs">
-                                ({g.etapaEnsinoName || g.courseName})
-                              </span>
+                          {filteredPeriods.map((p) => (
+                            <SelectItem key={p.id} value={p.id.toString()}>
+                              {p.name}
                             </SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
+                      <FormMessage />
                     </FormItem>
                   )}
                 />
 
-                {/* 4. Shift (Turno) */}
+                {/* 4. Course */}
                 <FormField
                   control={form.control}
-                  name="shift"
+                  name="courseId"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Turno</FormLabel>
+                      <FormLabel>Curso</FormLabel>
                       <Select
                         onValueChange={field.onChange}
                         value={field.value}
-                        disabled={!gradeId}
+                        disabled={!academicYearId || coursesLoading}
                       >
                         <FormControl>
                           <SelectTrigger>
@@ -659,18 +603,19 @@ export default function AssessmentInput() {
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          {availableShifts.map((s) => (
-                            <SelectItem key={s} value={s}>
-                              {s}
+                          {safeCourses.map((c) => (
+                            <SelectItem key={c.id} value={c.id.toString()}>
+                              {c.name}
                             </SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
+                      <FormMessage />
                     </FormItem>
                   )}
                 />
 
-                {/* 5. Class (Turma) */}
+                {/* 5. Class */}
                 <FormField
                   control={form.control}
                   name="classId"
@@ -680,7 +625,7 @@ export default function AssessmentInput() {
                       <Select
                         onValueChange={field.onChange}
                         value={field.value}
-                        disabled={!shift}
+                        disabled={!courseId || classesLoading}
                       >
                         <FormControl>
                           <SelectTrigger>
@@ -688,47 +633,25 @@ export default function AssessmentInput() {
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          {availableClasses.map((c) => (
-                            <SelectItem key={c.id} value={c.id}>
-                              {c.name}
-                            </SelectItem>
-                          ))}
+                          {classesLoading ? (
+                            <div className="flex justify-center p-2">
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            </div>
+                          ) : (
+                            filteredClasses.map((c) => (
+                              <SelectItem key={c.id} value={c.id.toString()}>
+                                {c.name}
+                              </SelectItem>
+                            ))
+                          )}
                         </SelectContent>
                       </Select>
+                      <FormMessage />
                     </FormItem>
                   )}
                 />
 
-                {/* 6. Period */}
-                <FormField
-                  control={form.control}
-                  name="periodId"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Período</FormLabel>
-                      <Select
-                        onValueChange={field.onChange}
-                        value={field.value}
-                        disabled={!academicYearId}
-                      >
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Selecione..." />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {periods.map((p) => (
-                            <SelectItem key={p.id} value={p.id}>
-                              {p.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </FormItem>
-                  )}
-                />
-
-                {/* 7. Subject */}
+                {/* 6. Subject */}
                 <FormField
                   control={form.control}
                   name="subjectId"
@@ -738,7 +661,7 @@ export default function AssessmentInput() {
                       <Select
                         onValueChange={field.onChange}
                         value={field.value}
-                        disabled={!gradeId}
+                        disabled={!courseId || coursesLoading}
                       >
                         <FormControl>
                           <SelectTrigger>
@@ -746,91 +669,18 @@ export default function AssessmentInput() {
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          {subjects.map((s) => (
-                            <SelectItem key={s.id} value={s.id}>
+                          {safeSubjects.map((s) => (
+                            <SelectItem key={s.id} value={s.id.toString()}>
                               {s.name}
                             </SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
-                    </FormItem>
-                  )}
-                />
-
-                {/* 8. Category */}
-                <FormField
-                  control={form.control}
-                  name="category"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Categoria</FormLabel>
-                      <Select
-                        onValueChange={field.onChange}
-                        value={field.value}
-                      >
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          <SelectItem value="regular">Regular</SelectItem>
-                          <SelectItem value="recuperation">
-                            Recuperação
-                          </SelectItem>
-                          <SelectItem value="external_exam">
-                            Prova Externa
-                          </SelectItem>
-                        </SelectContent>
-                      </Select>
+                      <FormMessage />
                     </FormItem>
                   )}
                 />
               </div>
-
-              {/* 9. Assessment Type - Dynamic */}
-              {availableAssessmentTypes.length > 0 && (
-                <div className="animate-slide-down">
-                  <FormField
-                    control={form.control}
-                    name="assessmentTypeId"
-                    render={({ field }) => (
-                      <FormItem className="max-w-md">
-                        <FormLabel>
-                          Tipo de Avaliação{' '}
-                          {category === 'recuperation' ? '(Referência)' : ''}
-                        </FormLabel>
-                        <Select
-                          onValueChange={field.onChange}
-                          value={field.value}
-                        >
-                          <FormControl>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Selecione o tipo de avaliação..." />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            {availableAssessmentTypes.map((t) => (
-                              <SelectItem key={t.id} value={t.id}>
-                                {t.name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
-              )}
-
-              {availableAssessmentTypes.length === 0 && gradeId && (
-                <div className="bg-yellow-50 text-yellow-800 p-3 rounded-md flex items-center gap-2 text-sm border border-yellow-200">
-                  <AlertCircle className="h-4 w-4" />
-                  Nenhum tipo de avaliação configurado para esta
-                  categoria/série.
-                </div>
-              )}
             </form>
           </Form>
         </CardContent>
@@ -848,17 +698,14 @@ export default function AssessmentInput() {
                 Diário de Classe
               </CardTitle>
               <CardDescription>
-                {filteredStudents.length} alunos listados
+                {filteredStudents.length} aluno(s) listado(s)
               </CardDescription>
             </div>
             <div className="flex gap-2">
-              <Badge className="h-8 px-3 bg-gradient-to-r from-purple-500/20 to-purple-600/20 text-purple-700 border-purple-300">
-                {evaluationRule?.name}
-              </Badge>
               <RequirePermission permission="create:assessment">
                 <Button 
                   onClick={handleSave} 
-                  disabled={loading} 
+                  disabled={loading || studentsLoading || gradesLoading} 
                   size="sm"
                   className="bg-gradient-to-r from-purple-500 via-purple-600 to-purple-500 bg-size-200 bg-pos-0 hover:bg-pos-100 text-white shadow-lg hover:shadow-xl transition-all duration-500 transform hover:scale-105 font-semibold disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
                 >
@@ -875,31 +722,46 @@ export default function AssessmentInput() {
             </div>
           </CardHeader>
           <CardContent>
-            {loading ? (
-              <div className="flex justify-center py-12">
-                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            {loading || studentsLoading ? (
+              <div className="space-y-2">
+                {Array.from({ length: 5 }).map((_, index) => (
+                  <div key={`skeleton-${index}`} className="flex gap-4">
+                    <Skeleton className="h-16 w-full" />
+                  </div>
+                ))}
               </div>
             ) : filteredStudents.length === 0 ? (
               <div className="text-center py-12 text-muted-foreground border-2 border-dashed rounded-lg">
-                Nenhum aluno encontrado nesta turma.
+                <AlertCircle className="h-12 w-12 mx-auto mb-4 opacity-20" />
+                <p className="font-medium">Nenhum aluno encontrado nesta turma.</p>
+                <p className="text-sm mt-2">Verifique se há alunos matriculados na turma selecionada.</p>
               </div>
             ) : (
               <div className="space-y-2">
-                {filteredStudents.map((student) => (
+                {filteredStudents.map((student: any) => (
                   <StudentRow
-                    key={student.id}
+                    key={`student-${student.id}`}
                     student={student}
                     value={studentGrades[student.id]}
-                    max={evaluationRule?.maxGrade || 10}
-                    isNumeric={evaluationRule?.type === 'numeric'}
+                    max={maxGrade}
+                    isNumeric={isNumeric}
                     onChange={handleGradeChange}
                   />
                 ))}
 
                 <div className="flex justify-end pt-6 sticky bottom-4">
                   <RequirePermission permission="create:assessment">
-                    <Button size="lg" onClick={handleSave} className="shadow-lg">
-                      <Save className="mr-2 h-4 w-4" />
+                    <Button 
+                      size="lg" 
+                      onClick={handleSave} 
+                      disabled={loading}
+                      className="shadow-lg bg-gradient-to-r from-purple-500 via-purple-600 to-purple-500 bg-size-200 bg-pos-0 hover:bg-pos-100 text-white"
+                    >
+                      {loading ? (
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      ) : (
+                        <Save className="mr-2 h-4 w-4" />
+                      )}
                       Salvar Alterações
                     </Button>
                   </RequirePermission>
@@ -914,9 +776,8 @@ export default function AssessmentInput() {
           <p className="text-lg font-medium">
             Selecione todos os filtros acima para carregar o diário.
           </p>
-          <p className="text-sm">
-            Certifique-se de que a configuração de tipos de avaliação esteja
-            correta.
+          <p className="text-sm mt-2">
+            Configure escola, ano letivo, período, curso, turma e disciplina.
           </p>
         </div>
       )}

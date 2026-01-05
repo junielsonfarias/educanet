@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import {
   Search,
   FileText,
@@ -27,11 +27,12 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { Badge } from '@/components/ui/badge'
-import useStudentStore from '@/stores/useStudentStore'
-import useAssessmentStore from '@/stores/useAssessmentStore'
-import useCourseStore from '@/stores/useCourseStore'
-import useSchoolStore from '@/stores/useSchoolStore'
-import useSettingsStore from '@/stores/useSettingsStore'
+import { useStudentStore } from '@/stores/useStudentStore.supabase'
+import { useAssessmentStore } from '@/stores/useAssessmentStore.supabase'
+import { useCourseStore } from '@/stores/useCourseStore.supabase'
+import { useSchoolStore } from '@/stores/useSchoolStore.supabase'
+import { useSettingsStore } from '@/stores/useSettingsStore.supabase'
+import { enrollmentService } from '@/lib/supabase/services'
 import { calculateGrades } from '@/lib/grade-calculator'
 import {
   Command,
@@ -56,10 +57,10 @@ import { Check, ChevronsUpDown } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 export default function IndividualPerformanceReport() {
-  const { students } = useStudentStore()
-  const { assessments, assessmentTypes } = useAssessmentStore()
-  const { etapasEnsino, evaluationRules } = useCourseStore()
-  const { schools } = useSchoolStore()
+  const { students, fetchStudents } = useStudentStore()
+  const { grades, fetchGrades } = useAssessmentStore()
+  const { courses, fetchCourses } = useCourseStore()
+  const { schools, fetchSchools } = useSchoolStore()
   const { settings } = useSettingsStore()
 
   const [openCombobox, setOpenCombobox] = useState(false)
@@ -67,26 +68,57 @@ export default function IndividualPerformanceReport() {
   const [selectedEnrollmentId, setSelectedEnrollmentId] = useState('')
   const [disciplineFilter, setDisciplineFilter] = useState('all')
   const [periodFilter, setPeriodFilter] = useState('all')
+  const [enrollments, setEnrollments] = useState<any[]>([])
 
-  const student = students.find((s) => s.id === selectedStudentId)
+  useEffect(() => {
+    fetchStudents()
+    fetchGrades()
+    fetchCourses()
+    fetchSchools()
+  }, [fetchStudents, fetchGrades, fetchCourses, fetchSchools])
+
+  const student = students.find((s) => s.id.toString() === selectedStudentId)
+
+  // Buscar matrículas do aluno selecionado
+  useEffect(() => {
+    const loadEnrollments = async () => {
+      if (selectedStudentId) {
+        try {
+          const studentEnrollments = await enrollmentService.getByStudent(parseInt(selectedStudentId))
+          setEnrollments(studentEnrollments)
+        } catch {
+          setEnrollments([])
+        }
+      } else {
+        setEnrollments([])
+      }
+    }
+    loadEnrollments()
+  }, [selectedStudentId])
 
   // Determine available enrollments for selected student
   const availableEnrollments = useMemo(() => {
-    if (!student) return []
-    return student.enrollments.map((e) => {
-      const school = schools.find((s) => s.id === e.schoolId)
+    if (!student || enrollments.length === 0) return []
+    return enrollments.map((e) => {
+      const school = schools.find((s) => s.id === e.school_id)
+      const className = e.class?.name || 'N/A'
+      const academicYear = e.academic_year?.name || 'N/A'
       return {
         ...e,
+        id: e.id.toString(),
         schoolName: school?.name || 'Escola Desconhecida',
-        label: `${e.year} - ${e.grade} (${school?.name})`,
+        label: `${academicYear} - ${className} (${school?.name})`,
+        year: academicYear,
+        grade: className,
+        schoolId: e.school_id?.toString(),
       }
     })
-  }, [student, schools])
+  }, [student, enrollments, schools])
 
   // Select first enrollment by default
-  useMemo(() => {
+  useEffect(() => {
     if (availableEnrollments.length > 0 && !selectedEnrollmentId) {
-      const active = availableEnrollments.find((e) => e.status === 'Cursando')
+      const active = availableEnrollments.find((e) => e.status === 'Ativo' || e.status === 'Cursando')
       setSelectedEnrollmentId(active ? active.id : availableEnrollments[0].id)
     }
   }, [availableEnrollments, selectedEnrollmentId])
@@ -98,85 +130,82 @@ export default function IndividualPerformanceReport() {
   const reportData = useMemo(() => {
     if (!student || !selectedEnrollment) return null
 
-    const school = schools.find((s) => s.id === selectedEnrollment.schoolId)
-    const academicYear = school?.academicYears.find(
-      (y) => y.name === selectedEnrollment.year.toString(),
-    )
-    const turmas = academicYear?.turmas || academicYear?.classes || []
-    const classroom = turmas.find(
-      (c) => c.name === selectedEnrollment.grade,
-    )
+    const enrollment = enrollments.find((e) => e.id.toString() === selectedEnrollmentId)
+    if (!enrollment) return null
 
-    let gradeStructure: any = null
-    let courseEvaluationRule: any = null
+    const classId = enrollment.class_id
+    const grade = courses.find((g) => g.id === enrollment.class?.grade_id)
+    if (!grade) return null
 
-    for (const etapaEnsino of etapasEnsino) {
-      const s = etapaEnsino.seriesAnos.find(
-        (sr) =>
-          sr.name === selectedEnrollment.grade ||
-          (classroom && sr.id === classroom.serieAnoId),
-      )
-      if (s) {
-        gradeStructure = s
-        courseEvaluationRule = evaluationRules.find(
-          (r) => r.id === s.evaluationRuleId,
-        )
-        break
-      }
-    }
+    const subjects = grade.subjects || []
 
-    if (!gradeStructure || !courseEvaluationRule) return null
-
-    const periods = academicYear?.periods || []
-
-    const subjects = gradeStructure.subjects.map((subject: any) => {
-      if (disciplineFilter !== 'all' && subject.id !== disciplineFilter)
+    const subjectsData = subjects.map((subject: any) => {
+      if (disciplineFilter !== 'all' && subject.id.toString() !== disciplineFilter)
         return null
 
-      const subjectAssessments = assessments.filter(
-        (a) =>
-          a.studentId === student.id &&
-          a.subjectId === subject.id &&
-          academicYear!.id === a.yearId,
+      // Buscar notas do aluno para esta disciplina e turma
+      const subjectGrades = grades.filter(
+        (g) =>
+          g.student_profile_id === student.id &&
+          g.evaluation_instance?.subject_id === subject.id &&
+          g.evaluation_instance?.class_id === classId,
       )
 
-      const calculation = calculateGrades(
-        subjectAssessments,
-        courseEvaluationRule,
-        periods,
-        assessmentTypes,
-        settings.defaultRecoveryStrategy,
-      )
+      // Calcular média
+      let finalGrade = 0
+      let isPassing = false
+      if (subjectGrades.length > 0) {
+        finalGrade = subjectGrades.reduce((sum, g) => sum + (g.grade_value || 0), 0) / subjectGrades.length
+        isPassing = finalGrade >= 6.0 // Pode ser configurável
+      }
 
-      const flatAssessments = calculation.periodResults
-        .filter((p) => periodFilter === 'all' || p.periodId === periodFilter)
-        .flatMap((p) =>
-          p.assessments.map((a) => ({ ...a, periodName: p.periodName })),
+      // Filtrar por período se necessário
+      let periodGrades = subjectGrades
+      if (periodFilter !== 'all') {
+        periodGrades = subjectGrades.filter(
+          (g) => g.evaluation_instance?.academic_period_id?.toString() === periodFilter
         )
+      }
+
+      // Mapear notas para formato esperado
+      const flatAssessments = periodGrades.map((g) => ({
+        id: g.id.toString(),
+        date: g.evaluation_instance?.evaluation_date || g.created_at,
+        value: g.grade_value || 0,
+        originalValue: g.grade_value || 0,
+        isRecovered: false, // TODO: Implementar lógica de recuperação se necessário
+        recoveryValue: null,
+        periodName: g.evaluation_instance?.academic_period?.name || 'Geral',
+        assessmentTypeId: g.evaluation_instance?.evaluation_type || 'Prova',
+      }))
 
       return {
         subjectId: subject.id,
         subjectName: subject.name,
         flatAssessments,
-        finalGrade: calculation.finalGrade,
-        status: calculation.status,
+        finalGrade: finalGrade,
+        status: isPassing ? 'Aprovado' : 'Em Risco',
       }
-    })
+    }).filter(Boolean)
+
+    // Buscar períodos acadêmicos
+    const academicPeriods = enrollment.academic_year?.academic_periods || []
 
     return {
-      subjects: subjects.filter(Boolean),
-      periods,
-      allSubjectsList: gradeStructure.subjects,
+      subjects: subjectsData,
+      periods: academicPeriods.map((p: any) => ({
+        id: p.id.toString(),
+        periodName: p.name,
+      })),
+      allSubjectsList: subjects,
     }
   }, [
     student,
     selectedEnrollment,
-    schools,
-    etapasEnsino,
-    evaluationRules,
-    assessments,
-    assessmentTypes,
-    settings.defaultRecoveryStrategy,
+    selectedEnrollmentId,
+    enrollments,
+    courses,
+    grades,
     disciplineFilter,
     periodFilter,
   ])
@@ -187,18 +216,17 @@ export default function IndividualPerformanceReport() {
     let csvContent =
       'data:text/csv;charset=utf-8,Aluno,Disciplina,Periodo,Data,Avaliacao,Nota Original,Recuperacao,Nota Final\n'
 
+    const studentName = `${student.person?.first_name || ''} ${student.person?.last_name || ''}`.trim()
+
     reportData.subjects.forEach((subject: any) => {
       subject.flatAssessments.forEach((assessment: any) => {
-        const type = assessmentTypes.find(
-          (t) => t.id === assessment.assessmentTypeId,
-        )
         const row = [
-          student.name,
+          studentName,
           subject.subjectName,
           assessment.periodName,
           assessment.date ? new Date(assessment.date).toLocaleDateString() : '',
-          type?.name || 'Avaliacao',
-          assessment.isRecovered ? assessment.originalValue : assessment.value, // Logic check: value is effective, originalValue is stored if recovered
+          assessment.assessmentTypeId || 'Avaliacao',
+          assessment.isRecovered ? assessment.originalValue : assessment.value,
           assessment.isRecovered ? assessment.recoveryValue : '-',
           assessment.value,
         ].join(',')
@@ -209,7 +237,7 @@ export default function IndividualPerformanceReport() {
     const encodedUri = encodeURI(csvContent)
     const link = document.createElement('a')
     link.setAttribute('href', encodedUri)
-    link.setAttribute('download', `relatorio_${student.name}.csv`)
+    link.setAttribute('download', `relatorio_${studentName.replace(/\s+/g, '_')}.csv`)
     document.body.appendChild(link)
     link.click()
     document.body.removeChild(link)
@@ -239,7 +267,9 @@ export default function IndividualPerformanceReport() {
                     aria-expanded={openCombobox}
                     className="w-full justify-between"
                   >
-                    {student ? student.name : 'Buscar aluno...'}
+                    {student 
+                      ? `${student.person?.first_name || ''} ${student.person?.last_name || ''}`.trim() || 'Aluno'
+                      : 'Buscar aluno...'}
                     <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                   </Button>
                 </PopoverTrigger>
@@ -400,9 +430,6 @@ export default function IndividualPerformanceReport() {
                       </TableHeader>
                       <TableBody>
                         {item.flatAssessments.map((assessment: any) => {
-                          const type = assessmentTypes.find(
-                            (t) => t.id === assessment.assessmentTypeId,
-                          )
                           return (
                             <TableRow key={assessment.id}>
                               <TableCell className="text-muted-foreground text-sm">
@@ -416,7 +443,7 @@ export default function IndividualPerformanceReport() {
                               <TableCell>
                                 <div className="flex flex-col">
                                   <span className="font-medium">
-                                    {type?.name || 'Avaliação'}
+                                    {assessment.assessmentTypeId || 'Avaliação'}
                                   </span>
                                   {assessment.category === 'recuperation' && (
                                     <span className="text-xs text-muted-foreground">

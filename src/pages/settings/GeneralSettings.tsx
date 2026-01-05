@@ -27,15 +27,15 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import useSettingsStore from '@/stores/useSettingsStore'
+import { useSettingsStore } from '@/stores/useSettingsStore.supabase'
 import { useToast } from '@/hooks/use-toast'
-import { fileToBase64 } from '@/lib/file-utils'
+import { toast } from 'sonner'
 import { Textarea } from '@/components/ui/textarea'
 import { availableMunicipalities } from '@/services/qedu-service'
 
 export default function GeneralSettings() {
   const { settings, updateSettings } = useSettingsStore()
-  const { toast } = useToast()
+  const { toast: toastHook } = useToast()
 
   const [formData, setFormData] = useState(settings)
   const municipalityLogoInputRef = useRef<HTMLInputElement>(null)
@@ -58,28 +58,62 @@ export default function GeneralSettings() {
     const file = e.target.files?.[0]
     if (file) {
       try {
-        const base64 = await fileToBase64(file)
-        setFormData((prev) => ({ ...prev, [field]: base64 }))
-        toast({
-          title: 'Arquivo carregado',
-          description: `A imagem foi processada. Salve para confirmar.`,
+        // Fazer upload para Supabase Storage (validações são feitas dentro da função)
+        const { uploadFile } = await import('@/lib/supabase/storage')
+        
+        const filePath = `logos/${field}/${Date.now()}-${file.name}`
+        const uploadResult = await uploadFile({
+          bucket: 'photos', // Usar bucket 'photos' que é público
+          file,
+          path: filePath,
+          upsert: true, // Substituir se já existir
+        })
+
+        if (!uploadResult.success || !uploadResult.publicUrl) {
+          throw new Error(uploadResult.error || 'Erro ao fazer upload da imagem')
+        }
+
+        // Atualizar formData com a URL pública
+        setFormData((prev) => ({ ...prev, [field]: uploadResult.publicUrl }))
+        
+        toast.success('Arquivo carregado', {
+          description: 'A imagem foi enviada com sucesso. Salve para confirmar.',
         })
       } catch (error) {
-        toast({
-          variant: 'destructive',
-          title: 'Erro no carregamento',
-          description: 'Não foi possível processar a imagem.',
+        toast.error('Erro no carregamento', {
+          description: error instanceof Error ? error.message : 'Não foi possível processar a imagem.',
         })
       }
     }
   }
 
-  const handleSave = () => {
-    updateSettings(formData)
-    toast({
-      title: 'Configurações salvas',
-      description: 'As alterações foram aplicadas ao sistema.',
-    })
+  const handleSave = async () => {
+    try {
+      // Salvar no Supabase usando settingsService
+      const { settingsService } = await import('@/lib/supabase/services')
+      
+      // Salvar cada campo de configuração no Supabase
+      await settingsService.setMultiple({
+        municipalityName: formData.municipalityName,
+        educationSecretaryName: formData.educationSecretaryName,
+        municipalityLogo: formData.municipalityLogo || null,
+        secretaryLogo: formData.secretaryLogo || null,
+        facebookHandle: formData.facebookHandle || null,
+        footerText: formData.footerText || null,
+        qeduMunicipalityId: formData.qeduMunicipalityId || null,
+      }, 'general')
+
+      // Também atualizar o store local para compatibilidade
+      updateSettings(formData)
+      
+      toast.success('Configurações salvas', {
+        description: 'As alterações foram aplicadas ao sistema e estão disponíveis em todos os navegadores.',
+      })
+    } catch {
+      toast.error('Erro ao salvar', {
+        description: 'Não foi possível salvar as configurações. Tente novamente.',
+      })
+    }
   }
 
   return (

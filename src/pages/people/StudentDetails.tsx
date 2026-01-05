@@ -31,11 +31,11 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import useStudentStore from '@/stores/useStudentStore'
+import { useStudentStore } from '@/stores/useStudentStore.supabase'
 import useUserStore from '@/stores/useUserStore'
-import useSchoolStore from '@/stores/useSchoolStore'
-import useAssessmentStore from '@/stores/useAssessmentStore'
-import useCourseStore from '@/stores/useCourseStore'
+import { useSchoolStore } from '@/stores/useSchoolStore.supabase'
+import { useAssessmentStore } from '@/stores/useAssessmentStore.supabase'
+import { useCourseStore } from '@/stores/useCourseStore.supabase'
 import useProjectStore from '@/stores/useProjectStore'
 import useOccurrenceStore from '@/stores/useOccurrenceStore'
 import {

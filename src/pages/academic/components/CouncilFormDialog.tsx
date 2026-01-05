@@ -40,7 +40,7 @@ import { cn } from '@/lib/utils'
 import { ptBR } from 'date-fns/locale'
 import { useToast } from '@/hooks/use-toast'
 import useCouncilStore from '@/stores/useCouncilStore'
-import useSchoolStore from '@/stores/useSchoolStore'
+import { useSchoolStore } from '@/stores/useSchoolStore.supabase'
 import useUserStore from '@/stores/useUserStore'
 
 const councilSchema = z.object({

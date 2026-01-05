@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import {
   Dialog,
   DialogContent,
@@ -16,9 +16,12 @@ import {
 } from '@/components/ui/select'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
-import useStudentStore from '@/stores/useStudentStore'
-import useSchoolStore from '@/stores/useSchoolStore'
+import { useStudentStore } from '@/stores/useStudentStore.supabase'
+import { useSchoolStore } from '@/stores/useSchoolStore.supabase'
+import { useAcademicYearStore } from '@/stores/useAcademicYearStore.supabase'
+import { classService } from '@/lib/supabase/services'
 import { DocumentType } from '@/lib/mock-data'
+import { Skeleton } from '@/components/ui/skeleton'
 
 interface DocumentGenerationDialogProps {
   open: boolean
@@ -37,25 +40,58 @@ export function DocumentGenerationDialog({
   onOpenChange,
   onGenerate,
 }: DocumentGenerationDialogProps) {
-  const { students } = useStudentStore()
-  const { schools } = useSchoolStore()
+  const { students, fetchStudents } = useStudentStore()
+  const { schools, fetchSchools } = useSchoolStore()
+  const { academicYears, fetchAcademicYears } = useAcademicYearStore()
 
   const [documentType, setDocumentType] = useState<DocumentType>('historico')
   const [selectedStudent, setSelectedStudent] = useState<string>('')
   const [selectedSchool, setSelectedSchool] = useState<string>('')
   const [selectedAcademicYear, setSelectedAcademicYear] = useState<string>('')
   const [selectedClassroom, setSelectedClassroom] = useState<string>('')
+  const [classes, setClasses] = useState<any[]>([])
+  const [loadingClasses, setLoadingClasses] = useState(false)
 
-  const selectedSchoolData = schools.find((s) => s.id === selectedSchool)
-  const academicYears = selectedSchoolData?.academicYears || []
-  const selectedYear = academicYears.find((y) => y.id === selectedAcademicYear)
-  const turmas = selectedYear?.turmas || []
-  const classrooms = turmas
+  // Carregar dados iniciais
+  useEffect(() => {
+    if (open) {
+      fetchStudents()
+      fetchSchools()
+      fetchAcademicYears()
+    }
+  }, [open, fetchStudents, fetchSchools, fetchAcademicYears])
 
-  const selectedStudentData = students.find((s) => s.id === selectedStudent)
-  const studentEnrollments = selectedStudentData?.enrollments.filter(
-    (e) => e.schoolId === selectedSchool,
-  ) || []
+  // Filtrar anos letivos por escola
+  const filteredAcademicYears = academicYears.filter((y) => 
+    y.school_id?.toString() === selectedSchool
+  )
+
+  // Buscar turmas quando escola e ano são selecionados
+  useEffect(() => {
+    const fetchClasses = async () => {
+      if (selectedSchool && selectedAcademicYear) {
+        setLoadingClasses(true)
+        try {
+          const classesData = await classService.getBySchool(parseInt(selectedSchool))
+          const filteredClasses = (classesData || []).filter(
+            (c) => c.academic_year_id?.toString() === selectedAcademicYear
+          )
+          setClasses(filteredClasses)
+        } catch (error) {
+          console.error('Erro ao buscar turmas:', error)
+          setClasses([])
+        } finally {
+          setLoadingClasses(false)
+        }
+      } else {
+        setClasses([])
+      }
+    }
+    fetchClasses()
+  }, [selectedSchool, selectedAcademicYear])
+
+  const safeStudents = Array.isArray(students) ? students : []
+  const safeSchools = Array.isArray(schools) ? schools : []
 
   const handleGenerate = () => {
     if (!selectedStudent || !selectedSchool) {
@@ -131,11 +167,14 @@ export function DocumentGenerationDialog({
                 <SelectValue placeholder="Selecione o aluno" />
               </SelectTrigger>
               <SelectContent>
-                {students.map((student) => (
-                  <SelectItem key={student.id} value={student.id}>
-                    {student.name} - {student.registration}
-                  </SelectItem>
-                ))}
+                {safeStudents.map((student) => {
+                  const fullName = `${student.person?.first_name || ''} ${student.person?.last_name || ''}`.trim()
+                  return (
+                    <SelectItem key={student.id} value={student.id.toString()}>
+                      {fullName} - {student.registration_number || student.id}
+                    </SelectItem>
+                  )
+                })}
               </SelectContent>
             </Select>
           </div>
@@ -147,8 +186,8 @@ export function DocumentGenerationDialog({
                 <SelectValue placeholder="Selecione a escola" />
               </SelectTrigger>
               <SelectContent>
-                {schools.map((school) => (
-                  <SelectItem key={school.id} value={school.id}>
+                {safeSchools.map((school) => (
+                  <SelectItem key={school.id} value={school.id.toString()}>
                     {school.name}
                   </SelectItem>
                 ))}
@@ -168,8 +207,8 @@ export function DocumentGenerationDialog({
                     <SelectValue placeholder="Selecione o ano letivo" />
                   </SelectTrigger>
                   <SelectContent>
-                    {academicYears.map((year) => (
-                      <SelectItem key={year.id} value={year.id}>
+                    {filteredAcademicYears.map((year) => (
+                      <SelectItem key={year.id} value={year.id.toString()}>
                         {year.name}
                       </SelectItem>
                     ))}
@@ -187,11 +226,17 @@ export function DocumentGenerationDialog({
                     <SelectValue placeholder="Selecione a turma" />
                   </SelectTrigger>
                   <SelectContent>
-                    {classrooms.map((classroom) => (
-                      <SelectItem key={classroom.id} value={classroom.id}>
-                        {classroom.name}
-                      </SelectItem>
-                    ))}
+                    {loadingClasses ? (
+                      <div className="flex justify-center p-2">
+                        <Skeleton className="h-4 w-32" />
+                      </div>
+                    ) : (
+                      classes.map((classroom) => (
+                        <SelectItem key={classroom.id} value={classroom.id.toString()}>
+                          {classroom.name}
+                        </SelectItem>
+                      ))
+                    )}
                   </SelectContent>
                 </Select>
               </div>

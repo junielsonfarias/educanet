@@ -20,8 +20,8 @@ import {
 import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import useCouncilStore from '@/stores/useCouncilStore'
-import useSchoolStore from '@/stores/useSchoolStore'
-import useStudentStore from '@/stores/useStudentStore'
+import { useSchoolStore } from '@/stores/useSchoolStore.supabase'
+import { useStudentStore } from '@/stores/useStudentStore.supabase'
 
 interface CouncilDetailsDialogProps {
   open: boolean

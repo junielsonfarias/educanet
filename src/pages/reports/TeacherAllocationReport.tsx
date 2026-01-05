@@ -10,9 +10,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { ArrowLeft, Printer } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
-import useTeacherStore from '@/stores/useTeacherStore'
-import useSchoolStore from '@/stores/useSchoolStore'
-import useCourseStore from '@/stores/useCourseStore'
+import { useTeacherStore } from '@/stores/useTeacherStore.supabase'
+import { useSchoolStore } from '@/stores/useSchoolStore.supabase'
+import { useCourseStore } from '@/stores/useCourseStore.supabase'
 
 export default function TeacherAllocationReport() {
   const navigate = useNavigate()

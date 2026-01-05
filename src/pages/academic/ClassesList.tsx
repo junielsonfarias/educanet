@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import {
   Calendar,
   Users,
@@ -20,6 +20,7 @@ import {
 } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
+import { Skeleton } from '@/components/ui/skeleton'
 import {
   Select,
   SelectContent,
@@ -43,67 +44,87 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
-import useSchoolStore from '@/stores/useSchoolStore'
-import useCourseStore from '@/stores/useCourseStore'
-import useUserStore from '@/stores/useUserStore'
-import useStudentStore from '@/stores/useStudentStore'
-import useAssessmentStore from '@/stores/useAssessmentStore'
-import useAttendanceStore from '@/stores/useAttendanceStore'
-import useOccurrenceStore from '@/stores/useOccurrenceStore'
-import useTeacherStore from '@/stores/useTeacherStore'
+import { useSchoolStore } from '@/stores/useSchoolStore.supabase'
+import { useCourseStore } from '@/stores/useCourseStore.supabase'
+import { useAuth } from '@/hooks/useAuth'
+import { classService } from '@/lib/supabase/services'
+import type { ClassWithDetails } from '@/lib/supabase/services/class-service'
 import { ClassroomDialog } from '@/pages/schools/components/ClassroomDialog'
-import { useToast } from '@/hooks/use-toast'
-import {
-  getClassroomDataStats,
-  cleanupClassroomData,
-} from '@/lib/cleanup-utils'
+import { toast } from 'sonner'
 
 export default function ClassesList() {
-  const { schools, addClassroom, updateClassroom, deleteClassroom } =
-    useSchoolStore()
-  const { etapasEnsino } = useCourseStore()
-  const { currentUser } = useUserStore()
-  const { students, updateStudent } = useStudentStore()
-  const { assessments, removeAssessment } = useAssessmentStore()
-  const { attendanceRecords, removeAttendanceRecord } = useAttendanceStore()
-  const { occurrences, removeOccurrence } = useOccurrenceStore()
-  const { teachers, updateTeacher } = useTeacherStore()
-  const { toast } = useToast()
+  const { schools, loading: schoolsLoading, fetchSchools } = useSchoolStore()
+  const { userData } = useAuth()
+  
+  const [classes, setClasses] = useState<ClassWithDetails[]>([])
+  const [loading, setLoading] = useState(true)
 
   // Filters
   const [searchTerm, setSearchTerm] = useState('')
   const [schoolFilter, setSchoolFilter] = useState('all')
   const [gradeFilter, setGradeFilter] = useState('all')
   const [shiftFilter, setShiftFilter] = useState('all')
-  const [yearFilter, setYearFilter] = useState('all') // Not perfectly usable across all schools, but can filter by name (e.g. "2024")
+  const [yearFilter, setYearFilter] = useState('all')
 
   // Modal State
   const [isDialogOpen, setIsDialogOpen] = useState(false)
-  const [editingClass, setEditingClass] = useState<any>(null)
-  const [deleteData, setDeleteData] = useState<{
-    schoolId: string
-    yearId: string
-    classId: string
-  } | null>(null)
+  const [editingClass, setEditingClass] = useState<ClassWithDetails | null>(null)
+  const [deleteId, setDeleteId] = useState<number | null>(null)
 
-  // Flatten all classes (suporta tanto 'turmas' quanto 'classes' para compatibilidade)
-  const allClasses = (schools || []).flatMap((school) => {
-    if (!school || !Array.isArray(school.academicYears)) return []
-    return school.academicYears.flatMap((year) => {
-      const turmas = year.turmas || year.classes || []
-      if (!year || !Array.isArray(turmas)) return []
-      return turmas.map((cls) => ({
-        ...cls,
-        schoolName: school.name,
-        schoolId: school.id,
-        yearName: year.name,
-        yearId: year.id,
-      }))
-    })
-  })
+  // Carregar escolas e classes ao montar
+  useEffect(() => {
+    const loadData = async () => {
+      try {
+        setLoading(true)
+        await fetchSchools()
+        
+        // Carregar todas as classes
+        const allClassesData = await classService.getAll({
+          sort: { column: 'name', ascending: true }
+        })
+        
+        // Buscar informações completas para cada classe
+        const classesWithDetails = await Promise.all(
+          allClassesData.map(async (cls) => {
+            try {
+              return await classService.getClassFullInfo(cls.id)
+            } catch {
+              return null
+            }
+          })
+        )
+        
+        setClasses(classesWithDetails.filter(Boolean) as ClassWithDetails[])
+      } catch (error: any) {
+        toast.error(error?.message || 'Erro ao carregar turmas')
+      } finally {
+        setLoading(false)
+      }
+    }
+    
+    loadData()
+  }, [fetchSchools])
 
-  // Unique lists for filters (filtrar valores undefined/null e garantir strings)
-  // Memoizado para evitar recriações desnecessárias que podem causar problemas no Select
+  // Adaptar classes para estrutura esperada pelo componente
+  const allClasses = useMemo(() => {
+    return classes.map((cls) => ({
+      ...cls,
+      id: cls.id.toString(),
+      name: cls.name || '',
+      schoolName: cls.school?.name || '',
+      schoolId: cls.school_id?.toString() || '',
+      yearName: cls.academic_year?.name || '',
+      yearId: cls.academic_year_id?.toString() || '',
+      gradeName: cls.course?.name || '',
+      serieAnoName: cls.course?.name || '',
+      shift: cls.shift || '',
+      capacity: cls.capacity || 0,
+      isMultiGrade: false, // Pode ser calculado se necessário
+      stats: cls.stats,
+    }))
+  }, [classes])
+
+  // Unique lists for filters
   const uniqueYears = useMemo(
     () =>
       Array.from(
@@ -115,6 +136,7 @@ export default function ClassesList() {
       ).sort(),
     [allClasses],
   )
+  
   const uniqueGrades = useMemo(
     () =>
       Array.from(
@@ -129,7 +151,8 @@ export default function ClassesList() {
 
   // Filtering
   const filteredClasses = allClasses.filter((cls) => {
-    const matchesSearch = cls.name
+    if (!cls) return false
+    const matchesSearch = (cls.name || '')
       .toLowerCase()
       .includes(searchTerm.toLowerCase())
     const matchesSchool =
@@ -152,175 +175,129 @@ export default function ClassesList() {
 
   // Permissions
   const canManage = (schoolId?: string) => {
-    if (!currentUser) return false
-    if (currentUser.role === 'admin' || currentUser.role === 'supervisor')
-      return true
-    if (currentUser.role === 'coordinator' && currentUser.schoolIds) {
-      return schoolId ? currentUser.schoolIds.includes(schoolId) : false
-    }
-    if (currentUser.role === 'administrative') {
-      return schoolId ? currentUser.schoolId === schoolId : false
-    }
+    if (!userData) return false
+    const role = userData.role
+    if (role === 'Admin' || role === 'Supervisor') return true
+    // Coordenador e Administrativo podem gerenciar turmas de suas escolas
+    // TODO: Implementar verificação de escolas vinculadas ao usuário
     return false
   }
 
   // Determine schools available for creation
-  const availableSchools = schools.filter((s) => canManage(s.id))
+  const safeSchools = Array.isArray(schools) ? schools : []
+  const availableSchools = safeSchools.filter((s) => canManage(s.id.toString()))
   const canCreate = availableSchools.length > 0
 
-  const handleCreate = (data: any) => {
-    if (data.schoolId && data.yearId) {
-      addClassroom(data.schoolId, data.yearId, data)
-      toast({
-        title: 'Turma Criada',
-        description: `${data.name} adicionada com sucesso.`,
-      })
-    }
-  }
-
-  const handleUpdate = (data: any) => {
-    if (editingClass) {
-      updateClassroom(
-        editingClass.schoolId,
-        editingClass.yearId,
-        editingClass.id,
-        data,
-      )
-      toast({
-        title: 'Turma Atualizada',
-        description: 'Informações salvas com sucesso.',
-      })
-      setEditingClass(null)
-    }
-  }
-
-  const handleDelete = () => {
-    if (deleteData) {
-      // Obter estatísticas antes de deletar
-      const stats = getClassroomDataStats(
-        deleteData.classId,
-        deleteData.schoolId,
-        deleteData.yearId,
-        {
-          students,
-          assessments,
-          attendanceRecords,
-          occurrences,
-          teachers,
-        },
-      )
-
-      // Mostrar aviso se houver dados relacionados
-      if (
-        stats.studentCount > 0 ||
-        stats.assessmentCount > 0 ||
-        stats.attendanceRecordCount > 0 ||
-        stats.occurrenceCount > 0 ||
-        stats.teacherAllocationCount > 0
-      ) {
-        const message = [
-          stats.studentCount > 0 && `${stats.studentCount} aluno(s)`,
-          stats.assessmentCount > 0 && `${stats.assessmentCount} avaliação(ões)`,
-          stats.attendanceRecordCount > 0 &&
-            `${stats.attendanceRecordCount} registro(s) de frequência`,
-          stats.occurrenceCount > 0 && `${stats.occurrenceCount} ocorrência(s)`,
-          stats.teacherAllocationCount > 0 &&
-            `${stats.teacherAllocationCount} alocação(ões) de professor`,
-        ]
-          .filter(Boolean)
-          .join(', ')
-
-        toast({
-          title: 'Atenção',
-          description: `Esta turma possui dados relacionados: ${message}. Eles serão atualizados ou removidos.`,
-          variant: 'default',
-        })
+  const handleCreate = async (data: any) => {
+    try {
+      if (!data.schoolId || !data.yearId) {
+        toast.error('Escola e ano letivo são obrigatórios')
+        return
       }
 
-      // Executar limpeza de dados relacionados
-      const cleanupResult = cleanupClassroomData(
-        deleteData.classId,
-        deleteData.schoolId,
-        deleteData.yearId,
-        {
-          students,
-          assessments,
-          attendanceRecords,
-          occurrences,
-          teachers,
-          removeEnrollments: false, // Atualizar status em vez de remover
-        },
-      )
+      const classData = {
+        school_id: parseInt(data.schoolId),
+        academic_year_id: parseInt(data.yearId),
+        course_id: data.courseId ? parseInt(data.courseId) : null,
+        name: data.name || '',
+        shift: data.shift || '',
+        max_students: data.maxCapacity || data.capacity || 30,
+        room: data.room || null,
+      }
 
-      // Remover dados relacionados dos stores
-
-      // 1. Atualizar status de matrículas
-      students.forEach((student) => {
-        const enrollmentsToUpdate = student.enrollments.filter(
-          (e) =>
-            e.classroomId === deleteData.classId ||
-            (e.schoolId === deleteData.schoolId &&
-              e.academicYearId === deleteData.yearId &&
-              !e.classroomId),
-        )
-        if (enrollmentsToUpdate.length > 0) {
-          enrollmentsToUpdate.forEach((enrollment) => {
-            enrollment.status = 'Transferido'
+      const newClass = await classService.create(classData)
+      
+      if (newClass) {
+        // Recarregar classes
+        const allClassesData = await classService.getAll()
+        const classesWithDetails = await Promise.all(
+          allClassesData.map(async (cls) => {
+            try {
+              return await classService.getClassFullInfo(cls.id)
+            } catch {
+              return null
+            }
           })
-          updateStudent(student.id, { enrollments: student.enrollments })
-        }
-      })
-
-      // 2. Remover assessments
-      assessments
-        .filter((a) => a.classroomId === deleteData.classId)
-        .forEach((a) => {
-          removeAssessment(a.id)
-        })
-
-      // 3. Remover attendance records
-      attendanceRecords
-        .filter((r) => r.classroomId === deleteData.classId)
-        .forEach((r) => {
-          removeAttRecord(r.id)
-        })
-
-      // 4. Remover occurrences
-      occurrences
-        .filter((o) => o.classroomId === deleteData.classId)
-        .forEach((o) => {
-          removeOcc(o.id)
-        })
-
-      // 5. Remover teacher allocations
-      teachers.forEach((teacher) => {
-        const allocationsToRemove = teacher.allocations.filter(
-          (a) =>
-            a.classroomId === deleteData.classId &&
-            a.schoolId === deleteData.schoolId &&
-            a.academicYearId === deleteData.yearId,
         )
-        if (allocationsToRemove.length > 0) {
-          updateTeacher(teacher.id, {
-            allocations: teacher.allocations.filter(
-              (a) => !allocationsToRemove.some((ar) => ar.id === a.id),
-            ),
-          })
+        setClasses(classesWithDetails.filter(Boolean) as ClassWithDetails[])
+        
+        setIsDialogOpen(false)
+        toast.success('Turma criada com sucesso!')
+      }
+    } catch (error: any) {
+      toast.error(error?.message || 'Erro ao criar turma')
+    }
+  }
+
+  const handleUpdate = async (data: any) => {
+    if (editingClass) {
+      try {
+        const classData = {
+          name: data.name || editingClass.name,
+          shift: data.shift || editingClass.shift,
+          max_students: data.maxCapacity || data.capacity || editingClass.max_students || editingClass.capacity,
+          room: data.room || editingClass.room,
+          course_id: data.courseId ? parseInt(data.courseId) : editingClass.course_id,
         }
-      })
 
-      // Deletar a turma
-      deleteClassroom(
-        deleteData.schoolId,
-        deleteData.yearId,
-        deleteData.classId,
-      )
+        const updatedClass = await classService.update(editingClass.id, classData)
+        
+        if (updatedClass) {
+          // Recarregar classes
+          const allClassesData = await classService.getAll()
+          const classesWithDetails = await Promise.all(
+            allClassesData.map(async (cls) => {
+              try {
+                return await classService.getClassFullInfo(cls.id)
+              } catch {
+                return null
+              }
+            })
+          )
+          setClasses(classesWithDetails.filter(Boolean) as ClassWithDetails[])
+          
+          setIsDialogOpen(false)
+          setEditingClass(null)
+          toast.success('Turma atualizada com sucesso!')
+        }
+      } catch (error: any) {
+        toast.error(error?.message || 'Erro ao atualizar turma')
+      }
+    }
+  }
 
-      toast({
-        title: 'Turma Removida',
-        description: `A turma foi excluída. ${cleanupResult.enrollmentsUpdated} matrícula(s) atualizada(s), ${cleanupResult.assessmentsRemoved} avaliação(ões) removida(s), ${cleanupResult.attendanceRecordsRemoved} registro(s) de frequência removido(s), ${cleanupResult.occurrencesRemoved} ocorrência(s) removida(s).`,
-      })
-      setDeleteData(null)
+  const handleDelete = async () => {
+    if (deleteId) {
+      try {
+        // Verificar se há alunos matriculados
+        const stats = await classService.getClassStats(deleteId)
+        
+        if (stats.totalStudents > 0) {
+          toast.warning(
+            `Esta turma possui ${stats.totalStudents} aluno(s) matriculado(s). A exclusão atualizará o status das matrículas.`
+          )
+        }
+
+        await classService.delete(deleteId)
+        
+        // Recarregar classes
+        const allClassesData = await classService.getAll()
+        const classesWithDetails = await Promise.all(
+          allClassesData.map(async (cls) => {
+            try {
+              return await classService.getClassFullInfo(cls.id)
+            } catch {
+              return null
+            }
+          })
+        )
+        setClasses(classesWithDetails.filter(Boolean) as ClassWithDetails[])
+        
+        setDeleteId(null)
+        toast.success('Turma removida com sucesso!')
+      } catch (error: any) {
+        toast.error(error?.message || 'Erro ao remover turma')
+      }
     }
   }
 
@@ -330,8 +307,12 @@ export default function ClassesList() {
   }
 
   const openEditDialog = (cls: any) => {
-    setEditingClass(cls)
-    setIsDialogOpen(true)
+    // Encontrar a classe completa
+    const fullClass = classes.find(c => c.id.toString() === cls.id)
+    if (fullClass) {
+      setEditingClass(fullClass)
+      setIsDialogOpen(true)
+    }
   }
 
   return (
@@ -385,8 +366,8 @@ export default function ClassesList() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Todas as Escolas</SelectItem>
-                {schools.map((s) => (
-                  <SelectItem key={s.id} value={s.id}>
+                {safeSchools.map((s) => (
+                  <SelectItem key={s.id} value={s.id.toString()}>
                     {s.name}
                   </SelectItem>
                 ))}
@@ -437,10 +418,26 @@ export default function ClassesList() {
         </CardContent>
       </Card>
 
-      {filteredClasses.length === 0 ? (
+      {loading ? (
+        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <Card key={i}>
+              <CardHeader>
+                <Skeleton className="h-6 w-32" />
+                <Skeleton className="h-4 w-24" />
+              </CardHeader>
+              <CardContent>
+                <Skeleton className="h-20 w-full" />
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      ) : filteredClasses.length === 0 ? (
         <Card>
           <CardContent className="py-10 text-center text-muted-foreground">
-            Nenhuma turma encontrada com os filtros selecionados.
+            {searchTerm || schoolFilter !== 'all' || gradeFilter !== 'all' || shiftFilter !== 'all' || yearFilter !== 'all'
+              ? 'Nenhuma turma encontrada com os filtros selecionados.'
+              : 'Nenhuma turma cadastrada.'}
           </CardContent>
         </Card>
       ) : (
@@ -448,7 +445,11 @@ export default function ClassesList() {
           {filteredClasses.map((cls) => (
             <Card
               key={`${cls.schoolId}-${cls.id}`}
-              className="relative overflow-hidden bg-gradient-to-br from-white via-purple-50/30 to-white border-purple-200/50 hover:border-purple-400 hover:shadow-xl transition-all duration-300 group hover:scale-[1.02]"
+              className="relative overflow-hidden bg-gradient-to-br from-white via-purple-50/30 to-white border-purple-200/50 hover:border-purple-400 hover:shadow-xl transition-all duration-300 group hover:scale-[1.02] cursor-pointer"
+              onClick={() => {
+                const classId = typeof cls.id === 'string' ? cls.id : cls.id.toString()
+                navigate(`/academico/turmas/${classId}`)
+              }}
             >
               <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-purple-500/10 to-transparent rounded-full blur-2xl opacity-0 group-hover:opacity-100 transition-opacity" />
               <CardHeader className="pb-2 relative z-10">
@@ -472,7 +473,7 @@ export default function ClassesList() {
                       </span>
                     </div>
                   </div>
-                  {canManage(cls.schoolId) && (
+                  {canManage(cls.schoolId?.toString()) && (
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
                         <Button
@@ -490,13 +491,10 @@ export default function ClassesList() {
                         </DropdownMenuItem>
                         <DropdownMenuItem
                           className="text-destructive"
-                          onClick={() =>
-                            setDeleteData({
-                              schoolId: cls.schoolId,
-                              yearId: cls.yearId,
-                              classId: cls.id,
-                            })
-                          }
+                          onClick={() => {
+                            const classId = typeof cls.id === 'string' ? parseInt(cls.id) : cls.id
+                            setDeleteId(classId)
+                          }}
                         >
                           <Trash2 className="mr-2 h-4 w-4" /> Excluir
                         </DropdownMenuItem>
@@ -538,10 +536,10 @@ export default function ClassesList() {
                     <div className="p-1.5 rounded-md bg-gradient-to-br from-purple-100 to-purple-200">
                       <Users className="h-4 w-4 text-purple-600" />
                     </div>
-                    <span className="font-medium">{cls.studentCount || 0} Alunos</span>
-                    {cls.minStudents && (
+                    <span className="font-medium">{cls.stats?.totalStudents || 0} Alunos</span>
+                    {(cls.max_students || cls.capacity) && (
                       <span className="text-xs text-muted-foreground ml-auto">
-                        Min: {cls.minStudents}
+                        Capacidade: {cls.max_students || cls.capacity}
                       </span>
                     )}
                   </div>
@@ -556,78 +554,31 @@ export default function ClassesList() {
         open={isDialogOpen}
         onOpenChange={setIsDialogOpen}
         onSubmit={editingClass ? handleUpdate : handleCreate}
-        etapasEnsino={etapasEnsino}
+        etapasEnsino={[]} // TODO: Carregar etapas de ensino do Supabase quando necessário
         schools={availableSchools}
-        initialData={editingClass}
+        initialData={editingClass ? {
+          ...editingClass,
+          schoolId: editingClass.school_id?.toString(),
+          yearId: editingClass.academic_year_id?.toString(),
+          courseId: editingClass.course_id?.toString(),
+          maxCapacity: editingClass.max_students || editingClass.capacity,
+        } : undefined}
       />
 
       <AlertDialog
-        open={!!deleteData}
-        onOpenChange={(open) => !open && setDeleteData(null)}
+        open={!!deleteId}
+        onOpenChange={(open) => !open && setDeleteId(null)}
       >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Confirmar exclusão</AlertDialogTitle>
             <AlertDialogDescription>
-              {deleteData && (
-                <>
-                  Tem certeza que deseja excluir esta turma? Esta ação não pode
-                  ser desfeita.
-                  {(() => {
-                    const stats = getClassroomDataStats(
-                      deleteData.classId,
-                      deleteData.schoolId,
-                      deleteData.yearId,
-                      {
-                        students,
-                        assessments,
-                        attendanceRecords,
-                        occurrences,
-                        teachers,
-                      },
-                    )
-                    const hasData =
-                      stats.studentCount > 0 ||
-                      stats.assessmentCount > 0 ||
-                      stats.attendanceRecordCount > 0 ||
-                      stats.occurrenceCount > 0 ||
-                      stats.teacherAllocationCount > 0
-
-                    if (hasData) {
-                      return (
-                        <div className="mt-3 p-3 bg-yellow-50 border border-yellow-200 rounded-md">
-                          <p className="text-sm font-semibold text-yellow-800 mb-1">
-                            Dados relacionados que serão afetados:
-                          </p>
-                          <ul className="text-xs text-yellow-700 space-y-1">
-                            {stats.studentCount > 0 && (
-                              <li>• {stats.studentCount} aluno(s)</li>
-                            )}
-                            {stats.assessmentCount > 0 && (
-                              <li>• {stats.assessmentCount} avaliação(ões)</li>
-                            )}
-                            {stats.attendanceRecordCount > 0 && (
-                              <li>
-                                • {stats.attendanceRecordCount} registro(s) de
-                                frequência
-                              </li>
-                            )}
-                            {stats.occurrenceCount > 0 && (
-                              <li>• {stats.occurrenceCount} ocorrência(s)</li>
-                            )}
-                            {stats.teacherAllocationCount > 0 && (
-                              <li>
-                                • {stats.teacherAllocationCount} alocação(ões) de
-                                professor
-                              </li>
-                            )}
-                          </ul>
-                        </div>
-                      )
-                    }
-                    return null
-                  })()}
-                </>
+              Tem certeza que deseja excluir esta turma? Esta ação não pode
+              ser desfeita.
+              {deleteId && (
+                <span className="block mt-2 text-sm text-muted-foreground">
+                  Os dados relacionados (matrículas, avaliações, frequência) serão atualizados automaticamente.
+                </span>
               )}
             </AlertDialogDescription>
           </AlertDialogHeader>

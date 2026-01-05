@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { Plus, Edit, Trash2, Search, Newspaper } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -18,6 +18,7 @@ import {
   CardTitle,
 } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import { Skeleton } from '@/components/ui/skeleton'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -28,53 +29,85 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
-import usePublicContentStore from '@/stores/usePublicContentStore'
+import { usePublicContentStore } from '@/stores/usePublicContentStore.supabase'
 import { NewsFormDialog } from './components/NewsFormDialog'
-import { NewsPost } from '@/lib/mock-data'
-import { useToast } from '@/hooks/use-toast'
+import { toast } from 'sonner'
 import { format, parseISO } from 'date-fns'
 import { RequirePermission } from '@/components/RequirePermission'
+import type { Database } from '@/lib/supabase/database.types'
+
+type PublicContentRow = Database['public']['Tables']['public_portal_content']['Row']
 
 export default function NewsManager() {
-  const { news, addNews, updateNews, deleteNews } = usePublicContentStore()
-  const { toast } = useToast()
+  const { 
+    publicContent, 
+    loading, 
+    fetchPublicContent, 
+    addPublicContent, 
+    updatePublicContent, 
+    deletePublicContent,
+    publishContent,
+    unpublishContent
+  } = usePublicContentStore()
 
   const [searchTerm, setSearchTerm] = useState('')
   const [isDialogOpen, setIsDialogOpen] = useState(false)
-  const [editingNews, setEditingNews] = useState<NewsPost | null>(null)
-  const [deleteId, setDeleteId] = useState<string | null>(null)
+  const [editingNews, setEditingNews] = useState<PublicContentRow | null>(null)
+  const [deleteId, setDeleteId] = useState<number | null>(null)
 
-  const filteredNews = news.filter((item) =>
-    item.title.toLowerCase().includes(searchTerm.toLowerCase()),
-  )
+  // Fetch news on mount (filter by content_type = 'news')
+  useEffect(() => {
+    fetchPublicContent()
+  }, [fetchPublicContent])
 
-  const handleCreate = (data: any) => {
-    addNews(data)
-    toast({
-      title: 'Notícia publicada',
-      description: 'A notícia foi adicionada ao site com sucesso.',
-    })
-  }
+  // Filter only news items
+  const news = useMemo(() => {
+    if (!Array.isArray(publicContent)) return []
+    return publicContent.filter(item => item.content_type === 'news')
+  }, [publicContent])
 
-  const handleUpdate = (data: any) => {
-    if (editingNews) {
-      updateNews(editingNews.id, data)
-      toast({
-        title: 'Notícia atualizada',
-        description: 'As alterações foram salvas.',
+  // Filter by search term
+  const filteredNews = useMemo(() => {
+    return news.filter((item) =>
+      item.title?.toLowerCase().includes(searchTerm.toLowerCase()) || false
+    )
+  }, [news, searchTerm])
+
+  const handleCreate = async (data: any) => {
+    try {
+      await addPublicContent({
+        ...data,
+        content_type: 'news',
       })
-      setEditingNews(null)
+      toast.success('Notícia publicada com sucesso.')
+      setIsDialogOpen(false)
+    } catch (error) {
+      toast.error('Erro ao criar notícia')
     }
   }
 
-  const handleDelete = () => {
+  const handleUpdate = async (data: any) => {
+    if (editingNews) {
+      try {
+        await updatePublicContent(editingNews.id, data)
+        toast.success('Notícia atualizada com sucesso.')
+        setEditingNews(null)
+        setIsDialogOpen(false)
+      } catch (error) {
+        toast.error('Erro ao atualizar notícia')
+      }
+    }
+  }
+
+  const handleDelete = async () => {
     if (deleteId) {
-      deleteNews(deleteId)
-      toast({
-        title: 'Notícia removida',
-        description: 'O item foi excluído do sistema.',
-      })
-      setDeleteId(null)
+      try {
+        await deletePublicContent(deleteId)
+        toast.success('Notícia removida com sucesso.')
+        setDeleteId(null)
+      } catch (error) {
+        toast.error('Erro ao remover notícia')
+      }
     }
   }
 
@@ -83,17 +116,23 @@ export default function NewsManager() {
     setIsDialogOpen(true)
   }
 
-  const openEditDialog = (item: NewsPost) => {
+  const openEditDialog = (item: PublicContentRow) => {
     setEditingNews(item)
     setIsDialogOpen(true)
   }
 
-  const toggleStatus = (item: NewsPost) => {
-    updateNews(item.id, { active: !item.active })
-    toast({
-      title: item.active ? 'Notícia ocultada' : 'Notícia publicada',
-      description: `Status alterado para ${!item.active ? 'Ativo' : 'Inativo'}.`,
-    })
+  const toggleStatus = async (item: PublicContentRow) => {
+    try {
+      if (item.is_published) {
+        await unpublishContent(item.id)
+        toast.success('Notícia ocultada com sucesso.')
+      } else {
+        await publishContent(item.id)
+        toast.success('Notícia publicada com sucesso.')
+      }
+    } catch (error) {
+      toast.error('Erro ao alterar status da notícia')
+    }
   }
 
   return (
@@ -150,7 +189,18 @@ export default function NewsManager() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredNews.length === 0 ? (
+                {loading ? (
+                  // Loading skeletons
+                  Array.from({ length: 5 }).map((_, index) => (
+                    <TableRow key={`skeleton-${index}`}>
+                      <TableCell><Skeleton className="h-4 w-[300px]" /></TableCell>
+                      <TableCell><Skeleton className="h-4 w-[100px]" /></TableCell>
+                      <TableCell><Skeleton className="h-4 w-[150px]" /></TableCell>
+                      <TableCell><Skeleton className="h-4 w-[80px]" /></TableCell>
+                      <TableCell><Skeleton className="h-8 w-24 ml-auto" /></TableCell>
+                    </TableRow>
+                  ))
+                ) : filteredNews.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={5} className="h-24 text-center">
                       Nenhuma notícia encontrada.
@@ -158,24 +208,28 @@ export default function NewsManager() {
                   </TableRow>
                 ) : (
                   filteredNews.map((item) => (
-                    <TableRow key={item.id}>
+                    <TableRow key={`news-${item.id}`}>
                       <TableCell className="font-medium max-w-[300px] truncate">
                         <div className="flex items-center gap-2">
                           <Newspaper className="h-4 w-4 text-muted-foreground" />
-                          {item.title}
+                          {item.title || 'Sem título'}
                         </div>
                       </TableCell>
                       <TableCell>
-                        {format(parseISO(item.publishDate), 'dd/MM/yyyy')}
+                        {item.publish_date
+                          ? format(parseISO(item.publish_date), 'dd/MM/yyyy')
+                          : item.created_at
+                          ? format(parseISO(item.created_at), 'dd/MM/yyyy')
+                          : 'N/A'}
                       </TableCell>
-                      <TableCell>{item.author}</TableCell>
+                      <TableCell>{item.author || 'N/A'}</TableCell>
                       <TableCell>
                         <Badge
-                          variant={item.active ? 'default' : 'secondary'}
+                          variant={item.is_published ? 'default' : 'secondary'}
                           className="cursor-pointer"
                           onClick={() => toggleStatus(item)}
                         >
-                          {item.active ? 'Publicado' : 'Rascunho'}
+                          {item.is_published ? 'Publicado' : 'Rascunho'}
                         </Badge>
                       </TableCell>
                       <TableCell className="text-right">

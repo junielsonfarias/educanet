@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { Calendar, Plus, Search, Filter, Edit, Trash2, CheckCircle, XCircle, Clock } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -25,50 +25,68 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { Badge } from '@/components/ui/badge'
-import { useToast } from '@/hooks/use-toast'
-import useAppointmentStore from '@/stores/useAppointmentStore'
-import useStudentStore from '@/stores/useStudentStore'
-import useSchoolStore from '@/stores/useSchoolStore'
-import { Appointment, AppointmentType } from '@/lib/mock-data'
+import { Skeleton } from '@/components/ui/skeleton'
+import { toast } from 'sonner'
+import { useStudentStore } from '@/stores/useStudentStore.supabase'
+import { useSchoolStore } from '@/stores/useSchoolStore.supabase'
 import { AppointmentFormDialog } from './components/AppointmentFormDialog'
 import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import { RequirePermission } from '@/components/RequirePermission'
 
-export default function AppointmentsManager() {
-  const {
-    appointments,
-    addAppointment,
-    updateAppointment,
-    deleteAppointment,
-  } = useAppointmentStore()
-  const { students } = useStudentStore()
-  const { schools } = useSchoolStore()
-  const { toast } = useToast()
+// Tipo temporário até implementar appointments no BD
+interface Appointment {
+  id: string
+  type: 'matricula' | 'documentos' | 'informacoes' | 'reuniao' | 'outros'
+  requesterName: string
+  requesterPhone: string
+  dateTime: string
+  status: 'scheduled' | 'confirmed' | 'completed' | 'cancelled'
+  confirmedAt?: string
+  notes?: string
+}
 
+type AppointmentType = 'matricula' | 'documentos' | 'informacoes' | 'reuniao' | 'outros'
+
+export default function AppointmentsManager() {
+  const { students, loading: studentsLoading, fetchStudents } = useStudentStore()
+  const { schools, loading: schoolsLoading, fetchSchools } = useSchoolStore()
+
+  const [appointments, setAppointments] = useState<Appointment[]>([])
+  const [loading, setLoading] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
   const [typeFilter, setTypeFilter] = useState<AppointmentType | 'all'>('all')
   const [statusFilter, setStatusFilter] = useState<'all' | 'scheduled' | 'confirmed' | 'completed' | 'cancelled'>('all')
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [editingAppointment, setEditingAppointment] = useState<Appointment | null>(null)
 
+  useEffect(() => {
+    fetchStudents()
+    fetchSchools()
+    // TODO: Buscar appointments do BD quando implementado
+  }, [fetchStudents, fetchSchools])
+
   // Filtrar agendamentos
-  const filteredAppointments = appointments.filter((appointment) => {
-    const matchesSearch =
-      searchTerm === '' ||
-      appointment.requesterName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      appointment.requesterPhone.toLowerCase().includes(searchTerm.toLowerCase())
+  const filteredAppointments = useMemo(() => {
+    return appointments.filter((appointment) => {
+      const matchesSearch =
+        searchTerm === '' ||
+        appointment.requesterName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        appointment.requesterPhone.toLowerCase().includes(searchTerm.toLowerCase())
 
-    const matchesType = typeFilter === 'all' || appointment.type === typeFilter
-    const matchesStatus = statusFilter === 'all' || appointment.status === statusFilter
+      const matchesType = typeFilter === 'all' || appointment.type === typeFilter
+      const matchesStatus = statusFilter === 'all' || appointment.status === statusFilter
 
-    return matchesSearch && matchesType && matchesStatus
-  })
+      return matchesSearch && matchesType && matchesStatus
+    })
+  }, [appointments, searchTerm, typeFilter, statusFilter])
 
   // Ordenar por data
-  const sortedAppointments = [...filteredAppointments].sort((a, b) => {
-    return new Date(a.dateTime).getTime() - new Date(b.dateTime).getTime()
-  })
+  const sortedAppointments = useMemo(() => {
+    return [...filteredAppointments].sort((a, b) => {
+      return new Date(a.dateTime).getTime() - new Date(b.dateTime).getTime()
+    })
+  }, [filteredAppointments])
 
   const handleCreateAppointment = () => {
     setEditingAppointment(null)
@@ -80,31 +98,28 @@ export default function AppointmentsManager() {
     setIsDialogOpen(true)
   }
 
-  const handleConfirmAppointment = (id: string) => {
-    updateAppointment(id, {
-      status: 'confirmed',
-      confirmedAt: new Date().toISOString(),
-    })
-    toast({
-      title: 'Agendamento confirmado',
-      description: 'O agendamento foi confirmado com sucesso.',
-    })
+  const handleConfirmAppointment = async (id: string) => {
+    // TODO: Atualizar no BD quando implementado
+    setAppointments(appointments =>
+      appointments.map(a => a.id === id ? { ...a, status: 'confirmed', confirmedAt: new Date().toISOString() } : a)
+    )
+    toast.success('Agendamento confirmado com sucesso.')
   }
 
-  const handleCompleteAppointment = (id: string) => {
-    updateAppointment(id, { status: 'completed' })
-    toast({
-      title: 'Agendamento concluído',
-      description: 'O agendamento foi finalizado com sucesso.',
-    })
+  const handleCompleteAppointment = async (id: string) => {
+    // TODO: Atualizar no BD quando implementado
+    setAppointments(appointments =>
+      appointments.map(a => a.id === id ? { ...a, status: 'completed' } : a)
+    )
+    toast.success('Agendamento concluído com sucesso.')
   }
 
-  const handleCancelAppointment = (id: string) => {
-    updateAppointment(id, { status: 'cancelled' })
-    toast({
-      title: 'Agendamento cancelado',
-      description: 'O agendamento foi cancelado.',
-    })
+  const handleCancelAppointment = async (id: string) => {
+    // TODO: Atualizar no BD quando implementado
+    setAppointments(appointments =>
+      appointments.map(a => a.id === id ? { ...a, status: 'cancelled' } : a)
+    )
+    toast.success('Agendamento cancelado com sucesso.')
   }
 
   const getStatusBadge = (status: Appointment['status']) => {
@@ -276,20 +291,35 @@ export default function AppointmentsManager() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {sortedAppointments.length === 0 ? (
+                {loading || studentsLoading || schoolsLoading ? (
+                  // Loading skeletons
+                  Array.from({ length: 5 }).map((_, index) => (
+                    <TableRow key={`skeleton-${index}`}>
+                      <TableCell><Skeleton className="h-4 w-[150px]" /></TableCell>
+                      <TableCell><Skeleton className="h-4 w-[100px]" /></TableCell>
+                      <TableCell><Skeleton className="h-4 w-[150px]" /></TableCell>
+                      <TableCell><Skeleton className="h-4 w-[120px]" /></TableCell>
+                      <TableCell><Skeleton className="h-4 w-[80px]" /></TableCell>
+                      <TableCell><Skeleton className="h-8 w-24 ml-auto" /></TableCell>
+                    </TableRow>
+                  ))
+                ) : sortedAppointments.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={6} className="text-center py-10 text-muted-foreground">
-                      Nenhum agendamento encontrado.
+                      <div className="flex flex-col items-center gap-2">
+                        <Calendar className="h-8 w-8 opacity-50" />
+                        <p>Nenhum agendamento encontrado.</p>
+                        <p className="text-sm">Esta funcionalidade será implementada em breve no banco de dados.</p>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ) : (
                   sortedAppointments.map((appointment) => {
-                    const student = appointment.studentId
-                      ? students.find((s) => s.id === appointment.studentId)
-                      : undefined
+                    // TODO: Buscar aluno quando appointments tiverem studentId
+                    const student = undefined
 
                     return (
-                      <TableRow key={appointment.id}>
+                      <TableRow key={`appointment-${appointment.id}`}>
                         <TableCell>
                           <div className="flex flex-col">
                             <span className="font-medium">
@@ -383,21 +413,29 @@ export default function AppointmentsManager() {
       <AppointmentFormDialog
         open={isDialogOpen}
         onOpenChange={setIsDialogOpen}
-        onSave={(data) => {
-          if (editingAppointment) {
-            updateAppointment(editingAppointment.id, data)
-            toast({
-              title: 'Agendamento atualizado',
-              description: 'O agendamento foi atualizado com sucesso.',
-            })
-          } else {
-            addAppointment(data)
-            toast({
-              title: 'Agendamento criado',
-              description: 'O agendamento foi criado com sucesso.',
-            })
+        onSave={async (data) => {
+          try {
+            if (editingAppointment) {
+              // TODO: Atualizar no BD quando implementado
+              setAppointments(appointments =>
+                appointments.map(a => a.id === editingAppointment.id ? { ...editingAppointment, ...data } : a)
+              )
+              toast.success('Agendamento atualizado com sucesso.')
+            } else {
+              // TODO: Criar no BD quando implementado
+              const newAppointment: Appointment = {
+                id: `appointment-${Date.now()}`,
+                ...data,
+                status: 'scheduled',
+              }
+              setAppointments([...appointments, newAppointment])
+              toast.success('Agendamento criado com sucesso.')
+            }
+            setEditingAppointment(null)
+            setIsDialogOpen(false)
+          } catch (error) {
+            toast.error('Erro ao salvar agendamento')
           }
-          setEditingAppointment(null)
         }}
         initialData={editingAppointment}
       />

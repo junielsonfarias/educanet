@@ -13,16 +13,50 @@ Este projeto foi criado de ponta a ponta com o [Skip](https://goskip.dev).
 - **React Hook Form** - Gerenciamento de formulários performático
 - **Zod** - Validação de schemas TypeScript-first
 - **Recharts** - Biblioteca de gráficos para React
+- **Supabase** - Backend como serviço (BaaS) para autenticação e banco de dados
 
 ## 📋 Pré-requisitos
 
 - Node.js 18+
-- npm
+- npm ou pnpm
+- Conta no Supabase (gratuita) - [Criar conta](https://supabase.com)
 
 ## 🔧 Instalação
 
+### 1. Clonar o repositório
+
 ```bash
+git clone <url-do-repositorio>
+cd educanet
+```
+
+### 2. Instalar dependências
+
+```bash
+pnpm install
+# ou
 npm install
+```
+
+### 3. Configurar variáveis de ambiente
+
+Crie um arquivo `.env.local` na raiz do projeto com as seguintes variáveis:
+
+```env
+VITE_SUPABASE_URL=https://seu-projeto-id.supabase.co
+VITE_SUPABASE_ANON_KEY=sua-chave-anon-public-aqui
+```
+
+**📖 Para mais detalhes sobre configuração do Supabase, consulte:**
+- [Guia de Configuração de Variáveis de Ambiente](docs/CONFIGURAR_VARIAVEIS_AMBIENTE.md)
+- [Documentação Completa do Supabase](docs/SUPABASE_PRONTO_PARA_USO.md)
+
+### 4. Iniciar o servidor de desenvolvimento
+
+```bash
+pnpm dev
+# ou
+npm run dev
 ```
 
 ## 💻 Scripts Disponíveis
@@ -76,12 +110,28 @@ npm run format
 
 ```
 .
-├── src/              # Código fonte da aplicação
-├── public/           # Arquivos estáticos
-├── dist/             # Build de produção (gerado)
-├── node_modules/     # Dependências (gerado)
-└── package.json      # Configurações e dependências do projeto
+├── src/                      # Código fonte da aplicação
+│   ├── lib/
+│   │   └── supabase/         # Configuração e helpers do Supabase
+│   │       ├── client.ts     # Cliente Supabase configurado
+│   │       ├── helpers.ts    # Funções auxiliares
+│   │       ├── storage.ts   # Helpers de Storage
+│   │       └── types.ts     # Tipos TypeScript
+│   ├── pages/                # Páginas da aplicação
+│   ├── components/           # Componentes reutilizáveis
+│   └── stores/               # Stores Zustand
+├── docs/                     # Documentação do projeto
+│   ├── CONFIGURAR_VARIAVEIS_AMBIENTE.md
+│   ├── SUPABASE_SETUP.md
+│   └── TROUBLESHOOTING.md
+├── public/                   # Arquivos estáticos
+├── dist/                     # Build de produção (gerado)
+├── node_modules/             # Dependências (gerado)
+└── package.json              # Configurações e dependências do projeto
 ```
+
+**📖 Para mais detalhes sobre a estrutura do Supabase, consulte:**
+- [Estrutura de Pastas do Supabase](docs/ESTRUTURA_SUPABASE.md)
 
 ## 🎨 Componentes UI
 
@@ -130,3 +180,20 @@ npm run build
 ```
 
 Os arquivos otimizados serão gerados na pasta `dist/` e estarão prontos para deploy.
+
+## 🔐 Configuração do Supabase
+
+Este projeto utiliza o Supabase como backend. Para configurar:
+
+1. **Criar projeto no Supabase**: Acesse [supabase.com](https://supabase.com) e crie um novo projeto
+2. **Configurar variáveis de ambiente**: Veja [Guia de Configuração](docs/CONFIGURAR_VARIAVEIS_AMBIENTE.md)
+3. **Testar conexão**: Acesse `/configuracoes/supabase-test` (apenas para admins)
+
+**📚 Documentação relacionada:**
+- [Setup Completo do Supabase](docs/SUPABASE_SETUP.md)
+- [Troubleshooting](docs/TROUBLESHOOTING.md)
+- [Estrutura de Pastas](docs/ESTRUTURA_SUPABASE.md)
+
+## 🆘 Problemas?
+
+Consulte o [Guia de Troubleshooting](docs/TROUBLESHOOTING.md) para soluções de problemas comuns.

@@ -26,9 +26,9 @@ import {
 } from '@/components/ui/select'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
-import useSchoolStore from '@/stores/useSchoolStore'
-import useCourseStore from '@/stores/useCourseStore'
-import useStudentStore from '@/stores/useStudentStore'
+import { useSchoolStore } from '@/stores/useSchoolStore.supabase'
+import { useCourseStore } from '@/stores/useCourseStore.supabase'
+import { useStudentStore } from '@/stores/useStudentStore.supabase'
 import { useEffect } from 'react'
 import { validateEnrollment } from '@/lib/enrollment-utils'
 import {

@@ -9,7 +9,7 @@ import {
   CardTitle,
 } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import useCourseStore from '@/stores/useCourseStore'
+import { useCourseStore } from '@/stores/useCourseStore.supabase'
 import { useNavigate } from 'react-router-dom'
 import { CourseFormDialog } from './components/CourseFormDialog'
 import { useToast } from '@/hooks/use-toast'

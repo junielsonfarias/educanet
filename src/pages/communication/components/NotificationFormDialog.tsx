@@ -28,9 +28,11 @@ import {
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
-import { Notification } from '@/lib/mock-data'
-import useNotificationStore from '@/stores/useNotificationStore'
-import useStudentStore from '@/stores/useStudentStore'
+import { useNotificationStore } from '@/stores/useNotificationStore.supabase'
+import { useStudentStore } from '@/stores/useStudentStore.supabase'
+import type { Database } from '@/lib/supabase/database.types'
+
+type CommunicationRow = Database['public']['Tables']['communications']['Row']
 
 const notificationSchema = z.object({
   channel: z.enum(['email', 'sms', 'push']),
@@ -43,8 +45,15 @@ const notificationSchema = z.object({
 interface NotificationFormDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
-  onSave: (data: Omit<Notification, 'id' | 'status' | 'sentAt'>) => void
-  initialData?: Notification | null
+  onSave: (data: {
+    recipient_person_id: number;
+    channel: string;
+    subject: string;
+    content: string;
+    priority?: string;
+    status?: string;
+  }) => void
+  initialData?: CommunicationRow | null
 }
 
 export function NotificationFormDialog({
@@ -53,8 +62,10 @@ export function NotificationFormDialog({
   onSave,
   initialData,
 }: NotificationFormDialogProps) {
-  const { templates } = useNotificationStore()
-  const { students } = useStudentStore()
+  const { students, fetchStudents } = useStudentStore()
+  
+  // Templates ainda não implementados no Supabase
+  const templates: any[] = []
 
   const form = useForm<z.infer<typeof notificationSchema>>({
     resolver: zodResolver(notificationSchema),
@@ -69,13 +80,18 @@ export function NotificationFormDialog({
 
   useEffect(() => {
     if (open) {
+      fetchStudents()
       if (initialData) {
+        // Extrair recipient_person_id do initialData (pode estar em recipients ou outro campo)
+        const recipientId = (initialData as any).recipient_person_id || 
+                           (initialData as any).recipients?.[0]?.person_id || 
+                           ''
         form.reset({
-          channel: initialData.channel,
-          recipientId: initialData.recipient.id,
-          subject: initialData.subject,
-          content: initialData.content,
-          templateId: initialData.templateId || '',
+          channel: (initialData as any).channel || initialData.communication_type || 'email',
+          recipientId: recipientId.toString(),
+          subject: initialData.title || (initialData as any).subject || '',
+          content: initialData.content || '',
+          templateId: '',
         })
       } else {
         form.reset({
@@ -88,7 +104,7 @@ export function NotificationFormDialog({
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, initialData?.id])
+  }, [open, initialData?.id, fetchStudents])
 
   const selectedTemplate = form.watch('templateId')
   const selectedChannel = form.watch('channel')
@@ -106,23 +122,26 @@ export function NotificationFormDialog({
   }, [selectedTemplate])
 
   const handleSubmit = (data: z.infer<typeof notificationSchema>) => {
-    const student = students.find((s) => s.id === data.recipientId)
+    const student = students.find((s) => s.id.toString() === data.recipientId)
     if (!student) {
       form.setError('recipientId', { message: 'Aluno não encontrado' })
       return
     }
 
+    // Obter person_id do student_profile
+    const personId = student.person_id || student.person?.id
+    if (!personId) {
+      form.setError('recipientId', { message: 'ID da pessoa não encontrado' })
+      return
+    }
+
     onSave({
+      recipient_person_id: typeof personId === 'number' ? personId : parseInt(personId.toString()),
       channel: data.channel,
-      recipient: {
-        id: student.id,
-        name: student.name,
-        email: student.contacts.email || student.email || '',
-        phone: student.contacts.phone || student.phone || '',
-      },
       subject: data.subject,
       content: data.content,
-      templateId: data.templateId && data.templateId !== 'none' ? data.templateId : undefined,
+      priority: 'normal',
+      status: initialData ? (initialData as any).status : 'pending',
     })
     onOpenChange(false)
   }
@@ -211,11 +230,14 @@ export function NotificationFormDialog({
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      {students.map((student) => (
-                        <SelectItem key={student.id} value={student.id}>
-                          {student.name} - {student.registration}
-                        </SelectItem>
-                      ))}
+                      {students.map((student) => {
+                        const fullName = `${student.person?.first_name || ''} ${student.person?.last_name || ''}`.trim()
+                        return (
+                          <SelectItem key={student.id} value={student.id.toString()}>
+                            {fullName} - {student.registration_number || student.id}
+                          </SelectItem>
+                        )
+                      })}
                     </SelectContent>
                   </Select>
                   <FormMessage />

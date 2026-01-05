@@ -7,6 +7,7 @@ import {
 } from '@/lib/mock-data'
 import { handleError } from '@/lib/error-handling'
 import { sanitizeStoreItem } from '@/lib/data-sanitizer'
+import { settingsService } from '@/lib/supabase/services'
 
 interface SettingsContextType {
   settings: GeneralSettings
@@ -24,30 +25,87 @@ export const SettingsProvider = ({
   children: React.ReactNode
 }) => {
   const [settings, setSettings] = useState<GeneralSettings>(initialSettings)
+  const [loading, setLoading] = useState(true)
 
+  // Carregar configurações do Supabase
   useEffect(() => {
-    const stored = localStorage.getItem('edu_settings')
-    if (stored) {
+    const loadSettings = async () => {
       try {
-        const parsed = JSON.parse(stored)
-        const sanitized = sanitizeStoreItem<GeneralSettings>(parsed, {
-          arrayFields: ['savedLayouts'],
-          defaults: initialSettings,
-        })
-        setSettings(sanitized || initialSettings)
-      } catch (error) {
-        handleError(error as Error, {
-          showToast: false,
-          context: { action: 'loadSettings', source: 'localStorage' },
-        })
-        setSettings(initialSettings)
+        setLoading(true)
+        
+        // Buscar todas as configurações do Supabase
+        const supabaseSettings = await settingsService.getAllSettings()
+        
+        // Se houver configurações no Supabase, usar elas
+        if (supabaseSettings && Object.keys(supabaseSettings).length > 0) {
+          const mergedSettings: GeneralSettings = {
+            ...initialSettings,
+            municipalityName: supabaseSettings.municipalityName || initialSettings.municipalityName,
+            educationSecretaryName: supabaseSettings.educationSecretaryName || initialSettings.educationSecretaryName,
+            municipalityLogo: supabaseSettings.municipalityLogo || initialSettings.municipalityLogo,
+            secretaryLogo: supabaseSettings.secretaryLogo || initialSettings.secretaryLogo,
+            facebookHandle: supabaseSettings.facebookHandle || initialSettings.facebookHandle,
+            footerText: supabaseSettings.footerText || initialSettings.footerText,
+            qeduMunicipalityId: supabaseSettings.qeduMunicipalityId || initialSettings.qeduMunicipalityId,
+          }
+          
+          setSettings(mergedSettings)
+          
+          // Também salvar no localStorage como cache
+          localStorage.setItem('edu_settings', JSON.stringify(mergedSettings))
+        } else {
+          // Fallback para localStorage se não houver no Supabase
+          const stored = localStorage.getItem('edu_settings')
+          if (stored) {
+            try {
+              const parsed = JSON.parse(stored)
+              const sanitized = sanitizeStoreItem<GeneralSettings>(parsed, {
+                arrayFields: ['savedLayouts'],
+                defaults: initialSettings,
+              })
+              setSettings(sanitized || initialSettings)
+            } catch (error) {
+              handleError(error as Error, {
+                showToast: false,
+                context: { action: 'loadSettings', source: 'localStorage' },
+              })
+              setSettings(initialSettings)
+            }
+          }
+        }
+      } catch {
+        // Fallback para localStorage em caso de erro
+        const stored = localStorage.getItem('edu_settings')
+        if (stored) {
+          try {
+            const parsed = JSON.parse(stored)
+            const sanitized = sanitizeStoreItem<GeneralSettings>(parsed, {
+              arrayFields: ['savedLayouts'],
+              defaults: initialSettings,
+            })
+            setSettings(sanitized || initialSettings)
+          } catch (err) {
+            handleError(err as Error, {
+              showToast: false,
+              context: { action: 'loadSettings', source: 'localStorage' },
+            })
+            setSettings(initialSettings)
+          }
+        }
+      } finally {
+        setLoading(false)
       }
     }
+
+    loadSettings()
   }, [])
 
+  // Salvar no localStorage como cache (mas não sobrescrever se vier do Supabase)
   useEffect(() => {
-    localStorage.setItem('edu_settings', JSON.stringify(settings))
-  }, [settings])
+    if (!loading) {
+      localStorage.setItem('edu_settings', JSON.stringify(settings))
+    }
+  }, [settings, loading])
 
   const updateSettings = (data: Partial<GeneralSettings>) => {
     setSettings((prev) => ({ ...prev, ...data }))
