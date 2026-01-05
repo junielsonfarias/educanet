@@ -359,7 +359,7 @@ export default function Dashboard() {
           <h2 className="text-3xl font-bold tracking-tight text-primary">
             Dashboard
           </h2>
-          <p className="text-muted-foreground">Layout: {activeLayout.name}</p>
+          <p className="text-muted-foreground">Layout: {activeLayout?.name || 'Padrão'}</p>
         </div>
         <div className="flex items-center space-x-2">
           <Button variant="outline" onClick={() => setCustomizerOpen(true)}>
