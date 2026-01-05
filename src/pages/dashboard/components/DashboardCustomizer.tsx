@@ -27,7 +27,7 @@ export function DashboardCustomizer({
 }: DashboardCustomizerProps) {
   const { activeLayout, saveDashboardLayout } = useSettingsStore()
   const [widgets, setWidgets] = useState<DashboardWidget[]>(
-    activeLayout.widgets,
+    activeLayout?.widgets || [],
   )
   const [layoutName, setLayoutName] = useState('')
 
@@ -51,8 +51,8 @@ export function DashboardCustomizer({
     const newLayout: DashboardLayout = {
       id: layoutName
         ? layoutName.toLowerCase().replace(/\s/g, '-')
-        : activeLayout.id,
-      name: layoutName || activeLayout.name,
+        : activeLayout?.id || 'custom',
+      name: layoutName || activeLayout?.name || 'Layout Personalizado',
       widgets,
     }
     saveDashboardLayout(newLayout)
