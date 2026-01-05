@@ -21,7 +21,7 @@ export function checkSupabaseEnv(): {
   
   if (!key) {
     errors.push('VITE_SUPABASE_ANON_KEY não está definida')
-  } else if (key.length < 100) {
+  } else if (key.length < 30) {
     errors.push('VITE_SUPABASE_ANON_KEY parece estar incompleta (muito curta)')
   }
   
