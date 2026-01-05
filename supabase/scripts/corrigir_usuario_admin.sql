@@ -11,12 +11,7 @@ SET
   updated_at = now()
 WHERE email = 'junielsonfarias@gmail.com';
 
--- PASSO 2: Garantir que a role Admin existe
-INSERT INTO roles (name, description, created_at, updated_at)
-VALUES ('Admin', 'Administrador do sistema com acesso total', now(), now())
-ON CONFLICT (name) DO NOTHING;
-
--- PASSO 3: Criar pessoa se não existir
+-- PASSO 2: Criar pessoa primeiro (se não existir)
 INSERT INTO people (type, first_name, last_name, email, created_at, updated_at, created_by)
 SELECT
   'Funcionario'::person_type,
@@ -25,10 +20,22 @@ SELECT
   'junielsonfarias@gmail.com',
   now(),
   now(),
-  1
+  COALESCE((SELECT MIN(id) FROM people WHERE deleted_at IS NULL), 1)
 WHERE NOT EXISTS (
   SELECT 1 FROM people
   WHERE email = 'junielsonfarias@gmail.com'
+);
+
+-- PASSO 3: Garantir que a role Admin existe (usando person_id como created_by)
+INSERT INTO roles (name, description, created_at, updated_at, created_by)
+SELECT
+  'Admin',
+  'Administrador do sistema com acesso total',
+  now(),
+  now(),
+  (SELECT id FROM people WHERE email = 'junielsonfarias@gmail.com' AND deleted_at IS NULL LIMIT 1)
+WHERE NOT EXISTS (
+  SELECT 1 FROM roles WHERE name = 'Admin'
 );
 
 -- Garantir que pessoa não está deletada
