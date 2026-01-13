@@ -25,6 +25,8 @@ import {
   TrendingUp,
   AlertCircle,
   Layout,
+  Calendar,
+  Sparkles,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useState, useEffect, useMemo } from 'react'
@@ -132,6 +134,24 @@ export default function Dashboard() {
     return Array.isArray(safeLayout?.widgets) ? safeLayout.widgets : []
   }, [safeLayout])
 
+  // Função de saudação baseada no horário
+  const getGreeting = () => {
+    const hour = new Date().getHours()
+    if (hour < 12) return 'Bom dia'
+    if (hour < 18) return 'Boa tarde'
+    return 'Boa noite'
+  }
+
+  // Formatar data atual
+  const formatDate = () => {
+    return new Date().toLocaleDateString('pt-BR', {
+      weekday: 'long',
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric',
+    })
+  }
+
   // Helper to get widget by key
   const getWidget = useMemo(() => {
     return (key: string) => {
@@ -147,12 +167,12 @@ export default function Dashboard() {
     switch (key) {
       case 'totalStudents':
         return (
-          <Card className="relative overflow-hidden bg-gradient-to-br from-white via-blue-50/50 to-white border-blue-200/50 hover:border-blue-300 hover:shadow-xl transition-all duration-300 group h-full">
-            <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-blue-500/10 to-transparent rounded-full blur-2xl opacity-0 group-hover:opacity-100 transition-opacity" />
+          <Card className="relative overflow-hidden bg-gradient-to-br from-card via-blue-500/5 to-card dark:from-card dark:via-blue-500/10 dark:to-card border-blue-200/50 dark:border-blue-500/20 hover:border-blue-400 dark:hover:border-blue-500/40 hover:shadow-xl hover:shadow-blue-500/10 transition-all duration-300 group h-full">
+            <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-blue-500/20 to-transparent rounded-full blur-2xl opacity-0 group-hover:opacity-100 transition-opacity" />
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 relative z-10">
               <CardTitle className="text-sm font-medium">Total de Alunos</CardTitle>
-              <div className="p-2.5 rounded-lg bg-gradient-to-br from-blue-50 to-blue-100">
-                <Users className="h-5 w-5 text-blue-600" />
+              <div className="p-2.5 rounded-xl bg-gradient-to-br from-blue-500/20 to-blue-600/30 dark:from-blue-500/30 dark:to-blue-600/40 shadow-lg shadow-blue-500/20">
+                <Users className="h-5 w-5 text-blue-600 dark:text-blue-400" />
               </div>
             </CardHeader>
             <CardContent className="relative z-10">
@@ -163,7 +183,7 @@ export default function Dashboard() {
                 </>
               ) : (
                 <>
-                  <div className="text-2xl font-bold text-blue-700">
+                  <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">
                     {stats.totalStudents.toLocaleString('pt-BR')}
                   </div>
                   <p className="text-xs text-muted-foreground">
@@ -176,11 +196,11 @@ export default function Dashboard() {
         )
       case 'activeSchools':
         return (
-          <Card className="relative overflow-hidden bg-gradient-to-br from-white via-primary/5 to-white border-primary/20 hover:border-primary/40 hover:shadow-xl transition-all duration-300 group h-full">
-            <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-primary/10 to-transparent rounded-full blur-2xl opacity-0 group-hover:opacity-100 transition-opacity" />
+          <Card className="relative overflow-hidden bg-gradient-to-br from-card via-primary/5 to-card dark:from-card dark:via-primary/10 dark:to-card border-primary/20 dark:border-primary/30 hover:border-primary/40 dark:hover:border-primary/50 hover:shadow-xl hover:shadow-primary/10 transition-all duration-300 group h-full">
+            <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-primary/20 to-transparent rounded-full blur-2xl opacity-0 group-hover:opacity-100 transition-opacity" />
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 relative z-10">
               <CardTitle className="text-sm font-medium">Escolas Ativas</CardTitle>
-              <div className="p-2.5 rounded-lg bg-gradient-to-br from-primary/10 to-primary/20">
+              <div className="p-2.5 rounded-xl bg-gradient-to-br from-primary/20 to-primary/30 dark:from-primary/30 dark:to-primary/40 shadow-lg shadow-primary/20">
                 <School className="h-5 w-5 text-primary" />
               </div>
             </CardHeader>
@@ -203,16 +223,16 @@ export default function Dashboard() {
         )
       case 'totalClasses':
         return (
-          <Card className="relative overflow-hidden bg-gradient-to-br from-white via-purple-50/50 to-white border-purple-200/50 hover:border-purple-300 hover:shadow-xl transition-all duration-300 group h-full">
-            <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-purple-500/10 to-transparent rounded-full blur-2xl opacity-0 group-hover:opacity-100 transition-opacity" />
+          <Card className="relative overflow-hidden bg-gradient-to-br from-card via-purple-500/5 to-card dark:from-card dark:via-purple-500/10 dark:to-card border-purple-200/50 dark:border-purple-500/20 hover:border-purple-400 dark:hover:border-purple-500/40 hover:shadow-xl hover:shadow-purple-500/10 transition-all duration-300 group h-full">
+            <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-purple-500/20 to-transparent rounded-full blur-2xl opacity-0 group-hover:opacity-100 transition-opacity" />
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 relative z-10">
               <CardTitle className="text-sm font-medium">Turmas</CardTitle>
-              <div className="p-2.5 rounded-lg bg-gradient-to-br from-purple-50 to-purple-100">
-                <BookOpen className="h-5 w-5 text-purple-600" />
+              <div className="p-2.5 rounded-xl bg-gradient-to-br from-purple-500/20 to-purple-600/30 dark:from-purple-500/30 dark:to-purple-600/40 shadow-lg shadow-purple-500/20">
+                <BookOpen className="h-5 w-5 text-purple-600 dark:text-purple-400" />
               </div>
             </CardHeader>
             <CardContent className="relative z-10">
-              <div className="text-2xl font-bold text-purple-700">48</div>
+              <div className="text-2xl font-bold text-purple-600 dark:text-purple-400">48</div>
               <p className="text-xs text-muted-foreground">
                 5 turmas com vagas abertas
               </p>
@@ -221,16 +241,16 @@ export default function Dashboard() {
         )
       case 'approvalRate':
         return (
-          <Card className="relative overflow-hidden bg-gradient-to-br from-white via-green-50/50 to-white border-green-200/50 hover:border-green-300 hover:shadow-xl transition-all duration-300 group h-full">
-            <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-green-500/10 to-transparent rounded-full blur-2xl opacity-0 group-hover:opacity-100 transition-opacity" />
+          <Card className="relative overflow-hidden bg-gradient-to-br from-card via-green-500/5 to-card dark:from-card dark:via-green-500/10 dark:to-card border-green-200/50 dark:border-green-500/20 hover:border-green-400 dark:hover:border-green-500/40 hover:shadow-xl hover:shadow-green-500/10 transition-all duration-300 group h-full">
+            <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-green-500/20 to-transparent rounded-full blur-2xl opacity-0 group-hover:opacity-100 transition-opacity" />
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 relative z-10">
               <CardTitle className="text-sm font-medium">Taxa de Aprovação</CardTitle>
-              <div className="p-2.5 rounded-lg bg-gradient-to-br from-green-50 to-green-100">
-                <TrendingUp className="h-5 w-5 text-green-600" />
+              <div className="p-2.5 rounded-xl bg-gradient-to-br from-green-500/20 to-green-600/30 dark:from-green-500/30 dark:to-green-600/40 shadow-lg shadow-green-500/20">
+                <TrendingUp className="h-5 w-5 text-green-600 dark:text-green-400" />
               </div>
             </CardHeader>
             <CardContent className="relative z-10">
-              <div className="text-2xl font-bold text-green-700">94.2%</div>
+              <div className="text-2xl font-bold text-green-600 dark:text-green-400">94.2%</div>
               <p className="text-xs text-muted-foreground">
                 +2.1% desde o último ano
               </p>
@@ -354,16 +374,34 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-6 animate-fade-in p-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-3xl font-bold tracking-tight text-primary">
-            Dashboard
-          </h2>
-          <p className="text-muted-foreground">Layout: {activeLayout?.name || 'Padrão'}</p>
+      {/* Header com saudação */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="space-y-1">
+          <div className="flex items-center gap-2">
+            <div className="p-2 rounded-lg bg-gradient-to-br from-primary/20 to-purple-500/20">
+              <Sparkles className="h-5 w-5 text-primary" />
+            </div>
+            <h2 className="text-2xl md:text-3xl font-bold tracking-tight bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text">
+              {getGreeting()}!
+            </h2>
+          </div>
+          <div className="flex items-center gap-2 text-muted-foreground">
+            <Calendar className="h-4 w-4" />
+            <p className="text-sm capitalize">{formatDate()}</p>
+          </div>
         </div>
-        <div className="flex items-center space-x-2">
-          <Button variant="outline" onClick={() => setCustomizerOpen(true)}>
-            <Layout className="mr-2 h-4 w-4" /> Personalizar
+        <div className="flex items-center gap-3">
+          <div className="hidden md:flex items-center gap-2 px-4 py-2 rounded-lg bg-card border text-sm">
+            <span className="text-muted-foreground">Layout:</span>
+            <span className="font-medium">{activeLayout?.name || 'Padrão'}</span>
+          </div>
+          <Button
+            variant="outline"
+            onClick={() => setCustomizerOpen(true)}
+            className="hover:bg-primary/10 hover:text-primary hover:border-primary/30 transition-all"
+          >
+            <Layout className="mr-2 h-4 w-4" />
+            <span>Personalizar</span>
           </Button>
         </div>
       </div>
@@ -371,7 +409,7 @@ export default function Dashboard() {
       <div className="grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-4">
         {Array.isArray(widgets) && widgets
           .filter((widget) => widget && widget.visible)
-          .map((widget) => {
+          .map((widget, index) => {
             let colSpanClass = ''
             if (widget.w === 2) colSpanClass = 'md:col-span-2'
             if (widget.w === 3) colSpanClass = 'md:col-span-2 lg:col-span-3'
@@ -381,7 +419,11 @@ export default function Dashboard() {
             if (!widgetContent) return null
 
             return (
-              <div key={`widget-${widget.id || widget.dataKey || Math.random()}`} className={colSpanClass}>
+              <div
+                key={`widget-${widget.id || widget.dataKey || Math.random()}`}
+                className={`${colSpanClass} animate-fade-in-up`}
+                style={{ animationDelay: `${index * 100}ms`, animationFillMode: 'backwards' }}
+              >
                 {widgetContent}
               </div>
             )

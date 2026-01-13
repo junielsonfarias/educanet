@@ -1,6 +1,16 @@
 /* Main entry point for the application - renders the root React component */
 import { createRoot } from 'react-dom/client'
+import { ThemeProvider } from 'next-themes'
 import App from './App.tsx'
 import './main.css'
 
-createRoot(document.getElementById('root')!).render(<App />)
+createRoot(document.getElementById('root')!).render(
+  <ThemeProvider
+    attribute="class"
+    defaultTheme="dark"
+    enableSystem
+    disableTransitionOnChange={false}
+  >
+    <App />
+  </ThemeProvider>
+)

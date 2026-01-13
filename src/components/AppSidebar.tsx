@@ -26,6 +26,14 @@ import {
   AlertTriangle,
   RefreshCcw,
   UserPlus,
+  UsersRound,
+  BookMarked,
+  Presentation,
+  ClipboardCheck,
+  Award,
+  Target,
+  ChevronRight,
+  Sparkles,
 } from 'lucide-react'
 import {
   Sidebar,
@@ -79,12 +87,12 @@ const peopleItems = [
   {
     title: 'Alunos',
     url: '/pessoas/alunos',
-    icon: Users,
+    icon: GraduationCap,
   },
   {
     title: 'Professores',
     url: '/pessoas/professores',
-    icon: GraduationCap,
+    icon: Presentation,
   },
   {
     title: 'Documentos Escolares',
@@ -112,12 +120,12 @@ const academicItems = [
   {
     title: 'Turmas',
     url: '/academico/turmas',
-    icon: Users,
+    icon: UsersRound,
   },
   {
     title: 'Diário de Classe',
     url: '/academico/diario',
-    icon: ClipboardList,
+    icon: BookMarked,
   },
   {
     title: 'Planejamento de Aulas',
@@ -132,22 +140,22 @@ const academicItems = [
   {
     title: 'Lançamento de Notas',
     url: '/avaliacao/lancamento',
-    icon: GraduationCap,
+    icon: ClipboardCheck,
   },
   {
     title: 'Análise e Comparação',
     url: '/academico/analise-avaliacoes',
-    icon: BarChart,
+    icon: Target,
   },
   {
     title: 'Regras de Avaliação',
     url: '/academico/regras-avaliacao',
-    icon: FileText,
+    icon: Award,
   },
   {
     title: 'Tipos de Avaliação',
     url: '/academico/tipos-avaliacao',
-    icon: FileText,
+    icon: ClipboardList,
   },
 ]
 
@@ -211,10 +219,24 @@ export function AppSidebar() {
 
   return (
     <Sidebar aria-label="Menu de navegacao principal">
-      <SidebarHeader className="p-4 border-b">
-        <div className="flex items-center gap-2 font-bold text-xl text-primary" role="banner">
-          <GraduationCap className="h-6 w-6" aria-hidden="true" />
-          <span>EduGestao</span>
+      <SidebarHeader className="p-4 border-b border-sidebar-border">
+        <div className="flex items-center gap-3" role="banner">
+          <div className="relative">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary via-blue-500 to-purple-600 flex items-center justify-center shadow-lg shadow-primary/25">
+              <GraduationCap className="h-6 w-6 text-white" aria-hidden="true" />
+            </div>
+            <div className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-green-500 border-2 border-sidebar-background flex items-center justify-center">
+              <Sparkles className="h-2.5 w-2.5 text-white" />
+            </div>
+          </div>
+          <div className="flex flex-col">
+            <span className="font-bold text-lg bg-gradient-to-r from-primary to-purple-500 bg-clip-text text-transparent">
+              EduCanet
+            </span>
+            <span className="text-[10px] text-muted-foreground tracking-wider uppercase">
+              Gestão Escolar
+            </span>
+          </div>
         </div>
       </SidebarHeader>
       <SidebarContent>
@@ -593,25 +615,33 @@ export function AppSidebar() {
         </SidebarGroup>
       </SidebarContent>
 
-      <SidebarFooter className="border-t p-4">
-        <div className="flex items-center gap-3 mb-4">
-          <Avatar className="h-9 w-9">
-            <AvatarFallback className="bg-primary/10 text-primary">
-              {userData?.email?.substring(0, 2).toUpperCase() || 'AD'}
-            </AvatarFallback>
-          </Avatar>
-          <div className="flex flex-col overflow-hidden">
-            <span className="text-sm font-medium truncate">
+      <SidebarFooter className="border-t border-sidebar-border p-4">
+        <div className="flex items-center gap-3 mb-4 p-2 rounded-lg bg-sidebar-accent/50 hover:bg-sidebar-accent transition-colors">
+          <div className="relative">
+            <Avatar className="h-10 w-10 ring-2 ring-primary/30 ring-offset-2 ring-offset-sidebar-background">
+              <AvatarFallback className="bg-gradient-to-br from-primary to-purple-600 text-white font-semibold">
+                {userData?.email?.substring(0, 2).toUpperCase() || 'AD'}
+              </AvatarFallback>
+            </Avatar>
+          </div>
+          <div className="flex flex-col overflow-hidden flex-1">
+            <span className="text-sm font-semibold truncate">
               {userData?.email?.split('@')[0] || 'Usuário'}
             </span>
-            <span className="text-xs text-muted-foreground truncate">
-              {userData?.email || 'admin@escola.com'}
-            </span>
+            <div className="flex items-center gap-2">
+              <Badge
+                variant="secondary"
+                className="text-[10px] px-1.5 py-0 h-4 bg-primary/20 text-primary hover:bg-primary/30"
+              >
+                {userData?.role || 'Admin'}
+              </Badge>
+            </div>
           </div>
+          <ChevronRight className="h-4 w-4 text-muted-foreground" />
         </div>
         <Button
-          variant="outline"
-          className="w-full justify-start text-muted-foreground hover:text-foreground"
+          variant="ghost"
+          className="w-full justify-start text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
           onClick={async () => {
             const result = await logout()
             if (result.success) {
@@ -619,7 +649,8 @@ export function AppSidebar() {
             }
           }}
         >
-          <LogOut className="mr-2 h-5 w-5" /> Sair
+          <LogOut className="mr-2 h-5 w-5" />
+          <span>Sair do Sistema</span>
         </Button>
       </SidebarFooter>
       <SidebarRail />
