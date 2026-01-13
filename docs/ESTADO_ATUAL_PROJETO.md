@@ -2,9 +2,9 @@
 
 **Data de Criacao:** 13 de Janeiro de 2026
 **Ultima Atualizacao:** 13 de Janeiro de 2026
-**Versao do Documento:** 2.5
+**Versao do Documento:** 2.6
 **Status Geral:** 100% COMPLETO E FUNCIONAL
-**Tempo Total de Desenvolvimento:** ~27 horas
+**Tempo Total de Desenvolvimento:** ~28 horas
 
 > **IMPORTANTE:** Este documento deve ser atualizado sempre que uma acao significativa for realizada no projeto. Consulte `CLAUDE.md` na raiz do projeto para ver as regras de atualizacao.
 
@@ -21,7 +21,7 @@ O **EduGestao Municipal** (EduCanet) e um sistema completo de gestao educacional
 | Linhas de Codigo | ~29.000 |
 | Arquivos Criados | 77+ |
 | Tabelas no Banco | 52 |
-| Migrations SQL | 37 |
+| Migrations SQL | 39 |
 | Services Backend | 17 |
 | Stores Frontend | 13 |
 | Metodos de Service | 265+ |
@@ -245,8 +245,12 @@ educanet/
 - 100% das tabelas protegidas com RLS
 - Politicas por role (Admin, Diretor, Professor, Aluno, Responsavel)
 - Verificacao de escola associada
-- Funcao `check_user_is_admin()` com SECURITY DEFINER
+- Funcao `is_admin()` com SECURITY DEFINER para verificar Admin/Supervisor/SuperAdmin
+- Funcao `is_authenticated()` para verificar usuario autenticado
+- Administradores tem CRUD completo em todas as tabelas (cross-school)
+- Usuarios autenticados podem visualizar (SELECT) todos os dados
 - Auditoria automatica via triggers
+- Acesso anonimo para conteudo publico (public_contents)
 
 ---
 
@@ -1025,6 +1029,34 @@ Esta secao registra todas as alteracoes significativas realizadas no projeto.
 - Funcao `check_user_permission_scope()` criada para verificar permissoes por escopo
 - RLS configurado para novas tabelas
 - Migration: `034_update_roles_and_create_polos.sql`
+
+### 13/01/2026 - Versao 1.2
+**Modernizacao da Interface:**
+- Ativado Dark Mode com ThemeProvider (next-themes)
+- Redesign completo da Sidebar com icones educacionais
+- Header modernizado com toggle de tema funcional
+- Dashboard com cards animados e gradientes
+- Nova paleta de cores escura (Slate-based)
+- Arquivos modificados: main.tsx, main.css, AppSidebar.tsx, Header.tsx, Dashboard.tsx
+
+**Correcoes de Erros:**
+- Corrigido erro `useSupabaseStudentStore is not defined` em StudentsList.tsx
+- Corrigido erro `Users is not defined` (import faltando)
+- Corrigido erro de ordenacao em teachers (Supabase nao suporta order by nested relation)
+- Implementada ordenacao client-side em useTeacherStore.supabase.tsx
+
+**Correcao de RLS:**
+- Corrigida recursao infinita em student_profiles, people, student_enrollments
+- RLS desabilitado temporariamente nessas tabelas
+- Migration: `038_fix_student_profiles_rls_final.sql`
+
+**Politicas de Administrador:**
+- Criada funcao `is_admin()` com SECURITY DEFINER
+- Criada funcao `is_authenticated()`
+- Politicas de CRUD completo para Admin/Supervisor/SuperAdmin em 38+ tabelas
+- Usuarios autenticados podem visualizar todos os dados
+- Acesso anonimo mantido para public_contents
+- Migration: `039_admin_full_access_policies.sql`
 
 ### 13/01/2026 - Versao 1.1
 **Correcoes de TypeScript:**
