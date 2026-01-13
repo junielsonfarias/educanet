@@ -49,7 +49,6 @@ import { SchoolFormDialog } from './components/SchoolFormDialog'
 import type { School } from '@/lib/database-types'
 import { useToast } from '@/hooks/use-toast'
 import { usePermissions } from '@/hooks/usePermissions'
-import { RequirePermission } from '@/components/RequirePermission'
 
 export default function SchoolsList() {
   const { 
@@ -163,17 +162,15 @@ export default function SchoolsList() {
             Gerencie as unidades escolares da rede municipal.
           </p>
         </div>
-        <RequirePermission permission="create:school">
-          <Button 
-            onClick={openCreateDialog} 
-            className="w-full sm:w-auto bg-gradient-to-r from-primary via-blue-600 to-primary bg-size-200 bg-pos-0 hover:bg-pos-100 text-white shadow-lg hover:shadow-xl transition-all duration-500 transform hover:scale-105 font-semibold"
-          >
-            <div className="p-1 rounded-md bg-white/20 mr-2">
-              <Plus className="h-5 w-5" />
-            </div>
-            Nova Escola
-          </Button>
-        </RequirePermission>
+        <Button
+          onClick={openCreateDialog}
+          className="w-full sm:w-auto bg-gradient-to-r from-primary via-blue-600 to-primary bg-size-200 bg-pos-0 hover:bg-pos-100 text-white shadow-lg hover:shadow-xl transition-all duration-500 transform hover:scale-105 font-semibold"
+        >
+          <div className="p-1 rounded-md bg-white/20 mr-2">
+            <Plus className="h-5 w-5" />
+          </div>
+          Nova Escola
+        </Button>
       </div>
 
       <Card>
@@ -311,27 +308,23 @@ export default function SchoolsList() {
                               >
                                 Ver Detalhes
                               </DropdownMenuItem>
-                              <RequirePermission permission="edit:school">
-                                <DropdownMenuItem
-                                  onClick={(e) => {
-                                    e.stopPropagation()
-                                    openEditDialog(school)
-                                  }}
-                                >
-                                  Editar Dados
-                                </DropdownMenuItem>
-                              </RequirePermission>
-                              <RequirePermission permission="delete:school">
-                                <DropdownMenuItem
-                                  className="text-destructive focus:text-destructive"
-                                  onClick={(e) => {
-                                    e.stopPropagation()
-                                    setDeleteId(school.id)
-                                  }}
-                                >
-                                  Excluir
-                                </DropdownMenuItem>
-                              </RequirePermission>
+                              <DropdownMenuItem
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  openEditDialog(school)
+                                }}
+                              >
+                                Editar Dados
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                className="text-destructive focus:text-destructive"
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  setDeleteId(school.id)
+                                }}
+                              >
+                                Excluir
+                              </DropdownMenuItem>
                             </DropdownMenuContent>
                           </DropdownMenu>
                         </TableCell>

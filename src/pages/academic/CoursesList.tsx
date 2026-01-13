@@ -13,7 +13,6 @@ import { useCourseStore } from '@/stores/useCourseStore.supabase'
 import { useNavigate } from 'react-router-dom'
 import { CourseFormDialog } from './components/CourseFormDialog'
 import { useToast } from '@/hooks/use-toast'
-import { RequirePermission } from '@/components/RequirePermission'
 
 export default function CoursesList() {
   const { courses, fetchCourses, createCourse, loading } = useCourseStore()
@@ -56,17 +55,15 @@ export default function CoursesList() {
             Gerencie os cursos e suas grades curriculares.
           </p>
         </div>
-        <RequirePermission permission="create:course">
-          <Button
-            onClick={() => setIsDialogOpen(true)}
-            className="w-full sm:w-auto bg-gradient-to-r from-purple-500 via-purple-600 to-purple-500 bg-size-200 bg-pos-0 hover:bg-pos-100 text-white shadow-lg hover:shadow-xl transition-all duration-500 transform hover:scale-105 font-semibold"
-          >
-            <div className="p-1 rounded-md bg-white/20 mr-2">
-              <Plus className="h-5 w-5" />
-            </div>
-            Novo Curso
-          </Button>
-        </RequirePermission>
+        <Button
+          onClick={() => setIsDialogOpen(true)}
+          className="w-full sm:w-auto bg-gradient-to-r from-purple-500 via-purple-600 to-purple-500 bg-size-200 bg-pos-0 hover:bg-pos-100 text-white shadow-lg hover:shadow-xl transition-all duration-500 transform hover:scale-105 font-semibold"
+        >
+          <div className="p-1 rounded-md bg-white/20 mr-2">
+            <Plus className="h-5 w-5" />
+          </div>
+          Novo Curso
+        </Button>
       </div>
 
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">

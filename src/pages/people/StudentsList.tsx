@@ -52,7 +52,6 @@ import { useNavigate } from 'react-router-dom'
 import { StudentFormDialog } from './components/StudentFormDialog'
 import { Student, Enrollment } from '@/lib/mock-data'
 import { useToast } from '@/hooks/use-toast'
-import { RequirePermission } from '@/components/RequirePermission'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useEffect } from 'react'
 import {
@@ -242,17 +241,15 @@ export default function StudentsList() {
           <Button variant="outline" className="w-full sm:w-auto">
             Exportar Lista
           </Button>
-          <RequirePermission permission="create:student">
-            <Button 
-              onClick={openCreateDialog} 
-              className="w-full sm:w-auto bg-gradient-to-r from-primary via-blue-600 to-primary bg-size-200 bg-pos-0 hover:bg-pos-100 text-white shadow-lg hover:shadow-xl transition-all duration-500 transform hover:scale-105 font-semibold"
-            >
-              <div className="p-1 rounded-md bg-white/20 mr-2">
-                <Plus className="h-5 w-5" />
-              </div>
-              Novo Aluno
-            </Button>
-          </RequirePermission>
+          <Button
+            onClick={openCreateDialog}
+            className="w-full sm:w-auto bg-gradient-to-r from-primary via-blue-600 to-primary bg-size-200 bg-pos-0 hover:bg-pos-100 text-white shadow-lg hover:shadow-xl transition-all duration-500 transform hover:scale-105 font-semibold"
+          >
+            <div className="p-1 rounded-md bg-white/20 mr-2">
+              <Plus className="h-5 w-5" />
+            </div>
+            Novo Aluno
+          </Button>
         </div>
       </div>
 
@@ -452,28 +449,24 @@ export default function StudentsList() {
                                 <FileText className="h-4 w-4" /> Histórico
                                 Escolar
                               </DropdownMenuItem>
-                              <RequirePermission permission="edit:student">
-                                <DropdownMenuSeparator />
-                                <DropdownMenuItem
-                                  onClick={(e) => {
-                                    e.stopPropagation()
-                                    openEditDialog(student)
-                                  }}
-                                >
-                                  Editar Cadastro
-                                </DropdownMenuItem>
-                              </RequirePermission>
-                              <RequirePermission permission="delete:student">
-                                <DropdownMenuItem
-                                  className="text-destructive"
-                                  onClick={(e) => {
-                                    e.stopPropagation()
-                                    setDeleteId(studentId)
-                                  }}
-                                >
-                                  Excluir
-                                </DropdownMenuItem>
-                              </RequirePermission>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  openEditDialog(student)
+                                }}
+                              >
+                                Editar Cadastro
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                className="text-destructive"
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  setDeleteId(studentId)
+                                }}
+                              >
+                                Excluir
+                              </DropdownMenuItem>
                             </DropdownMenuContent>
                           </DropdownMenu>
                         </TableCell>
