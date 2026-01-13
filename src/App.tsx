@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import { Toaster } from '@/components/ui/toaster'
-import { Toaster as Sonner } from '@/components/ui/sonner'
+// Sonner desabilitado temporariamente devido a incompatibilidade com React 19
+// import { Toaster as Sonner } from '@/components/ui/sonner'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import ErrorBoundary from '@/components/ErrorBoundary'
 import InstitutionalHome from './pages/Index'
@@ -131,7 +132,7 @@ const App = () => (
                                                   >
                                                     <TooltipProvider>
                                                       <Toaster />
-                                                      <Sonner />
+                                                      {/* <Sonner /> - Desabilitado por incompatibilidade com React 19 */}
                                                       <Routes>
                                     {/* Public Institutional Website Routes */}
                                     <Route element={<PublicLayout />}>

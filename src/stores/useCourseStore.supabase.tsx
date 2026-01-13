@@ -7,7 +7,8 @@
 
 import { create } from 'zustand';
 import { courseService, subjectService } from '@/lib/supabase/services/course-service';
-import { toast } from 'sonner';
+// Toast desabilitado temporariamente - Sonner incompatível com React 19
+// import { toast } from 'sonner';
 
 interface Course {
   id: number;
@@ -124,7 +125,7 @@ export const useCourseStore = create<CourseState>((set, get) => ({
     } catch (error: unknown) {
       const message = error?.message || 'Erro ao carregar cursos por nível';
       set({ error: message, loading: false });
-      toast.error(message);
+      console.error('Toast:',message);
     }
   },
 
@@ -136,7 +137,7 @@ export const useCourseStore = create<CourseState>((set, get) => ({
     } catch (error: unknown) {
       const message = error?.message || 'Erro ao carregar curso';
       set({ error: message, loading: false, currentCourse: null });
-      toast.error(message);
+      console.error('Toast:',message);
     }
   },
 
@@ -151,12 +152,12 @@ export const useCourseStore = create<CourseState>((set, get) => ({
         loading: false 
       });
       
-      toast.success('Curso criado com sucesso!');
+      console.log('Toast:','Curso criado com sucesso!');
       return newCourse;
     } catch (error: unknown) {
       const message = error?.message || 'Erro ao criar curso';
       set({ error: message, loading: false });
-      toast.error(message);
+      console.error('Toast:',message);
       return null;
     }
   },
@@ -173,12 +174,12 @@ export const useCourseStore = create<CourseState>((set, get) => ({
         loading: false 
       });
       
-      toast.success('Curso atualizado com sucesso!');
+      console.log('Toast:','Curso atualizado com sucesso!');
       return updatedCourse;
     } catch (error: unknown) {
       const message = error?.message || 'Erro ao atualizar curso';
       set({ error: message, loading: false });
-      toast.error(message);
+      console.error('Toast:',message);
       return null;
     }
   },
@@ -195,11 +196,11 @@ export const useCourseStore = create<CourseState>((set, get) => ({
         loading: false 
       });
       
-      toast.success('Curso removido com sucesso!');
+      console.log('Toast:','Curso removido com sucesso!');
     } catch (error: unknown) {
       const message = error?.message || 'Erro ao remover curso';
       set({ error: message, loading: false });
-      toast.error(message);
+      console.error('Toast:',message);
     }
   },
 
@@ -215,11 +216,11 @@ export const useCourseStore = create<CourseState>((set, get) => ({
         await get().fetchCourseById(courseId);
       }
       
-      toast.success('Disciplina adicionada ao curso!');
+      console.log('Toast:','Disciplina adicionada ao curso!');
     } catch (error: unknown) {
       const message = error?.message || 'Erro ao adicionar disciplina';
       set({ error: message, loading: false });
-      toast.error(message);
+      console.error('Toast:',message);
     }
   },
 
@@ -233,11 +234,11 @@ export const useCourseStore = create<CourseState>((set, get) => ({
         await get().fetchCourseById(courseId);
       }
       
-      toast.success('Disciplina removida do curso!');
+      console.log('Toast:','Disciplina removida do curso!');
     } catch (error: unknown) {
       const message = error?.message || 'Erro ao remover disciplina';
       set({ error: message, loading: false });
-      toast.error(message);
+      console.error('Toast:',message);
     }
   },
 
@@ -247,7 +248,7 @@ export const useCourseStore = create<CourseState>((set, get) => ({
       return subjects;
     } catch (error: unknown) {
       const message = (error as Error)?.message || 'Erro ao carregar disciplinas do curso';
-      toast.error(message);
+      console.error('Toast:',message);
       return [];
     }
   },
@@ -258,7 +259,7 @@ export const useCourseStore = create<CourseState>((set, get) => ({
       return classes;
     } catch (error: unknown) {
       const message = (error as Error)?.message || 'Erro ao carregar turmas do curso';
-      toast.error(message);
+      console.error('Toast:',message);
       return [];
     }
   },
@@ -275,7 +276,7 @@ export const useCourseStore = create<CourseState>((set, get) => ({
     } catch (error: unknown) {
       const message = error?.message || 'Erro ao carregar disciplinas';
       set({ error: message, loading: false });
-      toast.error(message);
+      console.error('Toast:',message);
     }
   },
 
@@ -287,7 +288,7 @@ export const useCourseStore = create<CourseState>((set, get) => ({
     } catch (error: unknown) {
       const message = error?.message || 'Erro ao buscar disciplinas';
       set({ error: message, loading: false });
-      toast.error(message);
+      console.error('Toast:',message);
     }
   },
 
@@ -313,7 +314,7 @@ export const useCourseStore = create<CourseState>((set, get) => ({
     } catch (error: unknown) {
       const message = error?.message || 'Erro ao carregar disciplina';
       set({ error: message, loading: false, currentSubject: null });
-      toast.error(message);
+      console.error('Toast:',message);
     }
   },
 
@@ -328,12 +329,12 @@ export const useCourseStore = create<CourseState>((set, get) => ({
         loading: false 
       });
       
-      toast.success('Disciplina criada com sucesso!');
+      console.log('Toast:','Disciplina criada com sucesso!');
       return newSubject;
     } catch (error: unknown) {
       const message = error?.message || 'Erro ao criar disciplina';
       set({ error: message, loading: false });
-      toast.error(message);
+      console.error('Toast:',message);
       return null;
     }
   },
@@ -350,12 +351,12 @@ export const useCourseStore = create<CourseState>((set, get) => ({
         loading: false 
       });
       
-      toast.success('Disciplina atualizada com sucesso!');
+      console.log('Toast:','Disciplina atualizada com sucesso!');
       return updatedSubject;
     } catch (error: unknown) {
       const message = error?.message || 'Erro ao atualizar disciplina';
       set({ error: message, loading: false });
-      toast.error(message);
+      console.error('Toast:',message);
       return null;
     }
   },
@@ -372,11 +373,11 @@ export const useCourseStore = create<CourseState>((set, get) => ({
         loading: false 
       });
       
-      toast.success('Disciplina removida com sucesso!');
+      console.log('Toast:','Disciplina removida com sucesso!');
     } catch (error: unknown) {
       const message = error?.message || 'Erro ao remover disciplina';
       set({ error: message, loading: false });
-      toast.error(message);
+      console.error('Toast:',message);
     }
   },
 
@@ -386,7 +387,7 @@ export const useCourseStore = create<CourseState>((set, get) => ({
       return teachers;
     } catch (error: unknown) {
       const message = (error as Error)?.message || 'Erro ao carregar professores da disciplina';
-      toast.error(message);
+      console.error('Toast:',message);
       return [];
     }
   },
@@ -399,7 +400,7 @@ export const useCourseStore = create<CourseState>((set, get) => ({
       return stats;
     } catch (error: unknown) {
       const message = error?.message || 'Erro ao carregar estatísticas';
-      toast.error(message);
+      console.error('Toast:',message);
       return null;
     }
   },
@@ -410,7 +411,7 @@ export const useCourseStore = create<CourseState>((set, get) => ({
       return total;
     } catch (error: unknown) {
       const message = error?.message || 'Erro ao calcular carga horária';
-      toast.error(message);
+      console.error('Toast:',message);
       return 0;
     }
   },
