@@ -31,13 +31,13 @@ export interface SubjectData {
   description?: string;
 }
 
-// Mapeamento de código INEP para education_level no banco
+// Mapeamento de código INEP para education_level no banco (deve corresponder ao ENUM)
 const CODIGO_TO_LEVEL: Record<string, string> = {
-  '01': 'Infantil',
-  '02': 'Infantil',
-  '03': 'Fundamental I',
-  '04': 'Fundamental II',
-  '05': 'Médio',
+  '01': 'Educação Infantil',    // Creche
+  '02': 'Educação Infantil',    // Pré-escola
+  '03': 'Ensino Fundamental I', // Anos Iniciais
+  '04': 'Ensino Fundamental II',// Anos Finais
+  '05': 'Ensino Médio',
   '06': 'EJA',
 };
 
