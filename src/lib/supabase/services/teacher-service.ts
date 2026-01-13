@@ -66,10 +66,18 @@ class TeacherService extends BaseService<Teacher> {
         query = query.eq('employment_status', options.employmentStatus);
       }
 
-      const { data, error } = await query.order('person.full_name');
+      const { data, error } = await query.order('id');
 
       if (error) throw handleSupabaseError(error);
-      return (data || []) as TeacherFullInfo[];
+
+      // Ordenar por nome client-side
+      const sorted = (data || []).sort((a: Record<string, unknown>, b: Record<string, unknown>) => {
+        const nameA = (a.person as Record<string, unknown>)?.full_name as string || '';
+        const nameB = (b.person as Record<string, unknown>)?.full_name as string || '';
+        return nameA.localeCompare(nameB, 'pt-BR');
+      });
+
+      return sorted as TeacherFullInfo[];
     } catch (error) {
       console.error('Error in TeacherService.getBySchool:', error);
       throw error;
@@ -102,10 +110,18 @@ class TeacherService extends BaseService<Teacher> {
         query = query.eq('class.academic_year_id', options.academicYearId);
       }
 
-      const { data, error } = await query.order('class.name');
+      const { data, error } = await query.order('id');
 
       if (error) throw handleSupabaseError(error);
-      return data || [];
+
+      // Ordenar por nome da turma client-side
+      const sorted = (data || []).sort((a: Record<string, unknown>, b: Record<string, unknown>) => {
+        const nameA = (a.class as Record<string, unknown>)?.name as string || '';
+        const nameB = (b.class as Record<string, unknown>)?.name as string || '';
+        return nameA.localeCompare(nameB, 'pt-BR');
+      });
+
+      return sorted;
     } catch (error) {
       console.error('Error in TeacherService.getTeacherClasses:', error);
       throw error;
@@ -182,10 +198,24 @@ class TeacherService extends BaseService<Teacher> {
         .in('class_id', classIds)
         .eq('status', 'Ativo')
         .is('deleted_at', null)
-        .order('student_enrollment.student_profile.person.full_name');
+        .order('id');
 
       if (error) throw handleSupabaseError(error);
-      return data || [];
+
+      // Ordenar por nome do aluno client-side
+      const sorted = (data || []).sort((a: Record<string, unknown>, b: Record<string, unknown>) => {
+        const enrollmentA = a.student_enrollment as Record<string, unknown>;
+        const enrollmentB = b.student_enrollment as Record<string, unknown>;
+        const profileA = enrollmentA?.student_profile as Record<string, unknown>;
+        const profileB = enrollmentB?.student_profile as Record<string, unknown>;
+        const personA = profileA?.person as Record<string, unknown>;
+        const personB = profileB?.person as Record<string, unknown>;
+        const nameA = personA?.full_name as string || '';
+        const nameB = personB?.full_name as string || '';
+        return nameA.localeCompare(nameB, 'pt-BR');
+      });
+
+      return sorted;
     } catch (error) {
       console.error('Error in TeacherService.getTeacherStudents:', error);
       throw error;
@@ -320,10 +350,18 @@ class TeacherService extends BaseService<Teacher> {
         query = query.limit(options.limit);
       }
 
-      const { data, error } = await query.order('person.full_name');
+      const { data, error } = await query.order('id');
 
       if (error) throw handleSupabaseError(error);
-      return (data || []) as TeacherFullInfo[];
+
+      // Ordenar por nome client-side
+      const sorted = (data || []).sort((a: Record<string, unknown>, b: Record<string, unknown>) => {
+        const nameA = (a.person as Record<string, unknown>)?.full_name as string || '';
+        const nameB = (b.person as Record<string, unknown>)?.full_name as string || '';
+        return nameA.localeCompare(nameB, 'pt-BR');
+      });
+
+      return sorted as TeacherFullInfo[];
     } catch (error) {
       console.error('Error in TeacherService.searchByName:', error);
       throw error;

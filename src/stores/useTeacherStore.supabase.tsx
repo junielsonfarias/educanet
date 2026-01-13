@@ -78,17 +78,26 @@ export const useTeacherStore = create<TeacherState>((set, get) => ({
     set({ loading: true, error: null });
     try {
       const teachers = await teacherService.getAll({
-        sort: { column: 'person.full_name', ascending: true }
+        sort: { column: 'id', ascending: true }
       });
-      
+
       // Buscar informações completas
       const teachersWithFullInfo = await Promise.all(
         teachers.map(teacher => teacherService.getTeacherFullInfo(teacher.id))
       );
-      
-      set({ 
-        teachers: teachersWithFullInfo.filter(Boolean) as TeacherFullInfo[], 
-        loading: false 
+
+      // Ordenar por nome após buscar as informações completas
+      const sortedTeachers = teachersWithFullInfo
+        .filter(Boolean)
+        .sort((a, b) => {
+          const nameA = a?.person?.full_name || '';
+          const nameB = b?.person?.full_name || '';
+          return nameA.localeCompare(nameB, 'pt-BR');
+        }) as TeacherFullInfo[];
+
+      set({
+        teachers: sortedTeachers,
+        loading: false
       });
     } catch (error: unknown) {
       const message = (error as Error)?.message || 'Erro ao carregar professores';
