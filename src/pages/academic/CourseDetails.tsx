@@ -48,6 +48,37 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 
+interface SerieAno {
+  id: string;
+  name: string;
+  numero?: number;
+  evaluationRuleId?: string;
+  subjects?: SubjectItem[];
+}
+
+interface SubjectItem {
+  id: string;
+  name: string;
+  workload: number;
+}
+
+interface CourseFormData {
+  name?: string;
+  codigoCenso?: string;
+  description?: string;
+}
+
+interface SerieAnoFormData {
+  name?: string;
+  numero?: number;
+  evaluationRuleId?: string;
+}
+
+interface SubjectFormData {
+  name?: string;
+  workload?: number;
+}
+
 export default function CourseDetails() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
@@ -73,8 +104,8 @@ export default function CourseDetails() {
   const [isCourseDialogOpen, setIsCourseDialogOpen] = useState(false)
 
   const [selectedSerieAnoId, setSelectedSerieAnoId] = useState<string | null>(null)
-  const [editingSerieAno, setEditingSerieAno] = useState<any>(null)
-  const [editingSubject, setEditingSubject] = useState<any>(null)
+  const [editingSerieAno, setEditingSerieAno] = useState<SerieAno | null>(null)
+  const [editingSubject, setEditingSubject] = useState<SubjectItem | null>(null)
   const [deleteSubjectData, setDeleteSubjectData] = useState<{
     serieAnoId: string
     subjectId: string
@@ -96,7 +127,7 @@ export default function CourseDetails() {
   }
 
   // Handlers for EtapaEnsino
-  const handleUpdateEtapaEnsino = (data: any) => {
+  const handleUpdateEtapaEnsino = (data: CourseFormData) => {
     updateEtapaEnsino(etapaEnsino.id, data)
     toast({
       title: 'Etapa de Ensino atualizada',
@@ -116,7 +147,7 @@ export default function CourseDetails() {
   // Alias para compatibilidade
   const openAddGradeDialog = openAddSerieAnoDialog
 
-  const openEditSerieAnoDialog = (serieAno: any) => {
+  const openEditSerieAnoDialog = (serieAno: SerieAno) => {
     setEditingSerieAno(serieAno)
     setIsGradeDialogOpen(true)
   }
@@ -124,7 +155,7 @@ export default function CourseDetails() {
   // Alias para compatibilidade
   const openEditGradeDialog = openEditSerieAnoDialog
 
-  const handleSerieAnoSubmit = (data: any) => {
+  const handleSerieAnoSubmit = (data: SerieAnoFormData) => {
     if (editingSerieAno) {
       updateSerieAno(etapaEnsino.id, editingSerieAno.id, data)
       toast({ title: 'Série/Ano atualizada', description: 'Alterações salvas.' })
@@ -144,13 +175,13 @@ export default function CourseDetails() {
     setIsSubjectDialogOpen(true)
   }
 
-  const openEditSubjectDialog = (serieAnoId: string, subject: any) => {
+  const openEditSubjectDialog = (serieAnoId: string, subject: SubjectItem) => {
     setSelectedSerieAnoId(serieAnoId)
     setEditingSubject(subject)
     setIsSubjectDialogOpen(true)
   }
 
-  const handleSubjectSubmit = (data: any) => {
+  const handleSubjectSubmit = (data: SubjectFormData) => {
     if (!selectedSerieAnoId) return
 
     if (editingSubject) {
@@ -250,7 +281,7 @@ export default function CourseDetails() {
               <Accordion type="single" collapsible className="w-full">
                 {/* Ordena séries/anos por número se disponível */}
                 {[...safeArray(etapaEnsino.seriesAnos)]
-                  .sort((a: any, b: any) => {
+                  .sort((a: SerieAno, b: SerieAno) => {
                     const numA = a.numero || parseInt(a.name) || 0
                     const numB = b.numero || parseInt(b.name) || 0
                     return numA - numB

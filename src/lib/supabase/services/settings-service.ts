@@ -10,7 +10,7 @@ import { handleSupabaseError } from '../helpers';
 
 export interface SettingsData {
   key: string;
-  value: any;
+  value: string | number | boolean | Record<string, unknown>;
   category?: string;
   description?: string;
 }
@@ -78,7 +78,7 @@ class SettingsService extends BaseService {
 
       // Converter array em objeto {key: value}
       const settings: Record<string, any> = {};
-      (data || []).forEach((setting: any) => {
+      (data || []).forEach((setting: Record<string, unknown>) => {
         settings[setting.key] = setting.value;
       });
 
@@ -92,7 +92,7 @@ class SettingsService extends BaseService {
   /**
    * Salvar ou atualizar configuração
    */
-  async setSetting(key: string, value: any, options?: {
+  async setSetting(key: string, value: string | number | boolean | Record<string, unknown>, options?: {
     category?: string;
     description?: string;
   }): Promise<any> {

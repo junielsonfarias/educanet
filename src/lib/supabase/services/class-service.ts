@@ -7,7 +7,7 @@
 import { BaseService } from './base-service';
 import { supabase } from '../client';
 import { handleSupabaseError } from '../helpers';
-import type { Class, ClassWithDetails } from '@/lib/database-types';
+import type { Class, ClassWithDetails, School, Course, AcademicYear, Student, Teacher, Subject } from '@/lib/database-types';
 
 export interface ClassStats {
   totalStudents: number;
@@ -19,13 +19,13 @@ export interface ClassStats {
 }
 
 export interface ClassWithFullInfo extends Class {
-  school?: any;
-  course?: any;
-  academic_year?: any;
+  school?: School;
+  course?: Course;
+  academic_year?: AcademicYear;
   stats?: ClassStats;
-  students?: any[];
-  teachers?: any[];
-  subjects?: any[];
+  students?: Student[];
+  teachers?: Teacher[];
+  subjects?: Subject[];
 }
 
 class ClassService extends BaseService<Class> {
@@ -178,7 +178,7 @@ class ClassService extends BaseService<Class> {
       const { data, error } = await query.order('student_enrollment.student_profile.person.full_name');
 
       if (error) throw handleSupabaseError(error);
-      return (data || []).map((item: any) => item.student_enrollment?.student_profile).filter(Boolean);
+      return (data || []).map((item: Record<string, unknown>) => item.student_enrollment?.student_profile).filter(Boolean);
     } catch (error) {
       console.error('Error in ClassService.getClassStudents:', error);
       throw error;
@@ -232,7 +232,7 @@ class ClassService extends BaseService<Class> {
 
       // Agrupar por disciplina (pode ter múltiplos professores)
       const subjectsMap = new Map();
-      (data || []).forEach((item: any) => {
+      (data || []).forEach((item: Record<string, unknown>) => {
         if (item.subject) {
           const subjectId = item.subject.id;
           if (!subjectsMap.has(subjectId)) {
@@ -525,7 +525,7 @@ class ClassService extends BaseService<Class> {
 
       // Filtrar turmas com vagas
       const classesWithStats = await Promise.all(
-        (data || []).map(async (classData: any) => {
+        (data || []).map(async (classData: Record<string, unknown>) => {
           const stats = await this.getClassStats(classData.id);
           return {
             ...classData,

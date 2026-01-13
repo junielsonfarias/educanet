@@ -17,7 +17,7 @@ export function isSupabaseConfigured(): boolean {
 export async function checkConnection(): Promise<{
   success: boolean
   message: string
-  details?: any
+  details?: Record<string, unknown> | PostgrestError | Error
 }> {
   try {
     if (!isSupabaseConfigured()) {

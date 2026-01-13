@@ -62,6 +62,91 @@ export interface EnrollmentWithDetails extends StudentEnrollment {
   academic_year: AcademicYear;
 }
 
+// Types adicionais para dados do Supabase
+export interface ClassTeacherSubject {
+  id: number;
+  class_id: number;
+  teacher_id: number;
+  subject_id: number;
+  workload_hours?: number;
+  teacher?: TeacherFullInfo;
+  subject?: Subject;
+}
+
+export interface UserRole {
+  id: number;
+  user_id: string;
+  role_id: number;
+  role?: Role;
+}
+
+export interface AuthUser {
+  id: string;
+  email: string;
+  person_id?: number;
+  is_active: boolean;
+  person?: Person;
+  roles?: UserRole[];
+}
+
+export interface SettingRecord {
+  id: number;
+  key: string;
+  value: string | number | boolean | Record<string, unknown>;
+  category?: string;
+  description?: string;
+}
+
+export interface ProtocolRecord {
+  id: number;
+  protocol_number: string;
+  requester_name: string;
+  requester_email?: string;
+  requester_phone?: string;
+  subject: string;
+  description: string;
+  status: ProtocolStatus;
+  priority?: string;
+  school_id?: number;
+  assigned_to?: number;
+  school?: School;
+}
+
+export interface PublicContent {
+  id: number;
+  title: string;
+  content: string;
+  type: PortalContentType;
+  status: PortalPublicationStatus;
+  is_featured: boolean;
+  published_at?: string;
+  author_id?: number;
+}
+
+export interface SchoolDocument {
+  id: number;
+  document_number: string;
+  document_type: SchoolDocumentType;
+  title: string;
+  content?: string;
+  student_id?: number;
+  school_id?: number;
+  academic_year_id?: number;
+}
+
+export interface Communication {
+  id: number;
+  title: string;
+  content: string;
+  type: CommunicationType;
+  sender_id?: number;
+  school_id?: number;
+  is_read: boolean;
+}
+
+// Tipo genérico para dados do Supabase (para callbacks)
+export type SupabaseRecord = Record<string, unknown>;
+
 // ENUMs
 export type PersonType = Enums<'person_type'>;
 export type StudentEnrollmentStatus = Enums<'student_enrollment_status'>;

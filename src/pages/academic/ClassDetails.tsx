@@ -81,7 +81,7 @@ export default function ClassDetails() {
     }
   }
 
-  const handleUpdate = async (data: any) => {
+  const handleUpdate = async (data: Record<string, unknown>) => {
     if (!classData) return
     
     try {

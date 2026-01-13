@@ -73,6 +73,10 @@ import ProtocolsManager from './pages/secretariat/ProtocolsManager'
 import ServiceQueue from './pages/secretariat/ServiceQueue'
 import AppointmentsManager from './pages/secretariat/AppointmentsManager'
 import TransfersManager from './pages/people/TransfersManager'
+import TransfersManagerSupabase from './pages/people/TransfersManager.supabase'
+import PreEnrollmentManagerSupabase from './pages/enrollment/PreEnrollmentManager.supabase'
+import PreEnrollmentPublicForm from './pages/enrollment/PreEnrollmentPublicForm'
+import ReenrollmentManagerSupabase from './pages/enrollment/ReenrollmentManager.supabase'
 import { UserProvider } from './stores/useUserStore'
 import { SchoolProvider } from './stores/useSchoolStore'
 import { StudentProvider } from './stores/useStudentStore'
@@ -186,6 +190,10 @@ const App = () => (
                                         path="/publico/matricula-online"
                                         element={<OnlineEnrollment />}
                                       />
+                                      <Route
+                                        path="/publico/pre-matricula"
+                                        element={<PreEnrollmentPublicForm />}
+                                      />
                                     </Route>
 
                                     {/* Auth Route */}
@@ -241,11 +249,21 @@ const App = () => (
                                       />
                                       <Route
                                         path="/pessoas/transferencias"
-                                        element={<TransfersManager />}
+                                        element={<TransfersManagerSupabase />}
                                       />
                                       <Route
                                         path="/pessoas/funcionarios"
                                         element={<StaffList />}
+                                      />
+
+                                      {/* Enrollment Routes */}
+                                      <Route
+                                        path="/matriculas/pre-matricula"
+                                        element={<PreEnrollmentManagerSupabase />}
+                                      />
+                                      <Route
+                                        path="/matriculas/rematricula"
+                                        element={<ReenrollmentManagerSupabase />}
                                       />
 
                                       {/* Academic Routes */}

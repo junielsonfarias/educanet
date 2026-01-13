@@ -74,7 +74,7 @@ export function validateFileType(
   const allowedTypes = ALLOWED_FILE_TYPES[bucket]
   const fileType = file.type
 
-  if (!allowedTypes.includes(fileType as any)) {
+  if (!allowedTypes.includes(fileType as typeof allowedTypes[number])) {
     return {
       valid: false,
       error: `Tipo de arquivo não permitido. Tipos aceitos: ${allowedTypes.join(', ')}`,
@@ -149,7 +149,11 @@ export async function uploadFile(options: UploadOptions): Promise<UploadResult> 
     const filePath = generateFilePath(bucket, file, path)
 
     // Faz upload
-    const uploadOptions: any = {
+    const uploadOptions: {
+      cacheControl: string
+      upsert: boolean
+      contentType?: string
+    } = {
       cacheControl: cacheControl || '3600',
       upsert,
     }
@@ -255,7 +259,7 @@ export async function listFiles(
   path?: string,
   limit?: number,
   offset?: number,
-): Promise<{ success: boolean; files?: any[]; error?: string }> {
+): Promise<{ success: boolean; files?: Array<{ name: string; id: string; created_at: string; updated_at: string; last_accessed_at: string; metadata: Record<string, unknown> }>; error?: string }> {
   try {
     let query = supabase.storage.from(bucket).list(path || '', {
       limit: limit || 100,

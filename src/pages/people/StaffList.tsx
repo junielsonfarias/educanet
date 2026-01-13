@@ -83,7 +83,7 @@ export default function StaffList() {
     })
   }, [staff, searchTerm])
 
-  const handleCreate = async (data: any) => {
+  const handleCreate = async (data: Record<string, unknown>) => {
     if (!currentUser?.person_id) {
       toast.error('Usuário não autenticado')
       return
@@ -116,7 +116,7 @@ export default function StaffList() {
     }
   }
 
-  const handleUpdate = async (data: any) => {
+  const handleUpdate = async (data: Record<string, unknown>) => {
     if (!editingStaff || !currentUser?.person_id) return
 
     const personData = {

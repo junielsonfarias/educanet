@@ -90,7 +90,7 @@ export default function SchoolsList() {
     }
   )
 
-  const handleCreate = async (data: any) => {
+  const handleCreate = async (data: Record<string, unknown>) => {
     try {
       const schoolData: Partial<School> = {
         name: data.name || '',
@@ -109,7 +109,7 @@ export default function SchoolsList() {
     }
   }
 
-  const handleUpdate = async (data: any) => {
+  const handleUpdate = async (data: Record<string, unknown>) => {
     if (editingSchool) {
       try {
         const schoolData: Partial<School> = {

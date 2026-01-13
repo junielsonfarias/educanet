@@ -86,7 +86,7 @@ export default function DocumentsManager() {
     })
   }, [documents, searchTerm])
 
-  const handleCreate = async (data: any) => {
+  const handleCreate = async (data: Record<string, unknown>) => {
     try {
       await addPublicContent({
         ...data,
@@ -99,7 +99,7 @@ export default function DocumentsManager() {
     }
   }
 
-  const handleUpdate = async (data: any) => {
+  const handleUpdate = async (data: Record<string, unknown>) => {
     if (editingDoc) {
       try {
         await updatePublicContent(editingDoc.id, data)

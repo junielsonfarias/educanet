@@ -93,7 +93,7 @@ class ProtocolService extends BaseService {
     try {
       const { data: { user } } = await supabase.auth.getUser();
 
-      const updateData: any = {
+      const updateData: Record<string, unknown> = {
         status: newStatus,
         updated_by: user?.id || 1
       };
@@ -244,7 +244,7 @@ class ProtocolService extends BaseService {
       let totalResolutionTime = 0;
       let resolvedCount = 0;
 
-      (data || []).forEach((protocol: any) => {
+      (data || []).forEach((protocol: Record<string, unknown>) => {
         byStatus[protocol.status] = (byStatus[protocol.status] || 0) + 1;
         byType[protocol.request_type] = (byType[protocol.request_type] || 0) + 1;
 

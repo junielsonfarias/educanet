@@ -36,7 +36,7 @@ const docSchema = z.object({
 interface DocumentFormDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
-  onSubmit: (data: any) => void
+  onSubmit: (data: Record<string, unknown>) => void
   initialData?: PublicDocument | null
 }
 

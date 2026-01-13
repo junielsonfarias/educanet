@@ -64,7 +64,7 @@ const baseSchema = z.object({
 interface UserFormDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
-  onSubmit: (data: any) => void
+  onSubmit: (data: Record<string, unknown>) => void
   initialData?: User | null
 }
 

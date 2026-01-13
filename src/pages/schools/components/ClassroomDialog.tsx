@@ -79,7 +79,7 @@ const classroomSchema = z.object({
 interface ClassroomDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
-  onSubmit: (data: any) => void
+  onSubmit: (data: Record<string, unknown>) => void
   etapasEnsino?: any[] // Etapas de ensino (opcional, pode ser carregado do Supabase)
   schools?: School[] // Optional, used when creating from ClassesList
   initialData?: any // For editing

@@ -89,7 +89,7 @@ export default function UsersList() {
     }
   }, [currentUser, navigate, toast])
 
-  const handleCreateUser = async (data: any) => {
+  const handleCreateUser = async (data: Record<string, unknown>) => {
     try {
       await addUser(data)
       toast({
@@ -105,7 +105,7 @@ export default function UsersList() {
     }
   }
 
-  const handleUpdateUser = async (data: any) => {
+  const handleUpdateUser = async (data: Record<string, unknown>) => {
     if (editingUser) {
       try {
         await updateUser(editingUser.id, data)

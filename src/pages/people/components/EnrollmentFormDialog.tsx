@@ -62,7 +62,7 @@ const enrollmentSchema = z.object({
 interface EnrollmentFormDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
-  onSubmit: (data: any) => void
+  onSubmit: (data: Record<string, unknown>) => void
   studentId?: string
 }
 

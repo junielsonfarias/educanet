@@ -93,7 +93,7 @@ class StudentService extends BaseService<Student> {
 
       // Extrair student_profiles únicos (evitar duplicatas)
       const students = new Map<number, StudentFullInfo>();
-      (data || []).forEach((enrollment: any) => {
+      (data || []).forEach((enrollment: Record<string, unknown>) => {
         if (enrollment.student_profile && !students.has(enrollment.student_profile.id)) {
           students.set(enrollment.student_profile.id, {
             ...enrollment.student_profile,
@@ -136,7 +136,7 @@ class StudentService extends BaseService<Student> {
 
       if (error) throw handleSupabaseError(error);
 
-      return (data || []).map((item: any) => item.student_enrollment?.student_profile).filter(Boolean);
+      return (data || []).map((item: Record<string, unknown>) => item.student_enrollment?.student_profile).filter(Boolean);
     } catch (error) {
       console.error('Error in StudentService.getByClass:', error);
       throw error;
@@ -163,7 +163,7 @@ class StudentService extends BaseService<Student> {
 
       if (error) throw handleSupabaseError(error);
 
-      return (data || []).map((item: any) => item.guardian).filter(Boolean);
+      return (data || []).map((item: Record<string, unknown>) => item.guardian).filter(Boolean);
     } catch (error) {
       console.error('Error in StudentService.getGuardians:', error);
       throw error;
@@ -483,7 +483,7 @@ class StudentService extends BaseService<Student> {
       const byStatus: Record<string, number> = {};
       const byEducationLevel: Record<string, number> = {};
 
-      (data || []).forEach((item: any) => {
+      (data || []).forEach((item: Record<string, unknown>) => {
         // Contar por status
         byStatus[item.status] = (byStatus[item.status] || 0) + 1;
 

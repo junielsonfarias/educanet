@@ -101,7 +101,7 @@ class SchoolService extends BaseService<School> {
       const studentsByEducationLevel: Record<string, number> = {};
       const studentsByStatus: Record<string, number> = {};
 
-      (enrollmentData || []).forEach((item: any) => {
+      (enrollmentData || []).forEach((item: Record<string, unknown>) => {
         // Contar por nível de ensino
         if (item.course?.education_level) {
           studentsByEducationLevel[item.course.education_level] = 

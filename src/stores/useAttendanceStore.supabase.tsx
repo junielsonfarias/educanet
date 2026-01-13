@@ -17,8 +17,8 @@ interface Attendance {
   attendance_date: string;
   status: string;
   justification?: string;
-  student?: any;
-  lesson?: any;
+  student?: Record<string, unknown>;
+  lesson?: Record<string, unknown>;
 }
 
 interface AttendanceStats {
@@ -104,7 +104,7 @@ export const useAttendanceStore = create<AttendanceState>((set, get) => ({
   fetchAttendances: async (options = {}) => {
     set({ loading: true, error: null });
     try {
-      let attendances: any[] = [];
+      let attendances: Record<string, unknown>[] = [];
 
       if (options.dateRange) {
         attendances = await attendanceService.getByDateRange(
@@ -126,7 +126,7 @@ export const useAttendanceStore = create<AttendanceState>((set, get) => ({
       }
 
       set({ attendances, loading: false });
-    } catch (error: any) {
+    } catch (error: unknown) {
       const message = error?.message || 'Erro ao carregar frequência';
       set({ error: message, loading: false });
       toast.error(message);
@@ -141,7 +141,7 @@ export const useAttendanceStore = create<AttendanceState>((set, get) => ({
         options
       );
       set({ attendances, loading: false });
-    } catch (error: any) {
+    } catch (error: unknown) {
       const message = error?.message || 'Erro ao carregar frequência do aluno';
       set({ error: message, loading: false });
       toast.error(message);
@@ -156,7 +156,7 @@ export const useAttendanceStore = create<AttendanceState>((set, get) => ({
         options
       );
       set({ attendances, loading: false });
-    } catch (error: any) {
+    } catch (error: unknown) {
       const message = error?.message || 'Erro ao carregar frequência da turma';
       set({ error: message, loading: false });
       toast.error(message);
@@ -168,7 +168,7 @@ export const useAttendanceStore = create<AttendanceState>((set, get) => ({
     try {
       const attendances = await attendanceService.getLessonAttendance(lessonId);
       set({ attendances, loading: false });
-    } catch (error: any) {
+    } catch (error: unknown) {
       const message = error?.message || 'Erro ao carregar frequência da aula';
       set({ error: message, loading: false });
       toast.error(message);
@@ -190,7 +190,7 @@ export const useAttendanceStore = create<AttendanceState>((set, get) => ({
       
       toast.success('Frequência registrada com sucesso!');
       return newAttendance;
-    } catch (error: any) {
+    } catch (error: unknown) {
       const message = error?.message || 'Erro ao registrar frequência';
       set({ error: message, loading: false });
       toast.error(message);
@@ -212,7 +212,7 @@ export const useAttendanceStore = create<AttendanceState>((set, get) => ({
       
       toast.success('Frequência atualizada com sucesso!');
       return updatedAttendance;
-    } catch (error: any) {
+    } catch (error: unknown) {
       const message = error?.message || 'Erro ao atualizar frequência';
       set({ error: message, loading: false });
       toast.error(message);
@@ -233,7 +233,7 @@ export const useAttendanceStore = create<AttendanceState>((set, get) => ({
       });
       
       toast.success('Frequência removida com sucesso!');
-    } catch (error: any) {
+    } catch (error: unknown) {
       const message = error?.message || 'Erro ao remover frequência';
       set({ error: message, loading: false });
       toast.error(message);
@@ -256,7 +256,7 @@ export const useAttendanceStore = create<AttendanceState>((set, get) => ({
       });
       
       toast.success(`Frequência de ${savedAttendances.length} alunos registrada!`);
-    } catch (error: any) {
+    } catch (error: unknown) {
       const message = error?.message || 'Erro ao registrar frequência em lote';
       set({ error: message, loading: false });
       toast.error(message);
@@ -274,7 +274,7 @@ export const useAttendanceStore = create<AttendanceState>((set, get) => ({
       await get().fetchLessonAttendance(lessonId);
       
       toast.success('Presença registrada!');
-    } catch (error: any) {
+    } catch (error: unknown) {
       const message = error?.message || 'Erro ao marcar presença';
       set({ error: message, loading: false });
       toast.error(message);
@@ -295,7 +295,7 @@ export const useAttendanceStore = create<AttendanceState>((set, get) => ({
       await get().fetchLessonAttendance(lessonId);
       
       toast.success('Falta registrada!');
-    } catch (error: any) {
+    } catch (error: unknown) {
       const message = error?.message || 'Erro ao marcar falta';
       set({ error: message, loading: false });
       toast.error(message);
@@ -311,7 +311,7 @@ export const useAttendanceStore = create<AttendanceState>((set, get) => ({
         options
       );
       return percentage;
-    } catch (error: any) {
+    } catch (error: unknown) {
       const message = error?.message || 'Erro ao calcular percentual';
       toast.error(message);
       return 0;
@@ -325,7 +325,7 @@ export const useAttendanceStore = create<AttendanceState>((set, get) => ({
         options
       );
       return percentage;
-    } catch (error: any) {
+    } catch (error: unknown) {
       const message = error?.message || 'Erro ao calcular percentual da turma';
       toast.error(message);
       return 0;
@@ -339,7 +339,7 @@ export const useAttendanceStore = create<AttendanceState>((set, get) => ({
         { periodId }
       );
       return percentage >= 75; // 75% é o mínimo legal
-    } catch (error: any) {
+    } catch (error: unknown) {
       const message = error?.message || 'Erro ao verificar frequência mínima';
       toast.error(message);
       return false;
@@ -355,11 +355,11 @@ export const useAttendanceStore = create<AttendanceState>((set, get) => ({
       );
 
       const totalLessons = attendances.length;
-      const presences = attendances.filter((a: any) => a.status === 'Presente').length;
-      const absences = attendances.filter((a: any) => 
+      const presences = attendances.filter((a: Record<string, unknown>) => a.status === 'Presente').length;
+      const absences = attendances.filter((a: Record<string, unknown>) => 
         a.status === 'Falta' || a.status === 'Falta_Justificada'
       ).length;
-      const justifiedAbsences = attendances.filter((a: any) => 
+      const justifiedAbsences = attendances.filter((a: Record<string, unknown>) => 
         a.status === 'Falta_Justificada'
       ).length;
       const percentage = totalLessons > 0 ? (presences / totalLessons) * 100 : 0;
@@ -377,7 +377,7 @@ export const useAttendanceStore = create<AttendanceState>((set, get) => ({
 
       set({ stats, loading: false });
       return stats;
-    } catch (error: any) {
+    } catch (error: unknown) {
       const message = error?.message || 'Erro ao carregar estatísticas';
       set({ error: message, loading: false, stats: null });
       toast.error(message);
@@ -394,7 +394,7 @@ export const useAttendanceStore = create<AttendanceState>((set, get) => ({
         minimumPercentage
       );
       return students;
-    } catch (error: any) {
+    } catch (error: unknown) {
       const message = error?.message || 'Erro ao buscar alunos em risco';
       toast.error(message);
       return [];

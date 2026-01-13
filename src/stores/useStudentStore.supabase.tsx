@@ -67,7 +67,7 @@ export const useStudentStore = create<StudentState>((set, get) => ({
         students: studentsWithFullInfo.filter(Boolean) as StudentFullInfo[], 
         loading: false 
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       const message = error?.message || 'Erro ao carregar alunos';
       set({ error: message, loading: false });
       toast.error(message);
@@ -79,7 +79,7 @@ export const useStudentStore = create<StudentState>((set, get) => ({
     try {
       const students = await studentService.getBySchool(schoolId, options);
       set({ students, loading: false });
-    } catch (error: any) {
+    } catch (error: unknown) {
       const message = error?.message || 'Erro ao carregar alunos da escola';
       set({ error: message, loading: false });
       toast.error(message);
@@ -91,7 +91,7 @@ export const useStudentStore = create<StudentState>((set, get) => ({
     try {
       const students = await studentService.getByClass(classId);
       set({ students, loading: false });
-    } catch (error: any) {
+    } catch (error: unknown) {
       const message = error?.message || 'Erro ao carregar alunos da turma';
       set({ error: message, loading: false });
       toast.error(message);
@@ -103,7 +103,7 @@ export const useStudentStore = create<StudentState>((set, get) => ({
     try {
       const student = await studentService.getStudentFullInfo(id);
       set({ currentStudent: student, loading: false });
-    } catch (error: any) {
+    } catch (error: unknown) {
       const message = error?.message || 'Erro ao carregar dados do aluno';
       set({ error: message, loading: false, currentStudent: null });
       toast.error(message);
@@ -115,7 +115,7 @@ export const useStudentStore = create<StudentState>((set, get) => ({
     try {
       const students = await studentService.searchByName(name, options);
       set({ students, loading: false });
-    } catch (error: any) {
+    } catch (error: unknown) {
       const message = error?.message || 'Erro ao buscar alunos';
       set({ error: message, loading: false });
       toast.error(message);
@@ -138,7 +138,7 @@ export const useStudentStore = create<StudentState>((set, get) => ({
       
       toast.success('Aluno criado com sucesso!');
       return newStudent;
-    } catch (error: any) {
+    } catch (error: unknown) {
       const message = error?.message || 'Erro ao criar aluno';
       set({ error: message, loading: false });
       toast.error(message);
@@ -165,7 +165,7 @@ export const useStudentStore = create<StudentState>((set, get) => ({
       
       toast.success('Aluno atualizado com sucesso!');
       return updatedStudent;
-    } catch (error: any) {
+    } catch (error: unknown) {
       const message = error?.message || 'Erro ao atualizar aluno';
       set({ error: message, loading: false });
       toast.error(message);
@@ -187,7 +187,7 @@ export const useStudentStore = create<StudentState>((set, get) => ({
       });
       
       toast.success('Aluno removido com sucesso!');
-    } catch (error: any) {
+    } catch (error: unknown) {
       const message = error?.message || 'Erro ao remover aluno';
       set({ error: message, loading: false });
       toast.error(message);
@@ -200,7 +200,7 @@ export const useStudentStore = create<StudentState>((set, get) => ({
     try {
       const guardians = await studentService.getGuardians(studentProfileId);
       return guardians;
-    } catch (error: any) {
+    } catch (error: unknown) {
       const message = error?.message || 'Erro ao carregar responsáveis';
       toast.error(message);
       return [];
@@ -216,7 +216,7 @@ export const useStudentStore = create<StudentState>((set, get) => ({
       await get().fetchStudentById(studentProfileId);
       
       toast.success('Responsável associado com sucesso!');
-    } catch (error: any) {
+    } catch (error: unknown) {
       const message = error?.message || 'Erro ao associar responsável';
       set({ error: message, loading: false });
       toast.error(message);
@@ -232,7 +232,7 @@ export const useStudentStore = create<StudentState>((set, get) => ({
       await get().fetchStudentById(studentProfileId);
       
       toast.success('Responsável removido com sucesso!');
-    } catch (error: any) {
+    } catch (error: unknown) {
       const message = error?.message || 'Erro ao remover responsável';
       set({ error: message, loading: false });
       toast.error(message);
@@ -245,7 +245,7 @@ export const useStudentStore = create<StudentState>((set, get) => ({
     try {
       const enrollments = await studentService.getEnrollments(studentProfileId, options);
       return enrollments;
-    } catch (error: any) {
+    } catch (error: unknown) {
       const message = error?.message || 'Erro ao carregar matrículas';
       toast.error(message);
       return [];

@@ -17,8 +17,8 @@ interface Document {
   title: string;
   issue_date: string;
   notes?: string;
-  student?: any;
-  versions?: any[];
+  student?: Record<string, unknown>;
+  versions?: Record<string, unknown>[];
 }
 
 interface DocumentState {
@@ -66,7 +66,7 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
         sort: { column: 'issue_date', ascending: false }
       });
       set({ documents, loading: false });
-    } catch (error: any) {
+    } catch (error: unknown) {
       const message = error?.message || 'Erro ao carregar documentos';
       set({ error: message, loading: false });
       toast.error(message);
@@ -81,7 +81,7 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
         documentType
       );
       set({ documents, loading: false });
-    } catch (error: any) {
+    } catch (error: unknown) {
       const message = error?.message || 'Erro ao carregar documentos do aluno';
       set({ error: message, loading: false });
       toast.error(message);
@@ -93,7 +93,7 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
     try {
       const document = await documentService.getDocumentFullInfo(id);
       set({ currentDocument: document, loading: false });
-    } catch (error: any) {
+    } catch (error: unknown) {
       const message = error?.message || 'Erro ao carregar documento';
       set({ error: message, loading: false, currentDocument: null });
       toast.error(message);
@@ -115,7 +115,7 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
       
       toast.success('Documento criado com sucesso!');
       return newDocument;
-    } catch (error: any) {
+    } catch (error: unknown) {
       const message = error?.message || 'Erro ao criar documento';
       set({ error: message, loading: false });
       toast.error(message);
@@ -137,7 +137,7 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
       
       toast.success('Documento atualizado com sucesso!');
       return updatedDocument;
-    } catch (error: any) {
+    } catch (error: unknown) {
       const message = error?.message || 'Erro ao atualizar documento';
       set({ error: message, loading: false });
       toast.error(message);
@@ -158,7 +158,7 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
       });
       
       toast.success('Documento removido com sucesso!');
-    } catch (error: any) {
+    } catch (error: unknown) {
       const message = error?.message || 'Erro ao remover documento';
       set({ error: message, loading: false });
       toast.error(message);
@@ -178,7 +178,7 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
       }
       
       toast.success('Nova versão adicionada com sucesso!');
-    } catch (error: any) {
+    } catch (error: unknown) {
       const message = error?.message || 'Erro ao adicionar versão';
       set({ error: message, loading: false });
       toast.error(message);
@@ -189,7 +189,7 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
     try {
       const versions = await documentService.getDocumentVersions(documentId);
       return versions;
-    } catch (error: any) {
+    } catch (error: unknown) {
       const message = error?.message || 'Erro ao carregar versões do documento';
       toast.error(message);
       return [];
@@ -202,7 +202,7 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
     try {
       const stats = await documentService.getStats(studentId);
       return stats;
-    } catch (error: any) {
+    } catch (error: unknown) {
       const message = error?.message || 'Erro ao carregar estatísticas';
       toast.error(message);
       return null;

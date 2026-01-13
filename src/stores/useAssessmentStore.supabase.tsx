@@ -17,12 +17,12 @@ interface Grade {
   score?: number;
   grade?: string;
   comments?: string;
-  student?: any;
-  evaluation?: any;
+  student?: Record<string, unknown>;
+  evaluation?: Record<string, unknown>;
 }
 
 interface StudentGrade {
-  student: any;
+  student: Record<string, unknown>;
   grades: Grade[];
   average: number;
   status: string;
@@ -90,7 +90,7 @@ export const useAssessmentStore = create<AssessmentState>((set, get) => ({
   fetchGrades: async (options = {}) => {
     set({ loading: true, error: null });
     try {
-      let grades: any[] = [];
+      let grades: Record<string, unknown>[] = [];
 
       if (options.classId && options.evaluationId) {
         grades = await gradeService.getEvaluationGrades(options.evaluationId);
@@ -105,7 +105,7 @@ export const useAssessmentStore = create<AssessmentState>((set, get) => ({
       }
 
       set({ grades, loading: false });
-    } catch (error: any) {
+    } catch (error: unknown) {
       const message = error?.message || 'Erro ao carregar notas';
       set({ error: message, loading: false });
       toast.error(message);
@@ -117,7 +117,7 @@ export const useAssessmentStore = create<AssessmentState>((set, get) => ({
     try {
       const grades = await gradeService.getStudentGrades(studentId, options);
       set({ grades, loading: false });
-    } catch (error: any) {
+    } catch (error: unknown) {
       const message = error?.message || 'Erro ao carregar notas do aluno';
       set({ error: message, loading: false });
       toast.error(message);
@@ -129,7 +129,7 @@ export const useAssessmentStore = create<AssessmentState>((set, get) => ({
     try {
       const grades = await gradeService.getClassGrades(classId, options);
       set({ grades, loading: false });
-    } catch (error: any) {
+    } catch (error: unknown) {
       const message = error?.message || 'Erro ao carregar notas da turma';
       set({ error: message, loading: false });
       toast.error(message);
@@ -151,7 +151,7 @@ export const useAssessmentStore = create<AssessmentState>((set, get) => ({
       
       toast.success('Nota salva com sucesso!');
       return newGrade;
-    } catch (error: any) {
+    } catch (error: unknown) {
       const message = error?.message || 'Erro ao salvar nota';
       set({ error: message, loading: false });
       toast.error(message);
@@ -173,7 +173,7 @@ export const useAssessmentStore = create<AssessmentState>((set, get) => ({
       
       toast.success('Nota atualizada com sucesso!');
       return updatedGrade;
-    } catch (error: any) {
+    } catch (error: unknown) {
       const message = error?.message || 'Erro ao atualizar nota';
       set({ error: message, loading: false });
       toast.error(message);
@@ -194,7 +194,7 @@ export const useAssessmentStore = create<AssessmentState>((set, get) => ({
       });
       
       toast.success('Nota removida com sucesso!');
-    } catch (error: any) {
+    } catch (error: unknown) {
       const message = error?.message || 'Erro ao remover nota';
       set({ error: message, loading: false });
       toast.error(message);
@@ -217,7 +217,7 @@ export const useAssessmentStore = create<AssessmentState>((set, get) => ({
       });
       
       toast.success(`${savedGrades.length} notas salvas com sucesso!`);
-    } catch (error: any) {
+    } catch (error: unknown) {
       const message = error?.message || 'Erro ao salvar notas em lote';
       set({ error: message, loading: false });
       toast.error(message);
@@ -234,7 +234,7 @@ export const useAssessmentStore = create<AssessmentState>((set, get) => ({
         periodId
       );
       return average;
-    } catch (error: any) {
+    } catch (error: unknown) {
       const message = error?.message || 'Erro ao calcular média';
       toast.error(message);
       return 0;
@@ -248,7 +248,7 @@ export const useAssessmentStore = create<AssessmentState>((set, get) => ({
         evaluationId
       );
       return average;
-    } catch (error: any) {
+    } catch (error: unknown) {
       const message = error?.message || 'Erro ao calcular média da turma';
       toast.error(message);
       return 0;
@@ -266,7 +266,7 @@ export const useAssessmentStore = create<AssessmentState>((set, get) => ({
       );
       set({ loading: false });
       return reportCard;
-    } catch (error: any) {
+    } catch (error: unknown) {
       const message = error?.message || 'Erro ao carregar boletim';
       set({ error: message, loading: false });
       toast.error(message);
@@ -290,7 +290,7 @@ export const useAssessmentStore = create<AssessmentState>((set, get) => ({
       };
 
       return stats;
-    } catch (error: any) {
+    } catch (error: unknown) {
       const message = error?.message || 'Erro ao carregar estatísticas';
       toast.error(message);
       return null;

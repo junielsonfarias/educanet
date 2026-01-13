@@ -21,7 +21,7 @@ export default function CoursesList() {
   const navigate = useNavigate()
   const { toast } = useToast()
 
-  const handleCreate = (data: any) => {
+  const handleCreate = (data: Record<string, unknown>) => {
     addEtapaEnsino(data)
     toast({
       title: 'Etapa de Ensino criada',

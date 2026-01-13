@@ -59,10 +59,10 @@ export const CourseProvider = ({ children }: { children: React.ReactNode }) => {
         // Sanitizar dados usando utilitário centralizado
         const sanitized = sanitizeStoreData<EtapaEnsino>(parsed, {
           arrayFields: ['seriesAnos'],
-          customSanitizer: (e: any) => ({
+          customSanitizer: (e: Record<string, unknown>) => ({
             ...e,
             seriesAnos: Array.isArray(e.seriesAnos)
-              ? e.seriesAnos.map((s: any) => ({
+              ? e.seriesAnos.map((s: Record<string, unknown>) => ({
                   ...s,
                   subjects: Array.isArray(s.subjects) ? s.subjects : [],
                 }))
@@ -77,10 +77,10 @@ export const CourseProvider = ({ children }: { children: React.ReactNode }) => {
         // Sanitizar dados: garantir que todas as etapas tenham seriesAnos como array
         const sanitized = sanitizeStoreData<EtapaEnsino>(oldCourses, {
           arrayFields: ['seriesAnos'],
-          customSanitizer: (e: any) => ({
+          customSanitizer: (e: Record<string, unknown>) => ({
             ...e,
             seriesAnos: Array.isArray(e.seriesAnos)
-              ? e.seriesAnos.map((s: any) => ({
+              ? e.seriesAnos.map((s: Record<string, unknown>) => ({
                   ...s,
                   subjects: Array.isArray(s.subjects) ? s.subjects : [],
                 }))

@@ -8,7 +8,7 @@ import { isValidArray } from '@/lib/data-sanitizer'
 
 interface SafeChartProps {
   /** Dados do gráfico (deve ser array) */
-  data: any[]
+  data: unknown[]
   /** Componentes filhos (gráfico Recharts) */
   children: ReactNode
   /** Mensagem exibida quando não há dados */
@@ -16,7 +16,7 @@ interface SafeChartProps {
   /** Altura mínima do container */
   minHeight?: number
   /** Validação customizada de dados */
-  validateData?: (data: any[]) => boolean
+  validateData?: (data: unknown[]) => boolean
   /** Classe CSS adicional para o container vazio */
   emptyClassName?: string
 }
@@ -34,7 +34,7 @@ export function SafeChart({
   emptyClassName = '',
 }: SafeChartProps) {
   // Validação padrão: array não vazio e primeiro item tem propriedades válidas
-  const defaultValidation = (d: any[]) => {
+  const defaultValidation = (d: unknown[]) => {
     if (!isValidArray(d)) return false
     const firstItem = d[0]
     return (
@@ -83,7 +83,7 @@ export function SafeChart({
  * @returns true se dados são válidos
  */
 export function useChartDataValidation(
-  data: any[],
+  data: unknown[],
   minItems: number = 1,
 ): boolean {
   if (!isValidArray(data)) return false

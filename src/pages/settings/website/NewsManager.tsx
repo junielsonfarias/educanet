@@ -73,7 +73,7 @@ export default function NewsManager() {
     )
   }, [news, searchTerm])
 
-  const handleCreate = async (data: any) => {
+  const handleCreate = async (data: Record<string, unknown>) => {
     try {
       await addPublicContent({
         ...data,
@@ -86,7 +86,7 @@ export default function NewsManager() {
     }
   }
 
-  const handleUpdate = async (data: any) => {
+  const handleUpdate = async (data: Record<string, unknown>) => {
     if (editingNews) {
       try {
         await updatePublicContent(editingNews.id, data)

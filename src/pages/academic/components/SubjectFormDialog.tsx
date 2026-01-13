@@ -29,7 +29,7 @@ const subjectSchema = z.object({
 interface SubjectFormDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
-  onSubmit: (data: any) => void
+  onSubmit: (data: Record<string, unknown>) => void
   gradeName?: string
   initialData?: any
 }

@@ -263,7 +263,7 @@ class CourseService extends BaseService {
 
       // Agrupar por nome (simplificado, já que course_level não existe)
       const byLevel: Record<string, number> = {};
-      (courses || []).forEach((course: any) => {
+      (courses || []).forEach((course: Record<string, unknown>) => {
         const level = course.name || 'Outros';
         byLevel[level] = (byLevel[level] || 0) + 1;
       });

@@ -53,7 +53,7 @@ const teacherSchema = z.object({
 interface TeacherFormDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
-  onSubmit: (data: any) => void
+  onSubmit: (data: Record<string, unknown>) => void
   initialData?: TeacherFullInfo | null
 }
 

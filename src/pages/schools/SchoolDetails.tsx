@@ -59,10 +59,10 @@ export default function SchoolDetails() {
 
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
-  const [classes, setClasses] = useState<any[]>([])
-  const [teachers, setTeachers] = useState<any[]>([])
-  const [students, setStudents] = useState<any[]>([])
-  const [infrastructure, setInfrastructure] = useState<any[]>([])
+  const [classes, setClasses] = useState<Record<string, unknown>[]>([])
+  const [teachers, setTeachers] = useState<Record<string, unknown>[]>([])
+  const [students, setStudents] = useState<Record<string, unknown>[]>([])
+  const [infrastructure, setInfrastructure] = useState<Record<string, unknown>[]>([])
 
   // Carregar dados da escola ao montar
   useEffect(() => {
@@ -89,11 +89,11 @@ export default function SchoolDetails() {
     setInfrastructure(infraData)
   }
 
-  const handleUpdate = async (data: any) => {
+  const handleUpdate = async (data: Record<string, unknown>) => {
     if (!currentSchool) return
-    
+
     try {
-      const schoolData: Partial<any> = {
+      const schoolData: Record<string, unknown> = {
         trade_name: data.name || currentSchool.trade_name,
         address: data.address || currentSchool.address,
         phone: data.phone || currentSchool.phone,
@@ -162,7 +162,7 @@ export default function SchoolDetails() {
   const school = currentSchool
   const isActive = !school.deleted_at
 
-  const handleAddYear = (data: any) => {
+  const handleAddYear = (data: Record<string, unknown>) => {
     addAcademicYear(school.id, data)
     toast({
       title: 'Ano Letivo Criado',
@@ -175,7 +175,7 @@ export default function SchoolDetails() {
     setIsClassDialogOpen(true)
   }
 
-  const handleAddClass = (data: any) => {
+  const handleAddClass = (data: Record<string, unknown>) => {
     if (selectedYearId) {
       addClassroom(school.id, selectedYearId, data)
       toast({

@@ -25,7 +25,7 @@ export type OperationStatus = 'idle' | 'loading' | 'success' | 'error'
 /**
  * Tipo para resultado de operação
  */
-export interface OperationResult<T = any> {
+export interface OperationResult<T = unknown> {
   success: boolean
   data?: T
   error?: string
@@ -38,7 +38,7 @@ export interface OperationResult<T = any> {
 export interface QueryFilter {
   column: string
   operator: 'eq' | 'neq' | 'gt' | 'gte' | 'lt' | 'lte' | 'like' | 'ilike' | 'in'
-  value: any
+  value: string | number | boolean | string[] | number[] | null
 }
 
 /**
@@ -72,7 +72,7 @@ export interface QueryConfig {
 export interface SupabaseCustomError {
   code: string
   message: string
-  details?: any
+  details?: Record<string, unknown>
   hint?: string
 }
 

@@ -41,6 +41,30 @@ import {
   safeMap,
 } from '@/lib/array-utils'
 
+interface SubjectStructure {
+  id: string;
+  name: string;
+}
+
+interface EvaluationRule {
+  id: string;
+  name: string;
+  [key: string]: unknown;
+}
+
+interface AcademicPeriod {
+  id: string;
+  name: string;
+  [key: string]: unknown;
+}
+
+interface GradeStructure {
+  id: string;
+  name: string;
+  subjects?: SubjectStructure[];
+  evaluationRuleId?: string;
+}
+
 export default function ReportCard() {
   const [searchRegistration, setSearchRegistration] = useState('')
   const [selectedSchool, setSelectedSchool] = useState('')
@@ -99,12 +123,12 @@ export default function ReportCard() {
   }, [activeYear, selectedSchool, students])
 
   const calculateSubjectGrades = (
-    subjects: any[],
+    subjects: SubjectStructure[],
     studentId: string,
     yearId: string,
     classId: string,
-    rule: any,
-    periods: any[],
+    rule: EvaluationRule,
+    periods: AcademicPeriod[],
     isYearActive: boolean,
   ): {
     grades: GradeData[]
@@ -122,7 +146,7 @@ export default function ReportCard() {
       value: number
     }[] = []
 
-    subjects.forEach((subject: any) => {
+    subjects.forEach((subject: SubjectStructure) => {
       const subjectAssessments = safeFilter(assessments,
         (a) =>
           a.studentId === studentId &&
@@ -134,7 +158,7 @@ export default function ReportCard() {
       // Collect Raw History
       subjectAssessments.forEach((a) => {
         const type = safeFind(assessmentTypes, (t) => t.id === a.assessmentTypeId)
-        const period = safeFind(periods, (p: any) => p.id === a.periodId)
+        const period = safeFind(periods, (p: AcademicPeriod) => p.id === a.periodId)
 
         const recovery = safeFind(assessments,
           (rec) => rec.relatedAssessmentId === a.id,
@@ -175,7 +199,7 @@ export default function ReportCard() {
           a.assessmentTypeId &&
           (a.category || 'regular') !== 'recuperation'
         ) {
-          const p = safeFind(periods, (pr: any) => pr.id === a.periodId)
+          const p = safeFind(periods, (pr: AcademicPeriod) => pr.id === a.periodId)
           if (p) {
             allAssessments.push({
               typeId: a.assessmentTypeId,
@@ -197,7 +221,7 @@ export default function ReportCard() {
       // Main Grades Data
       grades.push({
         subject: subject.name,
-        periodGrades: periods.map((p: any) => {
+        periodGrades: periods.map((p: AcademicPeriod) => {
           const pRes = calculation.periodResults.find(
             (pr) => pr.periodId === p.id,
           )
@@ -212,7 +236,7 @@ export default function ReportCard() {
       // Recovery Data
       recoveries.push({
         subject: subject.name,
-        periodGrades: periods.map((p: any) => {
+        periodGrades: periods.map((p: AcademicPeriod) => {
           const pRes = calculation.periodResults.find(
             (pr) => pr.periodId === p.id,
           )
@@ -303,8 +327,8 @@ export default function ReportCard() {
       }
 
       // Determine Regular Structure
-      let regularGradeStructure: any = null
-      let regularRule: any = null
+      let regularGradeStructure: GradeStructure | null = null
+      let regularRule: EvaluationRule | null = null
 
       for (const etapaEnsino of safeArray(etapasEnsino)) {
         const s = safeFind(safeArray(etapaEnsino.seriesAnos),
@@ -363,8 +387,8 @@ export default function ReportCard() {
         ) : undefined
         if (!depClass) continue
 
-        let depGradeStructure: any = null
-        let depRule: any = null
+        let depGradeStructure: GradeStructure | null = null
+        let depRule: EvaluationRule | null = null
 
         for (const etapaEnsino of etapasEnsino || []) {
           const s = safeFind(safeArray(etapaEnsino.seriesAnos), (serieAno) => serieAno.id === (depClass.serieAnoId || depClass.gradeId))
@@ -379,7 +403,7 @@ export default function ReportCard() {
 
         // Filter subjects with assessments
         const activeSubjects = safeFilter(depGradeStructure.subjects,
-          (subject: any) => {
+          (subject: SubjectStructure) => {
             return (assessments || []).some(
               (a) =>
                 a.studentId === student.id &&

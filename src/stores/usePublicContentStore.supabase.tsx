@@ -19,8 +19,8 @@ interface PublicContent {
   publication_date?: string;
   featured: boolean;
   cover_image_url?: string;
-  author?: any;
-  versions?: any[];
+  author?: Record<string, unknown>;
+  versions?: Record<string, unknown>[];
 }
 
 interface PublicContentState {
@@ -78,7 +78,7 @@ export const usePublicContentStore = create<PublicContentState>((set, get) => ({
   fetchContents: async (options = {}) => {
     set({ loading: true, error: null });
     try {
-      let contents: any[] = [];
+      let contents: Record<string, unknown>[] = [];
       
       if (options.status === 'Publicado') {
         contents = await publicContentService.getPublishedContent({
@@ -96,7 +96,7 @@ export const usePublicContentStore = create<PublicContentState>((set, get) => ({
       }
       
       set({ contents, loading: false });
-    } catch (error: any) {
+    } catch (error: unknown) {
       const message = error?.message || 'Erro ao carregar conteúdos';
       set({ error: message, loading: false });
       toast.error(message);
@@ -108,7 +108,7 @@ export const usePublicContentStore = create<PublicContentState>((set, get) => ({
     try {
       const publishedContents = await publicContentService.getPublishedContent(options);
       set({ publishedContents, loading: false });
-    } catch (error: any) {
+    } catch (error: unknown) {
       const message = error?.message || 'Erro ao carregar conteúdos publicados';
       set({ error: message, loading: false });
       toast.error(message);
@@ -120,7 +120,7 @@ export const usePublicContentStore = create<PublicContentState>((set, get) => ({
     try {
       const content = await publicContentService.getContentFullInfo(id);
       set({ currentContent: content, loading: false });
-    } catch (error: any) {
+    } catch (error: unknown) {
       const message = error?.message || 'Erro ao carregar conteúdo';
       set({ error: message, loading: false, currentContent: null });
       toast.error(message);
@@ -132,7 +132,7 @@ export const usePublicContentStore = create<PublicContentState>((set, get) => ({
     try {
       const contents = await publicContentService.getByAuthor(authorId, status);
       set({ contents, loading: false });
-    } catch (error: any) {
+    } catch (error: unknown) {
       const message = error?.message || 'Erro ao carregar conteúdos do autor';
       set({ error: message, loading: false });
       toast.error(message);
@@ -154,7 +154,7 @@ export const usePublicContentStore = create<PublicContentState>((set, get) => ({
       
       toast.success('Conteúdo criado com sucesso!');
       return newContent;
-    } catch (error: any) {
+    } catch (error: unknown) {
       const message = error?.message || 'Erro ao criar conteúdo';
       set({ error: message, loading: false });
       toast.error(message);
@@ -176,7 +176,7 @@ export const usePublicContentStore = create<PublicContentState>((set, get) => ({
       
       toast.success('Conteúdo atualizado com sucesso!');
       return updatedContent;
-    } catch (error: any) {
+    } catch (error: unknown) {
       const message = error?.message || 'Erro ao atualizar conteúdo';
       set({ error: message, loading: false });
       toast.error(message);
@@ -197,7 +197,7 @@ export const usePublicContentStore = create<PublicContentState>((set, get) => ({
       });
       
       toast.success('Conteúdo removido com sucesso!');
-    } catch (error: any) {
+    } catch (error: unknown) {
       const message = error?.message || 'Erro ao remover conteúdo';
       set({ error: message, loading: false });
       toast.error(message);
@@ -219,7 +219,7 @@ export const usePublicContentStore = create<PublicContentState>((set, get) => ({
       });
       
       toast.success('Conteúdo publicado com sucesso!');
-    } catch (error: any) {
+    } catch (error: unknown) {
       const message = error?.message || 'Erro ao publicar conteúdo';
       set({ error: message, loading: false });
       toast.error(message);
@@ -239,7 +239,7 @@ export const usePublicContentStore = create<PublicContentState>((set, get) => ({
       });
       
       toast.success('Conteúdo arquivado com sucesso!');
-    } catch (error: any) {
+    } catch (error: unknown) {
       const message = error?.message || 'Erro ao arquivar conteúdo';
       set({ error: message, loading: false });
       toast.error(message);
@@ -259,7 +259,7 @@ export const usePublicContentStore = create<PublicContentState>((set, get) => ({
       });
       
       toast.success(featured ? 'Conteúdo destacado!' : 'Destaque removido!');
-    } catch (error: any) {
+    } catch (error: unknown) {
       const message = error?.message || 'Erro ao alterar destaque';
       set({ error: message, loading: false });
       toast.error(message);
@@ -279,7 +279,7 @@ export const usePublicContentStore = create<PublicContentState>((set, get) => ({
       }
       
       toast.success('Nova versão salva com sucesso!');
-    } catch (error: any) {
+    } catch (error: unknown) {
       const message = error?.message || 'Erro ao salvar versão';
       set({ error: message, loading: false });
       toast.error(message);
@@ -292,7 +292,7 @@ export const usePublicContentStore = create<PublicContentState>((set, get) => ({
     try {
       const stats = await publicContentService.getStats();
       return stats;
-    } catch (error: any) {
+    } catch (error: unknown) {
       const message = error?.message || 'Erro ao carregar estatísticas';
       toast.error(message);
       return null;

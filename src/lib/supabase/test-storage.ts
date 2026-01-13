@@ -11,12 +11,21 @@ import { supabase } from './client'
 import { uploadFile, deleteFile } from './storage'
 import { toast } from 'sonner'
 
+const isDev = import.meta.env.DEV
+
+// Logger condicional que só exibe em desenvolvimento
+const devLog = {
+  log: (...args: unknown[]) => isDev && console.log(...args),
+  warn: (...args: unknown[]) => isDev && console.warn(...args),
+  table: (data: unknown) => isDev && console.table(data),
+}
+
 export interface StorageTestResult {
   bucket: string
   test: string
   success: boolean
   message: string
-  details?: any
+  details?: Record<string, unknown> | Error
 }
 
 /**
@@ -25,7 +34,7 @@ export interface StorageTestResult {
 export async function testStorageBuckets(): Promise<StorageTestResult[]> {
   const results: StorageTestResult[] = []
   
-  console.log('🧪 Iniciando testes de Storage Buckets...')
+  devLog.log('🧪 Iniciando testes de Storage Buckets...')
   
   const buckets: Array<'avatars' | 'documents' | 'attachments' | 'photos'> = [
     'avatars',
@@ -57,13 +66,13 @@ export async function testStorageBuckets(): Promise<StorageTestResult[]> {
           message: 'Bucket existe e está acessível',
         })
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       results.push({
         bucket,
         test: 'Verificar existência',
         success: false,
-        message: `Erro inesperado: ${error.message}`,
-        details: error,
+        message: `Erro inesperado: ${(error as Error).message}`,
+        details: error as Error,
       })
     }
   }
@@ -94,13 +103,13 @@ export async function testStorageBuckets(): Promise<StorageTestResult[]> {
           message: 'Leitura pública funcionando',
         })
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       results.push({
         bucket,
         test: 'Permissão de leitura pública',
         success: false,
-        message: `Erro: ${error.message}`,
-        details: error,
+        message: `Erro: ${(error as Error).message}`,
+        details: error as Error,
       })
     }
   }
@@ -160,13 +169,13 @@ export async function testStorageBuckets(): Promise<StorageTestResult[]> {
             details: uploadResult,
           })
         }
-      } catch (error: any) {
+      } catch (error: unknown) {
         results.push({
           bucket,
           test: 'Permissão de upload',
           success: false,
-          message: `Erro: ${error.message}`,
-          details: error,
+          message: `Erro: ${(error as Error).message}`,
+          details: error as Error,
         })
       }
     }
@@ -180,17 +189,17 @@ export async function testStorageBuckets(): Promise<StorageTestResult[]> {
   }
 
   // Exibir resultados
-  console.log('📊 Resultados dos Testes:')
-  console.table(results)
+  devLog.log('📊 Resultados dos Testes:')
+  devLog.table(results)
 
   const successCount = results.filter((r) => r.success).length
   const totalCount = results.length
 
   if (successCount === totalCount) {
-    console.log(`✅ Todos os testes passaram! (${successCount}/${totalCount})`)
+    devLog.log(`✅ Todos os testes passaram! (${successCount}/${totalCount})`)
     toast.success(`Testes de Storage: ${successCount}/${totalCount} passaram`)
   } else {
-    console.warn(`⚠️ Alguns testes falharam: ${successCount}/${totalCount}`)
+    devLog.warn(`⚠️ Alguns testes falharam: ${successCount}/${totalCount}`)
     toast.warning(`Testes de Storage: ${successCount}/${totalCount} passaram`)
   }
 
@@ -228,20 +237,24 @@ export async function testUploadFile(
         details: result,
       }
     }
-  } catch (error: any) {
+  } catch (error: unknown) {
     return {
       bucket,
       test: 'Upload de arquivo',
       success: false,
-      message: `Erro: ${error.message}`,
-      details: error,
+      message: `Erro: ${(error as Error).message}`,
+      details: error as Error,
     }
   }
 }
 
 // Expor globalmente para uso no console
 if (typeof window !== 'undefined') {
-  ;(window as any).testStorageBuckets = testStorageBuckets
-  ;(window as any).testUploadFile = testUploadFile
+  const windowWithTests = window as Window & {
+    testStorageBuckets: typeof testStorageBuckets;
+    testUploadFile: typeof testUploadFile;
+  }
+  windowWithTests.testStorageBuckets = testStorageBuckets
+  windowWithTests.testUploadFile = testUploadFile
 }
 

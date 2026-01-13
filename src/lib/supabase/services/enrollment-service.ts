@@ -460,7 +460,7 @@ class EnrollmentService extends BaseService<StudentEnrollment> {
       const byCourse: Record<string, number> = {};
       const bySchool: Record<string, number> = {};
 
-      (data || []).forEach((item: any) => {
+      (data || []).forEach((item: Record<string, unknown>) => {
         // Contar por status
         byStatus[item.status] = (byStatus[item.status] || 0) + 1;
 

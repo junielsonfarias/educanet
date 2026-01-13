@@ -70,7 +70,7 @@ export default function AssessmentTypesList() {
     // TODO: Buscar assessment types do BD quando implementado
   }, [fetchGrades, fetchCourses])
 
-  const handleCreate = (data: any) => {
+  const handleCreate = (data: Record<string, unknown>) => {
     // TODO: Criar no BD quando implementado
     const newType: AssessmentType = {
       id: `type-${Date.now()}`,
@@ -81,7 +81,7 @@ export default function AssessmentTypesList() {
     setIsDialogOpen(false)
   }
 
-  const handleUpdate = (data: any) => {
+  const handleUpdate = (data: Record<string, unknown>) => {
     if (editingType?.id) {
       // TODO: Atualizar no BD quando implementado
       setAssessmentTypes(types =>

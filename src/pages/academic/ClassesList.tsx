@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import {
   Calendar,
   Users,
@@ -52,7 +53,36 @@ import type { ClassWithDetails } from '@/lib/supabase/services/class-service'
 import { ClassroomDialog } from '@/pages/schools/components/ClassroomDialog'
 import { toast } from 'sonner'
 
+interface ClassFormData {
+  schoolId?: string;
+  yearId?: string;
+  courseId?: string;
+  name?: string;
+  shift?: string;
+  maxCapacity?: number;
+  capacity?: number;
+  room?: string;
+}
+
+interface ClassListItem {
+  id: string;
+  name: string;
+  schoolName: string;
+  schoolId: string;
+  yearName: string;
+  yearId: string;
+  gradeName: string;
+  serieAnoName: string;
+  shift: string;
+  capacity: number;
+  max_students?: number;
+  isMultiGrade: boolean;
+  stats?: { totalStudents: number };
+  acronym?: string;
+}
+
 export default function ClassesList() {
+  const navigate = useNavigate()
   const { schools, loading: schoolsLoading, fetchSchools } = useSchoolStore()
   const { userData } = useAuth()
   
@@ -95,8 +125,8 @@ export default function ClassesList() {
         )
         
         setClasses(classesWithDetails.filter(Boolean) as ClassWithDetails[])
-      } catch (error: any) {
-        toast.error(error?.message || 'Erro ao carregar turmas')
+      } catch (error: unknown) {
+        toast.error((error as Error)?.message || 'Erro ao carregar turmas')
       } finally {
         setLoading(false)
       }
@@ -188,7 +218,7 @@ export default function ClassesList() {
   const availableSchools = safeSchools.filter((s) => canManage(s.id.toString()))
   const canCreate = availableSchools.length > 0
 
-  const handleCreate = async (data: any) => {
+  const handleCreate = async (data: ClassFormData) => {
     try {
       if (!data.schoolId || !data.yearId) {
         toast.error('Escola e ano letivo são obrigatórios')
@@ -224,12 +254,12 @@ export default function ClassesList() {
         setIsDialogOpen(false)
         toast.success('Turma criada com sucesso!')
       }
-    } catch (error: any) {
-      toast.error(error?.message || 'Erro ao criar turma')
+    } catch (error: unknown) {
+      toast.error((error as Error)?.message || 'Erro ao criar turma')
     }
   }
 
-  const handleUpdate = async (data: any) => {
+  const handleUpdate = async (data: ClassFormData) => {
     if (editingClass) {
       try {
         const classData = {
@@ -260,8 +290,8 @@ export default function ClassesList() {
           setEditingClass(null)
           toast.success('Turma atualizada com sucesso!')
         }
-      } catch (error: any) {
-        toast.error(error?.message || 'Erro ao atualizar turma')
+      } catch (error: unknown) {
+        toast.error((error as Error)?.message || 'Erro ao atualizar turma')
       }
     }
   }
@@ -295,8 +325,8 @@ export default function ClassesList() {
         
         setDeleteId(null)
         toast.success('Turma removida com sucesso!')
-      } catch (error: any) {
-        toast.error(error?.message || 'Erro ao remover turma')
+      } catch (error: unknown) {
+        toast.error((error as Error)?.message || 'Erro ao remover turma')
       }
     }
   }
@@ -306,7 +336,7 @@ export default function ClassesList() {
     setIsDialogOpen(true)
   }
 
-  const openEditDialog = (cls: any) => {
+  const openEditDialog = (cls: ClassListItem) => {
     // Encontrar a classe completa
     const fullClass = classes.find(c => c.id.toString() === cls.id)
     if (fullClass) {

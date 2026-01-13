@@ -15,8 +15,8 @@ interface Course {
   course_level: string;
   workload_hours?: number;
   description?: string;
-  subjects?: any[];
-  classes?: any[];
+  subjects?: Record<string, unknown>[];
+  classes?: Record<string, unknown>[];
 }
 
 interface Subject {
@@ -25,8 +25,25 @@ interface Subject {
   subject_code?: string;
   workload_hours?: number;
   description?: string;
-  courses?: any[];
-  teachers?: any[];
+  courses?: Record<string, unknown>[];
+  teachers?: Record<string, unknown>[];
+}
+
+interface CourseSubjectOptions {
+  workload_hours?: number;
+  is_mandatory?: boolean;
+  order?: number;
+}
+
+interface FetchOptions {
+  academicYearId?: number;
+  status?: string;
+}
+
+interface CourseStats {
+  totalCourses: number;
+  totalSubjects: number;
+  coursesByLevel: Record<string, number>;
 }
 
 interface CourseState {
@@ -37,38 +54,38 @@ interface CourseState {
   currentSubject: Subject | null;
   loading: boolean;
   error: string | null;
-  
+
   // Ações - Cursos
   fetchCourses: () => Promise<void>;
   fetchCoursesByLevel: (level: string) => Promise<void>;
   fetchCourseById: (id: number) => Promise<void>;
-  createCourse: (data: any) => Promise<Course | null>;
-  updateCourse: (id: number, data: any) => Promise<Course | null>;
+  createCourse: (data: Partial<Course>) => Promise<Course | null>;
+  updateCourse: (id: number, data: Partial<Course>) => Promise<Course | null>;
   deleteCourse: (id: number) => Promise<void>;
-  
+
   // Grade curricular
-  addSubjectToCourse: (courseId: number, subjectId: number, options?: any) => Promise<void>;
+  addSubjectToCourse: (courseId: number, subjectId: number, options?: CourseSubjectOptions) => Promise<void>;
   removeSubjectFromCourse: (courseId: number, subjectId: number) => Promise<void>;
-  fetchCourseSubjects: (courseId: number, options?: any) => Promise<any[]>;
-  
+  fetchCourseSubjects: (courseId: number, options?: FetchOptions) => Promise<Subject[]>;
+
   // Turmas do curso
-  fetchCourseClasses: (courseId: number, options?: any) => Promise<any[]>;
-  
+  fetchCourseClasses: (courseId: number, options?: FetchOptions) => Promise<Record<string, unknown>[]>;
+
   // Ações - Disciplinas
   fetchSubjects: () => Promise<void>;
   searchSubjects: (searchTerm: string, limit?: number) => Promise<void>;
   fetchSubjectById: (id: number) => Promise<void>;
-  createSubject: (data: any) => Promise<Subject | null>;
-  updateSubject: (id: number, data: any) => Promise<Subject | null>;
+  createSubject: (data: Partial<Subject>) => Promise<Subject | null>;
+  updateSubject: (id: number, data: Partial<Subject>) => Promise<Subject | null>;
   deleteSubject: (id: number) => Promise<void>;
-  
+
   // Professores da disciplina
-  fetchSubjectTeachers: (subjectId: number, options?: any) => Promise<any[]>;
-  
+  fetchSubjectTeachers: (subjectId: number, options?: FetchOptions) => Promise<Record<string, unknown>[]>;
+
   // Estatísticas
-  fetchStats: () => Promise<any>;
+  fetchStats: () => Promise<CourseStats | null>;
   calculateTotalWorkload: (courseId: number) => Promise<number>;
-  
+
   // Utilitários
   clearError: () => void;
   setCurrentCourse: (course: Course | null) => void;
@@ -93,7 +110,7 @@ export const useCourseStore = create<CourseState>((set, get) => ({
         sort: { column: 'name', ascending: true }
       });
       set({ courses, loading: false });
-    } catch (error: any) {
+    } catch (error: unknown) {
       const message = error?.message || 'Erro ao carregar cursos';
       set({ error: message, loading: false });
       toast.error(message);
@@ -105,7 +122,7 @@ export const useCourseStore = create<CourseState>((set, get) => ({
     try {
       const courses = await courseService.getCoursesByLevel(level);
       set({ courses, loading: false });
-    } catch (error: any) {
+    } catch (error: unknown) {
       const message = error?.message || 'Erro ao carregar cursos por nível';
       set({ error: message, loading: false });
       toast.error(message);
@@ -117,14 +134,14 @@ export const useCourseStore = create<CourseState>((set, get) => ({
     try {
       const course = await courseService.getCourseWithSubjects(id);
       set({ currentCourse: course, loading: false });
-    } catch (error: any) {
+    } catch (error: unknown) {
       const message = error?.message || 'Erro ao carregar curso';
       set({ error: message, loading: false, currentCourse: null });
       toast.error(message);
     }
   },
 
-  createCourse: async (data: any) => {
+  createCourse: async (data: Partial<Course>) => {
     set({ loading: true, error: null });
     try {
       const newCourse = await courseService.createCourse(data);
@@ -137,7 +154,7 @@ export const useCourseStore = create<CourseState>((set, get) => ({
       
       toast.success('Curso criado com sucesso!');
       return newCourse;
-    } catch (error: any) {
+    } catch (error: unknown) {
       const message = error?.message || 'Erro ao criar curso';
       set({ error: message, loading: false });
       toast.error(message);
@@ -145,7 +162,7 @@ export const useCourseStore = create<CourseState>((set, get) => ({
     }
   },
 
-  updateCourse: async (id: number, data: any) => {
+  updateCourse: async (id: number, data: Partial<Course>) => {
     set({ loading: true, error: null });
     try {
       const updatedCourse = await courseService.update(id, data);
@@ -159,7 +176,7 @@ export const useCourseStore = create<CourseState>((set, get) => ({
       
       toast.success('Curso atualizado com sucesso!');
       return updatedCourse;
-    } catch (error: any) {
+    } catch (error: unknown) {
       const message = error?.message || 'Erro ao atualizar curso';
       set({ error: message, loading: false });
       toast.error(message);
@@ -180,7 +197,7 @@ export const useCourseStore = create<CourseState>((set, get) => ({
       });
       
       toast.success('Curso removido com sucesso!');
-    } catch (error: any) {
+    } catch (error: unknown) {
       const message = error?.message || 'Erro ao remover curso';
       set({ error: message, loading: false });
       toast.error(message);
@@ -189,7 +206,7 @@ export const useCourseStore = create<CourseState>((set, get) => ({
 
   // ==================== GRADE CURRICULAR ====================
 
-  addSubjectToCourse: async (courseId: number, subjectId: number, options?: any) => {
+  addSubjectToCourse: async (courseId: number, subjectId: number, options?: CourseSubjectOptions) => {
     set({ loading: true, error: null });
     try {
       await courseService.addSubjectToCourse(courseId, subjectId, options);
@@ -200,7 +217,7 @@ export const useCourseStore = create<CourseState>((set, get) => ({
       }
       
       toast.success('Disciplina adicionada ao curso!');
-    } catch (error: any) {
+    } catch (error: unknown) {
       const message = error?.message || 'Erro ao adicionar disciplina';
       set({ error: message, loading: false });
       toast.error(message);
@@ -218,30 +235,30 @@ export const useCourseStore = create<CourseState>((set, get) => ({
       }
       
       toast.success('Disciplina removida do curso!');
-    } catch (error: any) {
+    } catch (error: unknown) {
       const message = error?.message || 'Erro ao remover disciplina';
       set({ error: message, loading: false });
       toast.error(message);
     }
   },
 
-  fetchCourseSubjects: async (courseId: number, options?: any) => {
+  fetchCourseSubjects: async (courseId: number, options?: FetchOptions) => {
     try {
       const subjects = await courseService.getCourseSubjects(courseId, options);
       return subjects;
-    } catch (error: any) {
-      const message = error?.message || 'Erro ao carregar disciplinas do curso';
+    } catch (error: unknown) {
+      const message = (error as Error)?.message || 'Erro ao carregar disciplinas do curso';
       toast.error(message);
       return [];
     }
   },
 
-  fetchCourseClasses: async (courseId: number, options?: any) => {
+  fetchCourseClasses: async (courseId: number, options?: FetchOptions) => {
     try {
       const classes = await courseService.getCourseClasses(courseId, options);
       return classes;
-    } catch (error: any) {
-      const message = error?.message || 'Erro ao carregar turmas do curso';
+    } catch (error: unknown) {
+      const message = (error as Error)?.message || 'Erro ao carregar turmas do curso';
       toast.error(message);
       return [];
     }
@@ -256,7 +273,7 @@ export const useCourseStore = create<CourseState>((set, get) => ({
         sort: { column: 'name', ascending: true }
       });
       set({ subjects, loading: false });
-    } catch (error: any) {
+    } catch (error: unknown) {
       const message = error?.message || 'Erro ao carregar disciplinas';
       set({ error: message, loading: false });
       toast.error(message);
@@ -268,7 +285,7 @@ export const useCourseStore = create<CourseState>((set, get) => ({
     try {
       const subjects = await subjectService.searchSubjects(searchTerm, limit);
       set({ subjects, loading: false });
-    } catch (error: any) {
+    } catch (error: unknown) {
       const message = error?.message || 'Erro ao buscar disciplinas';
       set({ error: message, loading: false });
       toast.error(message);
@@ -294,14 +311,14 @@ export const useCourseStore = create<CourseState>((set, get) => ({
         }, 
         loading: false 
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       const message = error?.message || 'Erro ao carregar disciplina';
       set({ error: message, loading: false, currentSubject: null });
       toast.error(message);
     }
   },
 
-  createSubject: async (data: any) => {
+  createSubject: async (data: Partial<Subject>) => {
     set({ loading: true, error: null });
     try {
       const newSubject = await subjectService.createSubject(data);
@@ -314,7 +331,7 @@ export const useCourseStore = create<CourseState>((set, get) => ({
       
       toast.success('Disciplina criada com sucesso!');
       return newSubject;
-    } catch (error: any) {
+    } catch (error: unknown) {
       const message = error?.message || 'Erro ao criar disciplina';
       set({ error: message, loading: false });
       toast.error(message);
@@ -322,7 +339,7 @@ export const useCourseStore = create<CourseState>((set, get) => ({
     }
   },
 
-  updateSubject: async (id: number, data: any) => {
+  updateSubject: async (id: number, data: Partial<Subject>) => {
     set({ loading: true, error: null });
     try {
       const updatedSubject = await subjectService.update(id, data);
@@ -336,7 +353,7 @@ export const useCourseStore = create<CourseState>((set, get) => ({
       
       toast.success('Disciplina atualizada com sucesso!');
       return updatedSubject;
-    } catch (error: any) {
+    } catch (error: unknown) {
       const message = error?.message || 'Erro ao atualizar disciplina';
       set({ error: message, loading: false });
       toast.error(message);
@@ -357,19 +374,19 @@ export const useCourseStore = create<CourseState>((set, get) => ({
       });
       
       toast.success('Disciplina removida com sucesso!');
-    } catch (error: any) {
+    } catch (error: unknown) {
       const message = error?.message || 'Erro ao remover disciplina';
       set({ error: message, loading: false });
       toast.error(message);
     }
   },
 
-  fetchSubjectTeachers: async (subjectId: number, options?: any) => {
+  fetchSubjectTeachers: async (subjectId: number, options?: FetchOptions) => {
     try {
       const teachers = await subjectService.getSubjectTeachers(subjectId, options);
       return teachers;
-    } catch (error: any) {
-      const message = error?.message || 'Erro ao carregar professores da disciplina';
+    } catch (error: unknown) {
+      const message = (error as Error)?.message || 'Erro ao carregar professores da disciplina';
       toast.error(message);
       return [];
     }
@@ -381,7 +398,7 @@ export const useCourseStore = create<CourseState>((set, get) => ({
     try {
       const stats = await courseService.getStats();
       return stats;
-    } catch (error: any) {
+    } catch (error: unknown) {
       const message = error?.message || 'Erro ao carregar estatísticas';
       toast.error(message);
       return null;
@@ -392,7 +409,7 @@ export const useCourseStore = create<CourseState>((set, get) => ({
     try {
       const total = await courseService.calculateTotalWorkload(courseId);
       return total;
-    } catch (error: any) {
+    } catch (error: unknown) {
       const message = error?.message || 'Erro ao calcular carga horária';
       toast.error(message);
       return 0;

@@ -36,7 +36,7 @@ const UserProviderInternal = ({ children }: { children: React.ReactNode }) => {
         id: userData.id,
         email: userData.email,
         name: userData.email.split('@')[0], // Fallback, idealmente buscar nome da pessoa
-        role: userData.role as any,
+        role: userData.role as User['role'],
         schoolId: null, // Será preenchido se necessário
         schoolIds: [],
         createdAt: new Date().toISOString(),
@@ -61,7 +61,7 @@ const UserProviderInternal = ({ children }: { children: React.ReactNode }) => {
           name: au.person 
             ? `${au.person.first_name} ${au.person.last_name}` 
             : au.email.split('@')[0],
-          role: (au.roles?.[0]?.name || 'user') as any,
+          role: (au.roles?.[0]?.name || 'user') as User['role'],
           schoolId: null, // Será preenchido se necessário
           schoolIds: [],
           createdAt: au.created_at,
@@ -168,7 +168,7 @@ const UserProviderInternal = ({ children }: { children: React.ReactNode }) => {
         name: au.person 
           ? `${au.person.first_name} ${au.person.last_name}` 
           : au.email.split('@')[0],
-        role: (au.roles?.[0]?.name || 'user') as any,
+        role: (au.roles?.[0]?.name || 'user') as User['role'],
         schoolId: null,
         schoolIds: [],
         createdAt: au.created_at,
@@ -206,7 +206,7 @@ const UserProviderInternal = ({ children }: { children: React.ReactNode }) => {
       }
 
       // Atualizar dados em auth_users
-      const updateData: any = {}
+      const updateData: Record<string, string | boolean> = {}
       if (data.email) updateData.email = data.email
       if (data.role) {
         // Atualizar role em user_roles
@@ -251,7 +251,7 @@ const UserProviderInternal = ({ children }: { children: React.ReactNode }) => {
         name: au.person 
           ? `${au.person.first_name} ${au.person.last_name}` 
           : au.email.split('@')[0],
-        role: (au.roles?.[0]?.name || 'user') as any,
+        role: (au.roles?.[0]?.name || 'user') as User['role'],
         schoolId: null,
         schoolIds: [],
         createdAt: au.created_at,
@@ -287,7 +287,7 @@ const UserProviderInternal = ({ children }: { children: React.ReactNode }) => {
         name: au.person 
           ? `${au.person.first_name} ${au.person.last_name}` 
           : au.email.split('@')[0],
-        role: (au.roles?.[0]?.name || 'user') as any,
+        role: (au.roles?.[0]?.name || 'user') as User['role'],
         schoolId: null,
         schoolIds: [],
         createdAt: au.created_at,

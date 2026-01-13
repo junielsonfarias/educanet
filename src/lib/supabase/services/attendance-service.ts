@@ -428,7 +428,7 @@ class AttendanceService extends BaseService<Attendance> {
       if (enrollmentError) throw handleSupabaseError(enrollmentError);
 
       const report = await Promise.all(
-        (enrollments || []).map(async (enrollment: any) => {
+        (enrollments || []).map(async (enrollment: Record<string, unknown>) => {
           const studentProfileId = enrollment.student_enrollment?.student_profile?.id;
           if (!studentProfileId) return null;
 
@@ -446,7 +446,7 @@ class AttendanceService extends BaseService<Attendance> {
         })
       );
 
-      return report.filter(Boolean).sort((a: any, b: any) => 
+      return report.filter(Boolean).sort((a: Record<string, unknown>, b: Record<string, unknown>) => 
         a.student_name.localeCompare(b.student_name)
       );
     } catch (error) {
@@ -549,7 +549,7 @@ class AttendanceService extends BaseService<Attendance> {
       const totalAttendances = data?.length || 0;
       const byStatus: Record<string, number> = {};
 
-      (data || []).forEach((attendance: any) => {
+      (data || []).forEach((attendance: Record<string, unknown>) => {
         byStatus[attendance.attendance_status] = 
           (byStatus[attendance.attendance_status] || 0) + 1;
       });

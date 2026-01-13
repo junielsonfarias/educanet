@@ -56,9 +56,9 @@ class AuthUserService extends BaseService<AuthUserRow> {
 
       // Buscar person e roles para cada usuário separadamente
       const data = await Promise.all(
-        (usersData || []).map(async (user: any) => {
+        (usersData || []).map(async (user: Record<string, unknown>) => {
           let person = null
-          let roles: any[] = []
+          let roles: Record<string, unknown>[] = []
 
           if (user.person_id) {
             // Buscar person
@@ -84,7 +84,7 @@ class AuthUserService extends BaseService<AuthUserRow> {
               .is('deleted_at', null)
 
             if (!rolesError && rolesData) {
-              roles = rolesData.map((ur: any) => ur.role).filter(Boolean)
+              roles = rolesData.map((ur: Record<string, unknown>) => ur.role).filter(Boolean)
             }
           }
 
@@ -101,9 +101,9 @@ class AuthUserService extends BaseService<AuthUserRow> {
       if (error) throw handleSupabaseError(error)
 
       // Transformar roles de array aninhado para array simples
-      return (data || []).map((user: any) => ({
+      return (data || []).map((user: Record<string, unknown>) => ({
         ...user,
-        roles: user.roles?.map((ur: any) => ur.role).filter(Boolean) || [],
+        roles: user.roles?.map((ur: Record<string, unknown>) => ur.role).filter(Boolean) || [],
       })) as AuthUserFullInfo[]
     } catch (error) {
       console.error('Error in AuthUserService.getAllWithFullInfo:', error)
@@ -149,7 +149,7 @@ class AuthUserService extends BaseService<AuthUserRow> {
       // Transformar roles
       return {
         ...data,
-        roles: (data as any).roles?.map((ur: any) => ur.role).filter(Boolean) || [],
+        roles: (data as Record<string, unknown>).roles?.map((ur: Record<string, unknown>) => ur.role).filter(Boolean) || [],
       } as AuthUserFullInfo
     } catch (error) {
       console.error('Error in AuthUserService.getByIdWithFullInfo:', error)
@@ -366,9 +366,9 @@ class AuthUserService extends BaseService<AuthUserRow> {
 
       if (error) throw handleSupabaseError(error)
 
-      return (data || []).map((user: any) => ({
+      return (data || []).map((user: Record<string, unknown>) => ({
         ...user,
-        roles: user.roles?.map((ur: any) => ur.role).filter(Boolean) || [],
+        roles: user.roles?.map((ur: Record<string, unknown>) => ur.role).filter(Boolean) || [],
       })) as AuthUserFullInfo[]
     } catch (error) {
       console.error('Error in AuthUserService.getActiveUsers:', error)

@@ -111,7 +111,7 @@ const roleLabels: Record<Staff['role'], string> = {
 interface StaffFormDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
-  onSubmit: (data: any) => void
+  onSubmit: (data: Record<string, unknown>) => void
   initialData?: Staff | null
 }
 

@@ -256,7 +256,7 @@ class GradeService extends BaseService<Grade> {
       // Agrupar por disciplina e calcular média de cada
       const subjectAverages = new Map<number, number[]>();
       
-      data.forEach((grade: any) => {
+      data.forEach((grade: Record<string, unknown>) => {
         const subjectId = grade.evaluation_instance?.subject_id;
         if (subjectId) {
           if (!subjectAverages.has(subjectId)) {
@@ -322,7 +322,7 @@ class GradeService extends BaseService<Grade> {
       // Agrupar por disciplina
       const subjectsMap = new Map<number, any>();
       
-      (gradesData || []).forEach((grade: any) => {
+      (gradesData || []).forEach((grade: Record<string, unknown>) => {
         const subject = grade.evaluation_instance?.subject;
         if (!subject) return;
 
@@ -409,7 +409,7 @@ class GradeService extends BaseService<Grade> {
 
       // Para cada aluno, buscar notas da disciplina
       const results = await Promise.all(
-        (enrollments || []).map(async (enrollment: any) => {
+        (enrollments || []).map(async (enrollment: Record<string, unknown>) => {
           const studentProfileId = enrollment.student_enrollment?.student_profile?.id;
           if (!studentProfileId) return null;
 

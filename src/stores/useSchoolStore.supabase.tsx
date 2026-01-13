@@ -71,7 +71,7 @@ export const useSchoolStore = create<SchoolState>((set, get) => ({
         sort: { column: 'name', ascending: true }
       });
       set({ schools, loading: false });
-    } catch (error: any) {
+    } catch (error: unknown) {
       const message = error?.message || 'Erro ao carregar escolas';
       set({ error: message, loading: false });
       toast.error(message);
@@ -83,7 +83,7 @@ export const useSchoolStore = create<SchoolState>((set, get) => ({
     try {
       const schools = await schoolService.getActiveSchools();
       set({ schools, loading: false });
-    } catch (error: any) {
+    } catch (error: unknown) {
       const message = error?.message || 'Erro ao carregar escolas ativas';
       set({ error: message, loading: false });
       toast.error(message);
@@ -95,7 +95,7 @@ export const useSchoolStore = create<SchoolState>((set, get) => ({
     try {
       const school = await schoolService.getById(id);
       set({ currentSchool: school ? { ...school } : null, loading: false });
-    } catch (error: any) {
+    } catch (error: unknown) {
       const message = error?.message || 'Erro ao carregar dados da escola';
       set({ error: message, loading: false, currentSchool: null });
       toast.error(message);
@@ -107,7 +107,7 @@ export const useSchoolStore = create<SchoolState>((set, get) => ({
     try {
       const school = await schoolService.getSchoolWithStats(id);
       set({ currentSchool: school, loading: false });
-    } catch (error: any) {
+    } catch (error: unknown) {
       const message = error?.message || 'Erro ao carregar dados da escola';
       set({ error: message, loading: false, currentSchool: null });
       toast.error(message);
@@ -119,7 +119,7 @@ export const useSchoolStore = create<SchoolState>((set, get) => ({
     try {
       const schools = await schoolService.searchByName(name, limit);
       set({ schools, loading: false });
-    } catch (error: any) {
+    } catch (error: unknown) {
       const message = error?.message || 'Erro ao buscar escolas';
       set({ error: message, loading: false });
       toast.error(message);
@@ -143,7 +143,7 @@ export const useSchoolStore = create<SchoolState>((set, get) => ({
       }
       
       return stats;
-    } catch (error: any) {
+    } catch (error: unknown) {
       const message = error?.message || 'Erro ao carregar estatísticas';
       toast.error(message);
       return null;
@@ -155,7 +155,7 @@ export const useSchoolStore = create<SchoolState>((set, get) => ({
     try {
       const stats = await schoolService.getGeneralStats();
       set({ generalStats: stats, loading: false });
-    } catch (error: any) {
+    } catch (error: unknown) {
       const message = error?.message || 'Erro ao carregar estatísticas gerais';
       set({ error: message, loading: false });
       toast.error(message);
@@ -166,7 +166,7 @@ export const useSchoolStore = create<SchoolState>((set, get) => ({
     try {
       const infrastructure = await schoolService.getInfrastructure(schoolId);
       return infrastructure;
-    } catch (error: any) {
+    } catch (error: unknown) {
       const message = error?.message || 'Erro ao carregar infraestrutura';
       toast.error(message);
       return [];
@@ -177,7 +177,7 @@ export const useSchoolStore = create<SchoolState>((set, get) => ({
     try {
       const classes = await schoolService.getClasses(schoolId, options);
       return classes;
-    } catch (error: any) {
+    } catch (error: unknown) {
       const message = error?.message || 'Erro ao carregar turmas';
       toast.error(message);
       return [];
@@ -188,7 +188,7 @@ export const useSchoolStore = create<SchoolState>((set, get) => ({
     try {
       const teachers = await schoolService.getTeachers(schoolId, options);
       return teachers;
-    } catch (error: any) {
+    } catch (error: unknown) {
       const message = error?.message || 'Erro ao carregar professores';
       toast.error(message);
       return [];
@@ -199,7 +199,7 @@ export const useSchoolStore = create<SchoolState>((set, get) => ({
     try {
       const staff = await schoolService.getStaff(schoolId, options);
       return staff;
-    } catch (error: any) {
+    } catch (error: unknown) {
       const message = error?.message || 'Erro ao carregar funcionários';
       toast.error(message);
       return [];
@@ -210,7 +210,7 @@ export const useSchoolStore = create<SchoolState>((set, get) => ({
     try {
       const students = await schoolService.getStudents(schoolId, options);
       return students;
-    } catch (error: any) {
+    } catch (error: unknown) {
       const message = error?.message || 'Erro ao carregar alunos';
       toast.error(message);
       return [];
@@ -221,7 +221,7 @@ export const useSchoolStore = create<SchoolState>((set, get) => ({
     try {
       const availability = await schoolService.checkAvailability(schoolId);
       return availability;
-    } catch (error: any) {
+    } catch (error: unknown) {
       const message = error?.message || 'Erro ao verificar disponibilidade';
       toast.error(message);
       return null;
@@ -244,7 +244,7 @@ export const useSchoolStore = create<SchoolState>((set, get) => ({
       
       toast.success('Escola criada com sucesso!');
       return newSchool;
-    } catch (error: any) {
+    } catch (error: unknown) {
       const message = error?.message || 'Erro ao criar escola';
       set({ error: message, loading: false });
       toast.error(message);
@@ -267,7 +267,7 @@ export const useSchoolStore = create<SchoolState>((set, get) => ({
       
       toast.success('Escola atualizada com sucesso!');
       return updatedSchool;
-    } catch (error: any) {
+    } catch (error: unknown) {
       const message = error?.message || 'Erro ao atualizar escola';
       set({ error: message, loading: false });
       toast.error(message);
@@ -289,7 +289,7 @@ export const useSchoolStore = create<SchoolState>((set, get) => ({
       });
       
       toast.success('Escola removida com sucesso!');
-    } catch (error: any) {
+    } catch (error: unknown) {
       const message = error?.message || 'Erro ao remover escola';
       set({ error: message, loading: false });
       toast.error(message);

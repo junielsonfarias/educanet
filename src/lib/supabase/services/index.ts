@@ -31,6 +31,9 @@ import { lessonService } from './lesson-service';
 import { staffService } from './staff-service';
 import { authUserService } from './auth-user-service';
 import { personService } from './person-service';
+import { transferService } from './transfer-service';
+import { preEnrollmentService } from './pre-enrollment-service';
+import { reenrollmentService } from './reenrollment-service';
 
 // Services Específicos - Re-export
 export { studentService } from './student-service';
@@ -54,6 +57,9 @@ export { lessonService } from './lesson-service';
 export { staffService } from './staff-service';
 export { authUserService } from './auth-user-service';
 export { personService } from './person-service';
+export { transferService } from './transfer-service';
+export { preEnrollmentService } from './pre-enrollment-service';
+export { reenrollmentService } from './reenrollment-service';
 
 // Types específicos dos services
 export type { EnrollmentData, TransferData } from './enrollment-service';
@@ -74,6 +80,39 @@ export type { EvaluationInstanceWithDetails } from './evaluation-instance-servic
 export type { LessonWithDetails } from './lesson-service';
 export type { StaffFullInfo } from './staff-service';
 export type { AuthUserFullInfo } from './auth-user-service';
+export type {
+  Transfer,
+  TransferWithDetails,
+  TransferStatus,
+  TransferType,
+  SolicitarTransferenciaData,
+  TransferenciaExternaSaidaData
+} from './transfer-service';
+export type {
+  PreEnrollment,
+  PreEnrollmentWithDetails,
+  PreEnrollmentPeriod,
+  PreEnrollmentStatus,
+  PreEnrollmentType,
+  PreEnrollmentSchoolChoice,
+  SchoolVacancy,
+  SchoolCoverageArea,
+  CriarPreMatriculaData,
+  AcompanhamentoPreMatricula
+} from './pre-enrollment-service';
+export type {
+  ReenrollmentBatch,
+  ReenrollmentBatchWithDetails,
+  ReenrollmentItem,
+  ReenrollmentItemWithDetails,
+  ReenrollmentStatus,
+  ReenrollmentItemStatus,
+  StudentFinalResult,
+  EducationGrade,
+  SchoolEducationLevel,
+  PreviaRematricula,
+  ResultadoExecucao
+} from './reenrollment-service';
 
 // Default exports
 export default {
@@ -98,6 +137,9 @@ export default {
   lessonService,
   staffService,
   authUserService,
-  personService
+  personService,
+  transferService,
+  preEnrollmentService,
+  reenrollmentService
 };
 

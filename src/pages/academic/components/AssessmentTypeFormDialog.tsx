@@ -40,7 +40,7 @@ const typeSchema = z.object({
 interface AssessmentTypeFormDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
-  onSubmit: (data: any) => void
+  onSubmit: (data: Record<string, unknown>) => void
   initialData?: AssessmentType | null
 }
 

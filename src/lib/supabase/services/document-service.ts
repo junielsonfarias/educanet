@@ -186,7 +186,7 @@ class DocumentService extends BaseService {
       if (error) throw handleSupabaseError(error);
 
       const byType: Record<string, number> = {};
-      (data || []).forEach((doc: any) => {
+      (data || []).forEach((doc: Record<string, unknown>) => {
         byType[doc.document_type] = (byType[doc.document_type] || 0) + 1;
       });
 

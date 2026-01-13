@@ -10,11 +10,11 @@ export interface SanitizationSchema<T> {
   /** Campos que devem ser arrays (serão inicializados como [] se não forem arrays) */
   arrayFields?: string[]
   /** Campos que devem ser objetos (serão inicializados com defaults se não existirem) */
-  objectFields?: Record<string, any>
+  objectFields?: Record<string, Record<string, unknown>>
   /** Valores padrão para aplicar em todos os itens */
   defaults?: Partial<T>
   /** Função customizada de sanitização por item */
-  customSanitizer?: (item: any) => T
+  customSanitizer?: (item: unknown) => T
 }
 
 /**
@@ -24,7 +24,7 @@ export interface SanitizationSchema<T> {
  * @returns Array sanitizado e tipado
  */
 export function sanitizeStoreData<T>(
-  data: any,
+  data: unknown,
   schema: SanitizationSchema<T>,
 ): T[] {
   // Se não for array, retorna array vazio
@@ -32,7 +32,7 @@ export function sanitizeStoreData<T>(
     return []
   }
 
-  return data.map((item: any, index: number) => {
+  return data.map((item: unknown, index: number) => {
     // Se houver sanitizador customizado, usar ele
     if (schema.customSanitizer) {
       try {
@@ -43,13 +43,14 @@ export function sanitizeStoreData<T>(
       }
     }
 
-    const sanitized: any = { ...item }
+    const sanitized: Record<string, unknown> = { ...(item as Record<string, unknown>) }
 
     // Sanitizar arrays
+    const itemObj = item as Record<string, unknown>
     if (schema.arrayFields) {
       schema.arrayFields.forEach((field) => {
-        sanitized[field] = Array.isArray(item[field])
-          ? item[field]
+        sanitized[field] = Array.isArray(itemObj[field])
+          ? itemObj[field]
           : []
       })
     }
@@ -58,8 +59,8 @@ export function sanitizeStoreData<T>(
     if (schema.objectFields) {
       Object.entries(schema.objectFields).forEach(([field, defaults]) => {
         sanitized[field] =
-          item[field] && typeof item[field] === 'object' && !Array.isArray(item[field])
-            ? { ...defaults, ...item[field] }
+          itemObj[field] && typeof itemObj[field] === 'object' && !Array.isArray(itemObj[field])
+            ? { ...defaults, ...(itemObj[field] as Record<string, unknown>) }
             : { ...defaults }
       })
     }
@@ -76,7 +77,7 @@ export function sanitizeStoreData<T>(
  * @returns Objeto sanitizado e tipado
  */
 export function sanitizeStoreItem<T>(
-  data: any,
+  data: unknown,
   schema: SanitizationSchema<T>,
 ): T | null {
   if (!data || typeof data !== 'object' || Array.isArray(data)) {
@@ -93,12 +94,13 @@ export function sanitizeStoreItem<T>(
     }
   }
 
-  const sanitized: any = { ...data }
+  const sanitized: Record<string, unknown> = { ...(data as Record<string, unknown>) }
 
   // Sanitizar arrays
+  const dataObj = data as Record<string, unknown>
   if (schema.arrayFields) {
     schema.arrayFields.forEach((field) => {
-      sanitized[field] = Array.isArray(data[field]) ? data[field] : []
+      sanitized[field] = Array.isArray(dataObj[field]) ? dataObj[field] : []
     })
   }
 
@@ -106,8 +108,8 @@ export function sanitizeStoreItem<T>(
   if (schema.objectFields) {
     Object.entries(schema.objectFields).forEach(([field, defaults]) => {
       sanitized[field] =
-        data[field] && typeof data[field] === 'object' && !Array.isArray(data[field])
-          ? { ...defaults, ...data[field] }
+        dataObj[field] && typeof dataObj[field] === 'object' && !Array.isArray(dataObj[field])
+          ? { ...defaults, ...(dataObj[field] as Record<string, unknown>) }
           : { ...defaults }
     })
   }
@@ -121,7 +123,7 @@ export function sanitizeStoreItem<T>(
  * @param value - Valor a validar
  * @returns true se for array não vazio
  */
-export function isValidArray<T>(value: any): value is T[] {
+export function isValidArray<T>(value: unknown): value is T[] {
   return Array.isArray(value) && value.length > 0
 }
 
@@ -130,7 +132,7 @@ export function isValidArray<T>(value: any): value is T[] {
  * @param value - Valor a validar
  * @returns true se for objeto válido
  */
-export function isValidObject(value: any): value is Record<string, any> {
+export function isValidObject(value: unknown): value is Record<string, unknown> {
   return (
     value !== null &&
     typeof value === 'object' &&

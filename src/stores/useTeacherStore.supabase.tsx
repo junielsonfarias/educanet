@@ -10,6 +10,19 @@ import { teacherService } from '@/lib/supabase/services/teacher-service';
 import type { Teacher, TeacherFullInfo, Person } from '@/lib/database-types';
 import { toast } from 'sonner';
 
+interface CertificationData {
+  name: string;
+  institution?: string;
+  date?: string;
+  expiration_date?: string;
+}
+
+interface TeacherStats {
+  totalTeachers: number;
+  activeTeachers: number;
+  teachersBySchool?: Record<number, number>;
+}
+
 interface TeacherState {
   // Estado
   teachers: TeacherFullInfo[];
@@ -29,23 +42,23 @@ interface TeacherState {
   deleteTeacher: (teacherId: number) => Promise<void>;
   
   // Turmas e disciplinas
-  fetchTeacherClasses: (teacherId: number, options?: { academicYearId?: number }) => Promise<any[]>;
-  fetchTeacherSubjects: (teacherId: number) => Promise<any[]>;
-  fetchTeacherStudents: (teacherId: number, options?: { classId?: number; academicYearId?: number }) => Promise<any[]>;
-  
+  fetchTeacherClasses: (teacherId: number, options?: { academicYearId?: number }) => Promise<Record<string, unknown>[]>;
+  fetchTeacherSubjects: (teacherId: number) => Promise<Record<string, unknown>[]>;
+  fetchTeacherStudents: (teacherId: number, options?: { classId?: number; academicYearId?: number }) => Promise<Record<string, unknown>[]>;
+
   // Alocações
   assignToClass: (teacherId: number, classId: number, subjectId: number, workloadHours?: number) => Promise<void>;
   removeFromClass: (teacherId: number, classId: number, subjectId: number) => Promise<void>;
-  
+
   // Certificações
-  fetchCertifications: (teacherId: number) => Promise<any[]>;
-  addCertification: (teacherId: number, certificationData: any) => Promise<void>;
-  
+  fetchCertifications: (teacherId: number) => Promise<Record<string, unknown>[]>;
+  addCertification: (teacherId: number, certificationData: CertificationData) => Promise<void>;
+
   // Desenvolvimento profissional
-  fetchProfessionalDevelopment: (teacherId: number) => Promise<any[]>;
-  
+  fetchProfessionalDevelopment: (teacherId: number) => Promise<Record<string, unknown>[]>;
+
   // Estatísticas
-  fetchStats: (schoolId?: number) => Promise<any>;
+  fetchStats: (schoolId?: number) => Promise<TeacherStats | null>;
   
   // Utilitários
   clearError: () => void;
@@ -77,8 +90,8 @@ export const useTeacherStore = create<TeacherState>((set, get) => ({
         teachers: teachersWithFullInfo.filter(Boolean) as TeacherFullInfo[], 
         loading: false 
       });
-    } catch (error: any) {
-      const message = error?.message || 'Erro ao carregar professores';
+    } catch (error: unknown) {
+      const message = (error as Error)?.message || 'Erro ao carregar professores';
       set({ error: message, loading: false });
       toast.error(message);
     }
@@ -89,8 +102,8 @@ export const useTeacherStore = create<TeacherState>((set, get) => ({
     try {
       const teachers = await teacherService.getBySchool(schoolId, options);
       set({ teachers, loading: false });
-    } catch (error: any) {
-      const message = error?.message || 'Erro ao carregar professores da escola';
+    } catch (error: unknown) {
+      const message = (error as Error)?.message || 'Erro ao carregar professores da escola';
       set({ error: message, loading: false });
       toast.error(message);
     }
@@ -101,8 +114,8 @@ export const useTeacherStore = create<TeacherState>((set, get) => ({
     try {
       const teacher = await teacherService.getTeacherFullInfo(id);
       set({ currentTeacher: teacher, loading: false });
-    } catch (error: any) {
-      const message = error?.message || 'Erro ao carregar dados do professor';
+    } catch (error: unknown) {
+      const message = (error as Error)?.message || 'Erro ao carregar dados do professor';
       set({ error: message, loading: false, currentTeacher: null });
       toast.error(message);
     }
@@ -113,8 +126,8 @@ export const useTeacherStore = create<TeacherState>((set, get) => ({
     try {
       const teachers = await teacherService.searchByName(name, options);
       set({ teachers, loading: false });
-    } catch (error: any) {
-      const message = error?.message || 'Erro ao buscar professores';
+    } catch (error: unknown) {
+      const message = (error as Error)?.message || 'Erro ao buscar professores';
       set({ error: message, loading: false });
       toast.error(message);
     }
@@ -135,8 +148,8 @@ export const useTeacherStore = create<TeacherState>((set, get) => ({
       
       toast.success('Professor criado com sucesso!');
       return newTeacher;
-    } catch (error: any) {
-      const message = error?.message || 'Erro ao criar professor';
+    } catch (error: unknown) {
+      const message = (error as Error)?.message || 'Erro ao criar professor';
       set({ error: message, loading: false });
       toast.error(message);
       return null;
@@ -157,8 +170,8 @@ export const useTeacherStore = create<TeacherState>((set, get) => ({
       
       toast.success('Professor atualizado com sucesso!');
       return updatedTeacher;
-    } catch (error: any) {
-      const message = error?.message || 'Erro ao atualizar professor';
+    } catch (error: unknown) {
+      const message = (error as Error)?.message || 'Erro ao atualizar professor';
       set({ error: message, loading: false });
       toast.error(message);
       return null;
@@ -178,8 +191,8 @@ export const useTeacherStore = create<TeacherState>((set, get) => ({
       });
       
       toast.success('Professor removido com sucesso!');
-    } catch (error: any) {
-      const message = error?.message || 'Erro ao remover professor';
+    } catch (error: unknown) {
+      const message = (error as Error)?.message || 'Erro ao remover professor';
       set({ error: message, loading: false });
       toast.error(message);
     }
@@ -191,8 +204,8 @@ export const useTeacherStore = create<TeacherState>((set, get) => ({
     try {
       const classes = await teacherService.getTeacherClasses(teacherId, options);
       return classes;
-    } catch (error: any) {
-      const message = error?.message || 'Erro ao carregar turmas do professor';
+    } catch (error: unknown) {
+      const message = (error as Error)?.message || 'Erro ao carregar turmas do professor';
       toast.error(message);
       return [];
     }
@@ -202,8 +215,8 @@ export const useTeacherStore = create<TeacherState>((set, get) => ({
     try {
       const subjects = await teacherService.getTeacherSubjects(teacherId);
       return subjects;
-    } catch (error: any) {
-      const message = error?.message || 'Erro ao carregar disciplinas do professor';
+    } catch (error: unknown) {
+      const message = (error as Error)?.message || 'Erro ao carregar disciplinas do professor';
       toast.error(message);
       return [];
     }
@@ -213,8 +226,8 @@ export const useTeacherStore = create<TeacherState>((set, get) => ({
     try {
       const students = await teacherService.getTeacherStudents(teacherId, options);
       return students;
-    } catch (error: any) {
-      const message = error?.message || 'Erro ao carregar alunos do professor';
+    } catch (error: unknown) {
+      const message = (error as Error)?.message || 'Erro ao carregar alunos do professor';
       toast.error(message);
       return [];
     }
@@ -233,8 +246,8 @@ export const useTeacherStore = create<TeacherState>((set, get) => ({
       }
       
       toast.success('Professor alocado à turma com sucesso!');
-    } catch (error: any) {
-      const message = error?.message || 'Erro ao alocar professor';
+    } catch (error: unknown) {
+      const message = (error as Error)?.message || 'Erro ao alocar professor';
       set({ error: message, loading: false });
       toast.error(message);
     }
@@ -251,8 +264,8 @@ export const useTeacherStore = create<TeacherState>((set, get) => ({
       }
       
       toast.success('Alocação removida com sucesso!');
-    } catch (error: any) {
-      const message = error?.message || 'Erro ao remover alocação';
+    } catch (error: unknown) {
+      const message = (error as Error)?.message || 'Erro ao remover alocação';
       set({ error: message, loading: false });
       toast.error(message);
     }
@@ -264,14 +277,14 @@ export const useTeacherStore = create<TeacherState>((set, get) => ({
     try {
       const certifications = await teacherService.getCertifications(teacherId);
       return certifications;
-    } catch (error: any) {
-      const message = error?.message || 'Erro ao carregar certificações';
+    } catch (error: unknown) {
+      const message = (error as Error)?.message || 'Erro ao carregar certificações';
       toast.error(message);
       return [];
     }
   },
 
-  addCertification: async (teacherId: number, certificationData: any) => {
+  addCertification: async (teacherId: number, certificationData: CertificationData) => {
     set({ loading: true, error: null });
     try {
       await teacherService.addCertification(teacherId, certificationData);
@@ -282,8 +295,8 @@ export const useTeacherStore = create<TeacherState>((set, get) => ({
       }
       
       toast.success('Certificação adicionada com sucesso!');
-    } catch (error: any) {
-      const message = error?.message || 'Erro ao adicionar certificação';
+    } catch (error: unknown) {
+      const message = (error as Error)?.message || 'Erro ao adicionar certificação';
       set({ error: message, loading: false });
       toast.error(message);
     }
@@ -295,8 +308,8 @@ export const useTeacherStore = create<TeacherState>((set, get) => ({
     try {
       const programs = await teacherService.getProfessionalDevelopment(teacherId);
       return programs;
-    } catch (error: any) {
-      const message = error?.message || 'Erro ao carregar programas de desenvolvimento';
+    } catch (error: unknown) {
+      const message = (error as Error)?.message || 'Erro ao carregar programas de desenvolvimento';
       toast.error(message);
       return [];
     }
@@ -308,8 +321,8 @@ export const useTeacherStore = create<TeacherState>((set, get) => ({
     try {
       const stats = await teacherService.getStats(schoolId);
       return stats;
-    } catch (error: any) {
-      const message = error?.message || 'Erro ao carregar estatísticas';
+    } catch (error: unknown) {
+      const message = (error as Error)?.message || 'Erro ao carregar estatísticas';
       toast.error(message);
       return null;
     }

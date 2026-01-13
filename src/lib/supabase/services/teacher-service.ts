@@ -129,7 +129,7 @@ class TeacherService extends BaseService<Teacher> {
 
       // Extrair disciplinas únicas
       const subjectsMap = new Map();
-      (data || []).forEach((item: any) => {
+      (data || []).forEach((item: Record<string, unknown>) => {
         if (item.subject && !subjectsMap.has(item.subject.id)) {
           subjectsMap.set(item.subject.id, item.subject);
         }
@@ -155,7 +155,7 @@ class TeacherService extends BaseService<Teacher> {
         academicYearId: options?.academicYearId
       });
 
-      let classIds = classesData.map((item: any) => item.class?.id).filter(Boolean);
+      let classIds = classesData.map((item: Record<string, unknown>) => item.class?.id).filter(Boolean);
 
       if (options?.classId) {
         classIds = classIds.filter(id => id === options.classId);
@@ -537,7 +537,7 @@ class TeacherService extends BaseService<Teacher> {
       const byStatus: Record<string, number> = {};
       const bySchool: Record<string, number> = {};
 
-      (data || []).forEach((item: any) => {
+      (data || []).forEach((item: Record<string, unknown>) => {
         // Contar por status
         byStatus[item.employment_status] = (byStatus[item.employment_status] || 0) + 1;
 

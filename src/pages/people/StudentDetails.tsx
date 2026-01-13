@@ -114,8 +114,8 @@ export default function StudentDetails() {
         )
 
   // Grade Structure for Assessments
-  let gradeStructure: any = null
-  let periods: any[] = currentYear?.periods || []
+  let gradeStructure: Record<string, unknown> | null = null
+  let periods: Record<string, unknown>[] = currentYear?.periods || []
 
   if (activeEnrollment && currentYear && currentSchool) {
     // Usar função utilitária para buscar turma
@@ -156,7 +156,7 @@ export default function StudentDetails() {
   )
 
   // Handlers
-  const handleUpdate = (data: any) => {
+  const handleUpdate = (data: Record<string, unknown>) => {
     updateStudent(student.id, data)
     toast({
       title: 'Aluno atualizado',
@@ -164,7 +164,7 @@ export default function StudentDetails() {
     })
   }
 
-  const handleAddEnrollment = (data: any) => {
+  const handleAddEnrollment = (data: Record<string, unknown>) => {
     addEnrollment(student.id, data)
     toast({
       title: 'Matrícula realizada',

@@ -24,6 +24,8 @@ import {
   UserCog,
   Download,
   AlertTriangle,
+  RefreshCcw,
+  UserPlus,
 } from 'lucide-react'
 import {
   Sidebar,
@@ -183,6 +185,19 @@ const secretariatItems = [
   },
 ]
 
+const enrollmentItems = [
+  {
+    title: 'Pré-Matrícula',
+    url: '/matriculas/pre-matricula',
+    icon: UserPlus,
+  },
+  {
+    title: 'Rematrícula',
+    url: '/matriculas/rematricula',
+    icon: RefreshCcw,
+  },
+]
+
 export function AppSidebar() {
   const { pathname } = useLocation()
   const navigate = useNavigate()
@@ -195,11 +210,11 @@ export function AppSidebar() {
     userData?.role === 'Admin' || userData?.role === 'Supervisor'
 
   return (
-    <Sidebar>
+    <Sidebar aria-label="Menu de navegacao principal">
       <SidebarHeader className="p-4 border-b">
-        <div className="flex items-center gap-2 font-bold text-xl text-primary">
-          <GraduationCap className="h-6 w-6" />
-          <span>EduGestão</span>
+        <div className="flex items-center gap-2 font-bold text-xl text-primary" role="banner">
+          <GraduationCap className="h-6 w-6" aria-hidden="true" />
+          <span>EduGestao</span>
         </div>
       </SidebarHeader>
       <SidebarContent>
@@ -214,7 +229,7 @@ export function AppSidebar() {
                     isActive={isActive(item.url)}
                     tooltip={item.title}
                   >
-                    <Link to={item.url} className="flex justify-between group/item">
+                    <Link to={item.url} className="flex justify-between group/item" aria-current={isActive(item.url) ? 'page' : undefined}>
                       <div className="flex items-center gap-3">
                         {isActive(item.url) ? (
                           <div className="p-1.5 rounded-md bg-gradient-to-br from-primary/20 to-blue-600/20">
@@ -252,7 +267,7 @@ export function AppSidebar() {
                     isActive={isActive(item.url)}
                     tooltip={item.title}
                   >
-                    <Link to={item.url} className="flex items-center gap-3 group/item">
+                    <Link to={item.url} className="flex items-center gap-3 group/item" aria-current={isActive(item.url) ? 'page' : undefined}>
                       {isActive(item.url) ? (
                         <div className="p-1.5 rounded-md bg-gradient-to-br from-blue-500/20 to-blue-600/20">
                           <item.icon className="h-5 w-5 text-blue-600" />
@@ -280,7 +295,7 @@ export function AppSidebar() {
                     isActive={isActive(item.url)}
                     tooltip={item.title}
                   >
-                    <Link to={item.url} className="flex items-center gap-3 group/item">
+                    <Link to={item.url} className="flex items-center gap-3 group/item" aria-current={isActive(item.url) ? 'page' : undefined}>
                       {isActive(item.url) ? (
                         <div className="p-1.5 rounded-md bg-gradient-to-br from-purple-500/20 to-purple-600/20">
                           <item.icon className="h-5 w-5 text-purple-600" />
@@ -372,7 +387,7 @@ export function AppSidebar() {
                     isActive={isActive(item.url)}
                     tooltip={item.title}
                   >
-                    <Link to={item.url} className="flex items-center gap-3 group/item">
+                    <Link to={item.url} className="flex items-center gap-3 group/item" aria-current={isActive(item.url) ? 'page' : undefined}>
                       {isActive(item.url) ? (
                         <div className="p-1.5 rounded-md bg-gradient-to-br from-blue-500/20 to-blue-600/20">
                           <item.icon className="h-5 w-5 text-blue-600" />
@@ -504,7 +519,7 @@ export function AppSidebar() {
                     isActive={isActive(item.url)}
                     tooltip={item.title}
                   >
-                    <Link to={item.url} className="flex items-center gap-3 group/item">
+                    <Link to={item.url} className="flex items-center gap-3 group/item" aria-current={isActive(item.url) ? 'page' : undefined}>
                       {isActive(item.url) ? (
                         <div className="p-1.5 rounded-md bg-gradient-to-br from-indigo-500/20 to-indigo-600/20">
                           <item.icon className="h-5 w-5 text-indigo-600" />
@@ -532,13 +547,41 @@ export function AppSidebar() {
                     isActive={isActive(item.url)}
                     tooltip={item.title}
                   >
-                    <Link to={item.url} className="flex items-center gap-3 group/item">
+                    <Link to={item.url} className="flex items-center gap-3 group/item" aria-current={isActive(item.url) ? 'page' : undefined}>
                       {isActive(item.url) ? (
                         <div className="p-1.5 rounded-md bg-gradient-to-br from-indigo-500/20 to-indigo-600/20">
                           <item.icon className="h-5 w-5 text-indigo-600" />
                         </div>
                       ) : (
                         <item.icon className="h-5 w-5 text-muted-foreground group-hover/item:text-indigo-600 transition-colors" />
+                      )}
+                      <span>{item.title}</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+
+        <SidebarGroup>
+          <SidebarGroupLabel className="text-green-600 font-semibold">Matrículas</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {enrollmentItems.map((item) => (
+                <SidebarMenuItem key={item.title}>
+                  <SidebarMenuButton
+                    asChild
+                    isActive={isActive(item.url)}
+                    tooltip={item.title}
+                  >
+                    <Link to={item.url} className="flex items-center gap-3 group/item" aria-current={isActive(item.url) ? 'page' : undefined}>
+                      {isActive(item.url) ? (
+                        <div className="p-1.5 rounded-md bg-gradient-to-br from-green-500/20 to-green-600/20">
+                          <item.icon className="h-5 w-5 text-green-600" />
+                        </div>
+                      ) : (
+                        <item.icon className="h-5 w-5 text-muted-foreground group-hover/item:text-green-600 transition-colors" />
                       )}
                       <span>{item.title}</span>
                     </Link>

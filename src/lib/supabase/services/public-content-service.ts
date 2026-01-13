@@ -291,7 +291,7 @@ class PublicContentService extends BaseService {
       const byType: Record<string, number> = {};
       let featured = 0;
 
-      (data || []).forEach((content: any) => {
+      (data || []).forEach((content: Record<string, unknown>) => {
         byStatus[content.publication_status] = (byStatus[content.publication_status] || 0) + 1;
         // content_type não existe na tabela, removido
         if (content.featured) featured++;

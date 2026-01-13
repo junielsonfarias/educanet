@@ -13,26 +13,28 @@ import { toast } from 'sonner';
 
 interface Settings {
   // Configurações gerais
-  [key: string]: any;
+  [key: string]: string | number | boolean | Record<string, unknown> | null;
 }
+
+type SettingValue = string | number | boolean | Record<string, unknown> | null;
 
 interface SettingsState {
   // Estado
   settings: Settings;
   loading: boolean;
   error: string | null;
-  
+
   // Ações
   fetchSettings: () => Promise<void>;
   fetchByCategory: (category: string) => Promise<Settings>;
-  getSetting: (key: string, defaultValue?: any) => any;
-  setSetting: (key: string, value: any, options?: {
+  getSetting: <T = SettingValue>(key: string, defaultValue?: T) => T;
+  setSetting: (key: string, value: SettingValue, options?: {
     category?: string;
     description?: string;
   }) => Promise<void>;
-  setMultiple: (settings: Record<string, any>, category?: string) => Promise<void>;
+  setMultiple: (settings: Record<string, SettingValue>, category?: string) => Promise<void>;
   deleteSetting: (key: string) => Promise<void>;
-  
+
   // Utilitários
   clearError: () => void;
   reset: () => void;
@@ -55,8 +57,8 @@ export const useSettingsStore = create<SettingsState>()(
         try {
           const settings = await settingsService.getAllSettings();
           set({ settings, loading: false });
-        } catch (error: any) {
-          const message = error?.message || 'Erro ao carregar configurações';
+        } catch (error: unknown) {
+          const message = (error as Error)?.message || 'Erro ao carregar configurações';
           set({ error: message, loading: false });
           toast.error(message);
         }
@@ -66,31 +68,31 @@ export const useSettingsStore = create<SettingsState>()(
         set({ loading: true, error: null });
         try {
           const settingsArray = await settingsService.getByCategory(category);
-          
+
           // Converter array em objeto
           const settings: Settings = {};
-          settingsArray.forEach((setting: any) => {
-            settings[setting.key] = setting.value;
+          settingsArray.forEach((setting: Record<string, unknown>) => {
+            settings[setting.key as string] = setting.value as SettingValue;
           });
-          
+
           set({ loading: false });
           return settings;
-        } catch (error: any) {
-          const message = error?.message || 'Erro ao carregar configurações da categoria';
+        } catch (error: unknown) {
+          const message = (error as Error)?.message || 'Erro ao carregar configurações da categoria';
           set({ error: message, loading: false });
           toast.error(message);
           return {};
         }
       },
 
-      getSetting: (key: string, defaultValue?: any) => {
+      getSetting: <T = SettingValue>(key: string, defaultValue?: T): T => {
         const { settings } = get();
-        return settings[key] !== undefined ? settings[key] : defaultValue;
+        return (settings[key] !== undefined ? settings[key] : defaultValue) as T;
       },
 
       // ==================== SALVAR ====================
 
-      setSetting: async (key: string, value: any, options = {}) => {
+      setSetting: async (key: string, value: SettingValue, options = {}) => {
         set({ loading: true, error: null });
         try {
           await settingsService.setSetting(key, value, options);
@@ -102,14 +104,14 @@ export const useSettingsStore = create<SettingsState>()(
           });
           
           toast.success('Configuração salva com sucesso!');
-        } catch (error: any) {
-          const message = error?.message || 'Erro ao salvar configuração';
+        } catch (error: unknown) {
+          const message = (error as Error)?.message || 'Erro ao salvar configuração';
           set({ error: message, loading: false });
           toast.error(message);
         }
       },
 
-      setMultiple: async (newSettings: Record<string, any>, category?: string) => {
+      setMultiple: async (newSettings: Record<string, SettingValue>, category?: string) => {
         set({ loading: true, error: null });
         try {
           await settingsService.setMultiple(newSettings, category);
@@ -121,8 +123,8 @@ export const useSettingsStore = create<SettingsState>()(
           });
           
           toast.success('Configurações salvas com sucesso!');
-        } catch (error: any) {
-          const message = error?.message || 'Erro ao salvar configurações';
+        } catch (error: unknown) {
+          const message = (error as Error)?.message || 'Erro ao salvar configurações';
           set({ error: message, loading: false });
           toast.error(message);
         }
@@ -139,8 +141,8 @@ export const useSettingsStore = create<SettingsState>()(
           
           set({ settings: newSettings, loading: false });
           toast.success('Configuração removida com sucesso!');
-        } catch (error: any) {
-          const message = error?.message || 'Erro ao remover configuração';
+        } catch (error: unknown) {
+          const message = (error as Error)?.message || 'Erro ao remover configuração';
           set({ error: message, loading: false });
           toast.error(message);
         }

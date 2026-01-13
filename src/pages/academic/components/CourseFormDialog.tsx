@@ -53,7 +53,7 @@ const courseSchema = z.object({
 interface CourseFormDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
-  onSubmit: (data: any) => void
+  onSubmit: (data: Record<string, unknown>) => void
   initialData?: any
 }
 

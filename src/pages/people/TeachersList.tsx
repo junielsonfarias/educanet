@@ -80,7 +80,7 @@ export default function TeachersList() {
     )
   })
 
-  const handleCreate = async (data: any) => {
+  const handleCreate = async (data: Record<string, unknown>) => {
     try {
       // Separar dados de person e teacher
       const personData = {
@@ -106,7 +106,7 @@ export default function TeachersList() {
     }
   }
 
-  const handleUpdate = async (data: any) => {
+  const handleUpdate = async (data: Record<string, unknown>) => {
     if (editingTeacher) {
       try {
         // Separar dados de person e teacher

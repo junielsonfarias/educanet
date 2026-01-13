@@ -56,6 +56,60 @@ import {
 import { Check, ChevronsUpDown } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
+interface EnrollmentData {
+  id: number;
+  school_id?: number;
+  class_id?: number;
+  academic_year_id?: number;
+  status?: string;
+  class?: {
+    id: number;
+    name: string;
+    grade_id?: number;
+  };
+  academic_year?: {
+    id: number;
+    name: string;
+    academic_periods?: AcademicPeriodData[];
+  };
+}
+
+interface AcademicPeriodData {
+  id: number;
+  name: string;
+}
+
+interface SubjectData {
+  id: number;
+  name: string;
+}
+
+interface AssessmentFlatData {
+  id: string;
+  date: string;
+  value: number;
+  originalValue: number;
+  isRecovered: boolean;
+  recoveryValue: number | null;
+  periodName: string;
+  assessmentTypeId: string;
+  category?: string;
+}
+
+interface SubjectReportData {
+  subjectId: number;
+  subjectName: string;
+  flatAssessments: AssessmentFlatData[];
+  finalGrade: number;
+  status: string;
+}
+
+interface PeriodReportData {
+  id: string;
+  periodName: string;
+  name?: string;
+}
+
 export default function IndividualPerformanceReport() {
   const { students, fetchStudents } = useStudentStore()
   const { grades, fetchGrades } = useAssessmentStore()
@@ -68,7 +122,7 @@ export default function IndividualPerformanceReport() {
   const [selectedEnrollmentId, setSelectedEnrollmentId] = useState('')
   const [disciplineFilter, setDisciplineFilter] = useState('all')
   const [periodFilter, setPeriodFilter] = useState('all')
-  const [enrollments, setEnrollments] = useState<any[]>([])
+  const [enrollments, setEnrollments] = useState<EnrollmentData[]>([])
 
   useEffect(() => {
     fetchStudents()
@@ -139,7 +193,7 @@ export default function IndividualPerformanceReport() {
 
     const subjects = grade.subjects || []
 
-    const subjectsData = subjects.map((subject: any) => {
+    const subjectsData = subjects.map((subject: SubjectData) => {
       if (disciplineFilter !== 'all' && subject.id.toString() !== disciplineFilter)
         return null
 
@@ -193,7 +247,7 @@ export default function IndividualPerformanceReport() {
 
     return {
       subjects: subjectsData,
-      periods: academicPeriods.map((p: any) => ({
+      periods: academicPeriods.map((p: AcademicPeriodData) => ({
         id: p.id.toString(),
         periodName: p.name,
       })),
@@ -218,8 +272,8 @@ export default function IndividualPerformanceReport() {
 
     const studentName = `${student.person?.first_name || ''} ${student.person?.last_name || ''}`.trim()
 
-    reportData.subjects.forEach((subject: any) => {
-      subject.flatAssessments.forEach((assessment: any) => {
+    reportData.subjects.forEach((subject: SubjectReportData) => {
+      subject.flatAssessments.forEach((assessment: AssessmentFlatData) => {
         const row = [
           studentName,
           subject.subjectName,
@@ -343,7 +397,7 @@ export default function IndividualPerformanceReport() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Todas as Disciplinas</SelectItem>
-                  {reportData.allSubjectsList.map((s: any) => (
+                  {reportData.allSubjectsList.map((s: SubjectData) => (
                     <SelectItem key={s.id} value={s.id}>
                       {s.name}
                     </SelectItem>
@@ -358,7 +412,7 @@ export default function IndividualPerformanceReport() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Todos os Períodos</SelectItem>
-                  {reportData.periods.map((p: any) => (
+                  {reportData.periods.map((p: PeriodReportData) => (
                     <SelectItem key={p.id} value={p.id}>
                       {p.name}
                     </SelectItem>
@@ -385,7 +439,7 @@ export default function IndividualPerformanceReport() {
           </div>
 
           <div className="space-y-6">
-            {reportData.subjects.map((item: any) => (
+            {reportData.subjects.map((item: SubjectReportData) => (
               <Card key={item.subjectId}>
                 <CardHeader className="pb-2">
                   <div className="flex justify-between items-start">
@@ -429,7 +483,7 @@ export default function IndividualPerformanceReport() {
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {item.flatAssessments.map((assessment: any) => {
+                        {item.flatAssessments.map((assessment: AssessmentFlatData) => {
                           return (
                             <TableRow key={assessment.id}>
                               <TableCell className="text-muted-foreground text-sm">

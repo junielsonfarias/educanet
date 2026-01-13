@@ -19,13 +19,13 @@ interface Communication {
   target_audience: string;
   sent_date: string;
   expiration_date?: string;
-  recipients?: any[];
+  recipients?: Record<string, unknown>[];
 }
 
 interface NotificationState {
   // Estado
   communications: Communication[];
-  userCommunications: any[];
+  userCommunications: Record<string, unknown>[];
   currentCommunication: Communication | null;
   unreadCount: number;
   loading: boolean;
@@ -78,7 +78,7 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
   fetchCommunications: async (filters = {}) => {
     set({ loading: true, error: null });
     try {
-      const filtersArray: any[] = [];
+      const filtersArray: Record<string, unknown>[] = [];
       
       if (filters.type) {
         filtersArray.push({
@@ -102,7 +102,7 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
       });
       
       set({ communications, loading: false });
-    } catch (error: any) {
+    } catch (error: unknown) {
       const message = error?.message || 'Erro ao carregar comunicações';
       set({ error: message, loading: false });
       toast.error(message);
@@ -117,7 +117,7 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
         unreadOnly
       );
       set({ userCommunications, loading: false });
-    } catch (error: any) {
+    } catch (error: unknown) {
       const message = error?.message || 'Erro ao carregar suas comunicações';
       set({ error: message, loading: false });
       toast.error(message);
@@ -129,7 +129,7 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
     try {
       const communication = await communicationService.getCommunicationFullInfo(id);
       set({ currentCommunication: communication, loading: false });
-    } catch (error: any) {
+    } catch (error: unknown) {
       const message = error?.message || 'Erro ao carregar comunicação';
       set({ error: message, loading: false, currentCommunication: null });
       toast.error(message);
@@ -140,7 +140,7 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
     try {
       const count = await communicationService.getUnreadCount(personId);
       set({ unreadCount: count });
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error fetching unread count:', error);
       // Não mostra toast para não incomodar o usuário
     }
@@ -164,7 +164,7 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
       
       toast.success('Comunicação enviada com sucesso!');
       return newCommunication;
-    } catch (error: any) {
+    } catch (error: unknown) {
       const message = error?.message || 'Erro ao enviar comunicação';
       set({ error: message, loading: false });
       toast.error(message);
@@ -190,7 +190,7 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
       
       toast.success('Comunicação atualizada com sucesso!');
       return updatedCommunication;
-    } catch (error: any) {
+    } catch (error: unknown) {
       const message = error?.message || 'Erro ao atualizar comunicação';
       set({ error: message, loading: false });
       toast.error(message);
@@ -213,7 +213,7 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
       });
       
       toast.success('Comunicação removida com sucesso!');
-    } catch (error: any) {
+    } catch (error: unknown) {
       const message = error?.message || 'Erro ao remover comunicação';
       set({ error: message, loading: false });
       toast.error(message);
@@ -236,7 +236,7 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
         ),
         unreadCount: Math.max(0, unreadCount - 1)
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error marking as read:', error);
       // Não mostra toast para não incomodar o usuário
     }
@@ -253,7 +253,7 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
       }
       
       toast.success('Destinatários adicionados com sucesso!');
-    } catch (error: any) {
+    } catch (error: unknown) {
       const message = error?.message || 'Erro ao adicionar destinatários';
       set({ error: message, loading: false });
       toast.error(message);
@@ -290,7 +290,7 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
       });
       
       return newCommunication;
-    } catch (error: any) {
+    } catch (error: unknown) {
       const message = error?.message || 'Erro ao enviar comunicação';
       set({ error: message, loading: false });
       toast.error(message);
@@ -324,7 +324,7 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
       });
       
       toast.success('Status atualizado com sucesso!');
-    } catch (error: any) {
+    } catch (error: unknown) {
       const message = error?.message || 'Erro ao atualizar status';
       set({ error: message, loading: false });
       toast.error(message);

@@ -29,7 +29,7 @@ const yearSchema = z.object({
 interface AcademicYearDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
-  onSubmit: (data: any) => void
+  onSubmit: (data: Record<string, unknown>) => void
 }
 
 export function AcademicYearDialog({

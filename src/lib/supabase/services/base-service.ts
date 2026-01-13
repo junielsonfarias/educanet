@@ -20,7 +20,7 @@ export interface SortParams {
 }
 
 export interface FilterParams {
-  [key: string]: any;
+  [key: string]: string | number | boolean | null | undefined;
 }
 
 export interface QueryResult<T> {
@@ -29,7 +29,7 @@ export interface QueryResult<T> {
   error?: PostgrestError | null;
 }
 
-export class BaseService<T = any> {
+export class BaseService<T = Record<string, unknown>> {
   protected tableName: string;
 
   constructor(tableName: string) {
@@ -245,7 +245,7 @@ export class BaseService<T = any> {
       pagination?: PaginationParams;
       sort?: SortParams;
     }
-  ): Promise<any[]> {
+  ): Promise<Record<string, unknown>[]> {
     try {
       let query = supabase
         .from(this.tableName)

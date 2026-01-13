@@ -61,9 +61,9 @@ export default function TeacherDetails() {
 
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
-  const [classes, setClasses] = useState<any[]>([])
-  const [subjects, setSubjects] = useState<any[]>([])
-  const [certifications, setCertifications] = useState<any[]>([])
+  const [classes, setClasses] = useState<Record<string, unknown>[]>([])
+  const [subjects, setSubjects] = useState<Record<string, unknown>[]>([])
+  const [certifications, setCertifications] = useState<Record<string, unknown>[]>([])
 
   // Carregar dados do professor ao montar
   useEffect(() => {
@@ -88,7 +88,7 @@ export default function TeacherDetails() {
     setCertifications(certificationsData)
   }
 
-  const handleUpdate = async (data: any) => {
+  const handleUpdate = async (data: Record<string, unknown>) => {
     if (!currentTeacher) return
     
     try {
