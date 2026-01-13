@@ -222,12 +222,12 @@ export default function ResetPassword() {
                 disabled={loading || !password || !confirmPassword}
               >
                 {loading ? (
-                  <>
+                  <span className="flex items-center justify-center">
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Redefinindo...
-                  </>
+                    <span>Redefinindo...</span>
+                  </span>
                 ) : (
-                  'Redefinir Senha'
+                  <span>Redefinir Senha</span>
                 )}
               </Button>
             </form>

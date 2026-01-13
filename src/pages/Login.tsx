@@ -152,15 +152,15 @@ export default function Login() {
                   disabled={loading}
                 >
                   {loading ? (
-                    <>
+                    <span className="flex items-center justify-center">
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Entrando...
-                    </>
+                      <span>Entrando...</span>
+                    </span>
                   ) : (
-                    <>
-                      Entrar no Sistema
+                    <span className="flex items-center justify-center">
+                      <span>Entrar no Sistema</span>
                       <Sparkles className="ml-2 h-4 w-4" />
-                    </>
+                    </span>
                   )}
                 </Button>
               </div>

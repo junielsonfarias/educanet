@@ -121,12 +121,12 @@ export default function ForgotPassword() {
                   disabled={loading || !email}
                 >
                   {loading ? (
-                    <>
+                    <span className="flex items-center justify-center">
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Enviando...
-                    </>
+                      <span>Enviando...</span>
+                    </span>
                   ) : (
-                    'Enviar Link de Recuperação'
+                    <span>Enviar Link de Recuperação</span>
                   )}
                 </Button>
               </form>
