@@ -2,7 +2,7 @@
 
 **Data de Criacao:** 13 de Janeiro de 2026
 **Ultima Atualizacao:** 13 de Janeiro de 2026
-**Versao do Documento:** 2.6
+**Versao do Documento:** 2.7
 **Status Geral:** 100% COMPLETO E FUNCIONAL
 **Tempo Total de Desenvolvimento:** ~28 horas
 
@@ -1057,6 +1057,21 @@ Esta secao registra todas as alteracoes significativas realizadas no projeto.
 - Usuarios autenticados podem visualizar todos os dados
 - Acesso anonimo mantido para public_contents
 - Migration: `039_admin_full_access_policies.sql`
+
+### 13/01/2026 - Versao 2.7
+**Sistema de Etapas de Ensino com Séries:**
+- Reformulado formulário de cursos para incluir séries/anos no mesmo cadastro
+- Implementado auto-preenchimento de séries baseado no código INEP selecionado
+- CourseFormDialog com campos dinâmicos usando useFieldArray
+- Mapeamento de códigos INEP para níveis de ensino (01-06)
+- Series criadas automaticamente na tabela education_grades
+- Exibição de badges com contagem de séries na listagem de cursos
+
+**Arquivos modificados:**
+- src/pages/academic/components/CourseFormDialog.tsx (reescrito)
+- src/lib/supabase/services/course-service.ts (getAllWithSeries, createCourse)
+- src/stores/useCourseStore.supabase.tsx (fetchCourses)
+- src/pages/academic/CoursesList.tsx (exibição de séries)
 
 ### 13/01/2026 - Versao 1.1
 **Correcoes de TypeScript:**
