@@ -35,7 +35,7 @@ $$ LANGUAGE plpgsql SECURITY DEFINER STABLE;
 
 -- 3. Função para criar políticas de forma segura (verifica se tabela existe)
 -- =====================================================
-CREATE OR REPLACE FUNCTION public.create_admin_policies(table_name TEXT)
+CREATE OR REPLACE FUNCTION public.create_admin_policies(p_table_name TEXT)
 RETURNS VOID AS $$
 DECLARE
   policy_admin TEXT;
@@ -43,37 +43,37 @@ DECLARE
 BEGIN
   -- Verificar se a tabela existe
   IF NOT EXISTS (
-    SELECT 1 FROM information_schema.tables
-    WHERE table_schema = 'public' AND table_name = create_admin_policies.table_name
+    SELECT 1 FROM information_schema.tables t
+    WHERE t.table_schema = 'public' AND t.table_name = p_table_name
   ) THEN
-    RAISE NOTICE 'Tabela % não existe, pulando...', table_name;
+    RAISE NOTICE 'Tabela % não existe, pulando...', p_table_name;
     RETURN;
   END IF;
 
   -- Habilitar RLS
-  EXECUTE format('ALTER TABLE public.%I ENABLE ROW LEVEL SECURITY', table_name);
+  EXECUTE format('ALTER TABLE public.%I ENABLE ROW LEVEL SECURITY', p_table_name);
 
   -- Nomes das políticas
-  policy_admin := 'admin_' || table_name || '_all';
-  policy_select := 'authenticated_' || table_name || '_select';
+  policy_admin := 'admin_' || p_table_name || '_all';
+  policy_select := 'authenticated_' || p_table_name || '_select';
 
   -- Remover políticas existentes
-  EXECUTE format('DROP POLICY IF EXISTS %I ON public.%I', policy_admin, table_name);
-  EXECUTE format('DROP POLICY IF EXISTS %I ON public.%I', policy_select, table_name);
+  EXECUTE format('DROP POLICY IF EXISTS %I ON public.%I', policy_admin, p_table_name);
+  EXECUTE format('DROP POLICY IF EXISTS %I ON public.%I', policy_select, p_table_name);
 
   -- Criar política admin (CRUD completo)
   EXECUTE format(
     'CREATE POLICY %I ON public.%I FOR ALL TO authenticated USING (public.is_admin()) WITH CHECK (public.is_admin())',
-    policy_admin, table_name
+    policy_admin, p_table_name
   );
 
   -- Criar política select para usuários autenticados
   EXECUTE format(
     'CREATE POLICY %I ON public.%I FOR SELECT TO authenticated USING (true)',
-    policy_select, table_name
+    policy_select, p_table_name
   );
 
-  RAISE NOTICE 'Políticas criadas para tabela: %', table_name;
+  RAISE NOTICE 'Políticas criadas para tabela: %', p_table_name;
 END;
 $$ LANGUAGE plpgsql;
 
@@ -175,7 +175,7 @@ END $$;
 -- =====================================================
 -- 7. LIMPAR FUNÇÃO TEMPORÁRIA
 -- =====================================================
-DROP FUNCTION IF EXISTS public.create_admin_policies(TEXT);
+DROP FUNCTION IF EXISTS public.create_admin_policies(p_table_name TEXT);
 
 -- =====================================================
 -- COMENTÁRIOS FINAIS
