@@ -110,8 +110,9 @@ export const useCourseStore = create<CourseState>((set, get) => ({
       set({ courses, loading: false });
     } catch (error: unknown) {
       const message = (error as Error)?.message || 'Erro ao carregar cursos';
-      set({ error: message, loading: false });
-      toast.error(message);
+      set({ error: message, loading: false, courses: [] });
+      // Não mostrar toast para evitar erro de DOM com Sonner/React 19
+      console.warn('Erro ao carregar cursos:', message);
     }
   },
 

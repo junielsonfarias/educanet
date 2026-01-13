@@ -58,23 +58,24 @@ class CourseService extends BaseService {
         .is('deleted_at', null)
         .order('name', { ascending: true });
 
-      if (coursesError) throw handleSupabaseError(coursesError);
+      // Se houver erro, retornar array vazio (não lançar exceção)
+      if (coursesError) {
+        console.warn('Erro ao buscar cursos:', coursesError.message);
+        return [];
+      }
 
       // Tentar buscar séries (pode não existir se migration não foi aplicada)
       let grades: Record<string, unknown>[] = [];
-      try {
-        const { data: gradesData, error: gradesError } = await supabase
-          .from('education_grades')
-          .select('*')
-          .order('education_level', { ascending: true })
-          .order('grade_order', { ascending: true });
+      const { data: gradesData, error: gradesError } = await supabase
+        .from('education_grades')
+        .select('*')
+        .order('education_level', { ascending: true })
+        .order('grade_order', { ascending: true });
 
-        if (!gradesError && gradesData) {
-          grades = gradesData;
-        }
-      } catch {
-        // Tabela education_grades ainda não existe - migration 040 não aplicada
-        console.warn('Tabela education_grades não encontrada. Execute a migration 040.');
+      if (!gradesError && gradesData) {
+        grades = gradesData;
+      } else if (gradesError) {
+        console.warn('Tabela education_grades não encontrada ou erro:', gradesError.message);
       }
 
       // Associar séries aos cursos baseado no course_level
@@ -93,7 +94,8 @@ class CourseService extends BaseService {
       return coursesWithSeries;
     } catch (error) {
       console.error('Error in CourseService.getAllWithSeries:', error);
-      throw error;
+      // Retornar array vazio em caso de erro (não propagar exceção)
+      return [];
     }
   }
 
