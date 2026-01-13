@@ -18,7 +18,7 @@ export interface SerieData {
 export interface CourseData {
   name: string;
   codigoCenso?: string;
-  course_level?: string;
+  education_level?: string;
   workload_hours?: number;
   description?: string;
   series?: SerieData[];
@@ -78,9 +78,9 @@ class CourseService extends BaseService {
         console.warn('Tabela education_grades não encontrada ou erro:', gradesError.message);
       }
 
-      // Associar séries aos cursos baseado no course_level
+      // Associar séries aos cursos baseado no education_level
       const coursesWithSeries = (courses || []).map((course: Record<string, unknown>) => {
-        const courseLevel = course.course_level as string;
+        const courseLevel = course.education_level as string;
         const courseSeries = courseLevel
           ? grades.filter((g: Record<string, unknown>) => g.education_level === courseLevel)
           : [];
@@ -123,11 +123,11 @@ class CourseService extends BaseService {
       }
 
       // Buscar séries do nível de ensino
-      if (data?.course_level) {
+      if (data?.education_level) {
         const { data: grades } = await supabase
           .from('education_grades')
           .select('*')
-          .eq('education_level', data.course_level)
+          .eq('education_level', data.education_level)
           .order('grade_order', { ascending: true });
 
         data.series = grades || [];
@@ -148,7 +148,7 @@ class CourseService extends BaseService {
       const { data, error } = await supabase
         .from('courses')
         .select('*')
-        .eq('course_level', level)
+        .eq('education_level', level)
         .is('deleted_at', null)
         .order('name', { ascending: true });
 
@@ -178,20 +178,20 @@ class CourseService extends BaseService {
         createdBy = authUser?.person_id || 1;
       }
 
-      // Determinar o course_level baseado no código INEP
+      // Determinar o education_level baseado no código INEP
       const courseLevel = data.codigoCenso
         ? CODIGO_TO_LEVEL[data.codigoCenso] || data.name
-        : data.course_level || data.name;
+        : data.education_level || data.name;
 
-      // 1. Criar o curso (tentar com course_level, se falhar usar sem)
+      // 1. Criar o curso (tentar com education_level, se falhar usar sem)
       let course: Record<string, unknown> | null = null;
 
-      // Primeiro tentar com course_level
+      // Primeiro tentar com education_level
       const { data: courseData, error: courseError } = await supabase
         .from('courses')
         .insert({
           name: data.name,
-          course_level: courseLevel,
+          education_level: courseLevel,
           description: data.description,
           workload_hours: data.workload_hours,
           created_by: createdBy || 1
@@ -200,9 +200,9 @@ class CourseService extends BaseService {
         .single();
 
       if (courseError) {
-        // Se erro for por coluna não existir, tentar sem course_level
-        if (courseError.message?.includes('course_level')) {
-          console.warn('Coluna course_level não existe. Execute a migration 040.');
+        // Se erro for por coluna não existir, tentar sem education_level
+        if (courseError.message?.includes('education_level')) {
+          console.warn('Coluna education_level não existe. Execute a migration 040.');
           const { data: basicCourse, error: basicError } = await supabase
             .from('courses')
             .insert({
@@ -272,7 +272,7 @@ class CourseService extends BaseService {
       // Retornar curso com séries
       return {
         ...course,
-        course_level: courseLevel,
+        education_level: courseLevel,
         series: data.series || [],
         seriesCount: data.series?.length || 0,
       };
@@ -480,7 +480,7 @@ class CourseService extends BaseService {
 
       if (coursesError) throw handleSupabaseError(coursesError);
 
-      // Agrupar por nome (simplificado, já que course_level não existe)
+      // Agrupar por nome (simplificado, já que education_level não existe)
       const byLevel: Record<string, number> = {};
       (courses || []).forEach((course: Record<string, unknown>) => {
         const level = course.name || 'Outros';

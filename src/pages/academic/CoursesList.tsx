@@ -68,7 +68,7 @@ export default function CoursesList() {
 
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
         {courses.map((course) => {
-          const courseLevel = course.course_level || ''
+          const courseLevel = course.education_level || ''
           const seriesCount = course.seriesCount || course.series?.length || 0
           const series = course.series || []
 

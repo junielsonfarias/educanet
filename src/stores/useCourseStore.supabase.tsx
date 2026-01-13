@@ -12,7 +12,7 @@ import { toast } from 'sonner';
 interface Course {
   id: number;
   name: string;
-  course_level: string;
+  education_level: string;
   workload_hours?: number;
   description?: string;
   subjects?: Record<string, unknown>[];
