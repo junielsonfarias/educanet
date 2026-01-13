@@ -72,7 +72,6 @@ import NotificationsManager from './pages/communication/NotificationsManager'
 import ProtocolsManager from './pages/secretariat/ProtocolsManager'
 import ServiceQueue from './pages/secretariat/ServiceQueue'
 import AppointmentsManager from './pages/secretariat/AppointmentsManager'
-import TransfersManager from './pages/people/TransfersManager'
 import TransfersManagerSupabase from './pages/people/TransfersManager.supabase'
 import PreEnrollmentManagerSupabase from './pages/enrollment/PreEnrollmentManager.supabase'
 import PreEnrollmentPublicForm from './pages/enrollment/PreEnrollmentPublicForm'
@@ -98,7 +97,6 @@ import { AppointmentProvider } from './stores/useAppointmentStore'
 import { QueueProvider } from './stores/useQueueStore'
 import { CouncilProvider } from './stores/useCouncilStore'
 import { AttachmentProvider } from './stores/useAttachmentStore'
-import { TransferProvider } from './stores/useTransferStore'
 import { StaffProvider } from './stores/useStaffStore'
 
 const App = () => (
@@ -124,7 +122,6 @@ const App = () => (
                                         <QueueProvider>
                                           <CouncilProvider>
                                             <AttachmentProvider>
-                                              <TransferProvider>
                                                 <StaffProvider>
                                                   <BrowserRouter
                                                     future={{
@@ -451,7 +448,6 @@ const App = () => (
                                                   </TooltipProvider>
                                                 </BrowserRouter>
                                               </StaffProvider>
-                                            </TransferProvider>
                                           </AttachmentProvider>
                                         </CouncilProvider>
                                       </QueueProvider>

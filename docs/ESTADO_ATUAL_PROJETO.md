@@ -2,7 +2,7 @@
 
 **Data de Criacao:** 13 de Janeiro de 2026
 **Ultima Atualizacao:** 13 de Janeiro de 2026
-**Versao do Documento:** 2.3
+**Versao do Documento:** 2.4
 **Status Geral:** 100% COMPLETO E FUNCIONAL
 **Tempo Total de Desenvolvimento:** ~27 horas
 
@@ -693,6 +693,19 @@ O **EduGestao Municipal** e um sistema **100% completo e funcional**, desenvolvi
 ## 15. HISTORICO DE ALTERACOES
 
 Esta secao registra todas as alteracoes significativas realizadas no projeto.
+
+### 13/01/2026 - Versao 2.3
+**Limpeza de Arquivos Legacy e Correcoes de Integracao:**
+- Removidos arquivos legacy nao utilizados:
+  - `src/pages/people/TransfersManager.tsx` (substituido por .supabase.tsx)
+  - `src/pages/people/components/TransferFormDialog.tsx` (substituido por .supabase.tsx)
+  - `src/pages/people/components/TransferDetailsDialog.tsx` (substituido por .supabase.tsx)
+  - `src/stores/useTransferStore.tsx` (substituido por .supabase.tsx)
+- Removido import nao utilizado de TransfersManager em App.tsx
+- Removido TransferProvider do App.tsx (store legacy)
+- Verificado que PreEnrollmentPublicForm.tsx ja usa store correto (.supabase)
+- Build verificado: passa com sucesso (2.11s)
+- Reducao de ~1.7KB no bundle final
 
 ### 13/01/2026 - Versao 2.2
 **Correcao de TypeScript `any` em Componentes:**
