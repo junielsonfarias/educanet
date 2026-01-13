@@ -1,18 +1,27 @@
 /**
- * CourseService - Serviço para gerenciamento de cursos e disciplinas
- * 
- * Gerencia cursos, disciplinas, grades curriculares e séries/anos.
+ * CourseService - Serviço para gerenciamento de cursos/etapas de ensino e disciplinas
+ *
+ * Gerencia etapas de ensino (cursos), séries/anos e disciplinas.
+ * Usa a tabela education_grades para séries e courses para metadados.
  */
 
 import { BaseService } from './base-service';
 import { supabase } from '../client';
 import { handleSupabaseError } from '../helpers';
 
+export interface SerieData {
+  name: string;
+  order: number;
+  is_final?: boolean;
+}
+
 export interface CourseData {
   name: string;
-  course_level: string;
+  codigoCenso?: string;
+  course_level?: string;
   workload_hours?: number;
   description?: string;
+  series?: SerieData[];
 }
 
 export interface SubjectData {
@@ -22,9 +31,62 @@ export interface SubjectData {
   description?: string;
 }
 
+// Mapeamento de código INEP para education_level no banco
+const CODIGO_TO_LEVEL: Record<string, string> = {
+  '01': 'Infantil',
+  '02': 'Infantil',
+  '03': 'Fundamental I',
+  '04': 'Fundamental II',
+  '05': 'Médio',
+  '06': 'EJA',
+};
+
 class CourseService extends BaseService {
   constructor() {
     super('courses');
+  }
+
+  /**
+   * Buscar todos os cursos com suas séries
+   */
+  async getAllWithSeries(): Promise<any[]> {
+    try {
+      // Buscar cursos
+      const { data: courses, error: coursesError } = await supabase
+        .from('courses')
+        .select('*')
+        .is('deleted_at', null)
+        .order('name', { ascending: true });
+
+      if (coursesError) throw handleSupabaseError(coursesError);
+
+      // Buscar todas as séries
+      const { data: grades, error: gradesError } = await supabase
+        .from('education_grades')
+        .select('*')
+        .order('education_level', { ascending: true })
+        .order('grade_order', { ascending: true });
+
+      if (gradesError) throw handleSupabaseError(gradesError);
+
+      // Associar séries aos cursos baseado no course_level
+      const coursesWithSeries = (courses || []).map((course: Record<string, unknown>) => {
+        const courseLevel = course.course_level as string;
+        const courseSeries = (grades || []).filter(
+          (g: Record<string, unknown>) => g.education_level === courseLevel
+        );
+        return {
+          ...course,
+          series: courseSeries,
+          seriesCount: courseSeries.length,
+        };
+      });
+
+      return coursesWithSeries;
+    } catch (error) {
+      console.error('Error in CourseService.getAllWithSeries:', error);
+      throw error;
+    }
   }
 
   /**
@@ -48,6 +110,17 @@ class CourseService extends BaseService {
       if (error) {
         if (error.code === 'PGRST116') return null;
         throw handleSupabaseError(error);
+      }
+
+      // Buscar séries do nível de ensino
+      if (data?.course_level) {
+        const { data: grades } = await supabase
+          .from('education_grades')
+          .select('*')
+          .eq('education_level', data.course_level)
+          .order('grade_order', { ascending: true });
+
+        data.series = grades || [];
       }
 
       return data;
@@ -78,25 +151,119 @@ class CourseService extends BaseService {
   }
 
   /**
-   * Criar curso
+   * Criar curso/etapa de ensino com séries
    */
   async createCourse(data: CourseData): Promise<any> {
     try {
       const { data: { user } } = await supabase.auth.getUser();
 
-      const { data: course, error } = await supabase
+      // Determinar o course_level baseado no código INEP
+      const courseLevel = data.codigoCenso
+        ? CODIGO_TO_LEVEL[data.codigoCenso] || data.name
+        : data.course_level || data.name;
+
+      // 1. Criar o curso
+      const { data: course, error: courseError } = await supabase
         .from('courses')
         .insert({
-          ...data,
+          name: data.name,
+          course_level: courseLevel,
+          description: data.description,
+          workload_hours: data.workload_hours,
           created_by: user?.id || 1
         })
         .select()
         .single();
 
-      if (error) throw handleSupabaseError(error);
-      return course;
+      if (courseError) throw handleSupabaseError(courseError);
+
+      // 2. Criar as séries em education_grades (se não existirem)
+      if (data.series && data.series.length > 0) {
+        for (const serie of data.series) {
+          // Verificar se a série já existe
+          const { data: existingGrade } = await supabase
+            .from('education_grades')
+            .select('id')
+            .eq('education_level', courseLevel)
+            .eq('grade_name', serie.name)
+            .single();
+
+          if (!existingGrade) {
+            // Inserir nova série
+            await supabase
+              .from('education_grades')
+              .insert({
+                education_level: courseLevel,
+                grade_name: serie.name,
+                grade_order: serie.order,
+                is_final_grade: serie.is_final || false,
+              });
+          }
+        }
+
+        // Atualizar next_grade_id das séries
+        const { data: grades } = await supabase
+          .from('education_grades')
+          .select('*')
+          .eq('education_level', courseLevel)
+          .order('grade_order', { ascending: true });
+
+        if (grades && grades.length > 1) {
+          for (let i = 0; i < grades.length - 1; i++) {
+            await supabase
+              .from('education_grades')
+              .update({ next_grade_id: grades[i + 1].id })
+              .eq('id', grades[i].id);
+          }
+        }
+      }
+
+      // Retornar curso com séries
+      return {
+        ...course,
+        series: data.series || [],
+        seriesCount: data.series?.length || 0,
+      };
     } catch (error) {
       console.error('Error in CourseService.createCourse:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Buscar séries de um nível de ensino
+   */
+  async getSeriesByLevel(educationLevel: string): Promise<any[]> {
+    try {
+      const { data, error } = await supabase
+        .from('education_grades')
+        .select('*')
+        .eq('education_level', educationLevel)
+        .order('grade_order', { ascending: true });
+
+      if (error) throw handleSupabaseError(error);
+      return data || [];
+    } catch (error) {
+      console.error('Error in CourseService.getSeriesByLevel:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Buscar todas as séries disponíveis
+   */
+  async getAllSeries(): Promise<any[]> {
+    try {
+      const { data, error } = await supabase
+        .from('education_grades')
+        .select('*')
+        .order('education_level', { ascending: true })
+        .order('grade_order', { ascending: true });
+
+      if (error) throw handleSupabaseError(error);
+      return data || [];
+    } catch (error) {
+      console.error('Error in CourseService.getAllSeries:', error);
       throw error;
     }
   }

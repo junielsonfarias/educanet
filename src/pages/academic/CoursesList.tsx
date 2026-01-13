@@ -49,10 +49,10 @@ export default function CoursesList() {
       <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
         <div>
           <h2 className="text-3xl font-bold tracking-tight text-primary">
-            Cursos
+            Etapas de Ensino
           </h2>
           <p className="text-muted-foreground">
-            Gerencie os cursos e suas grades curriculares.
+            Gerencie as etapas de ensino, séries/anos e grades curriculares.
           </p>
         </div>
         <Button
@@ -62,14 +62,15 @@ export default function CoursesList() {
           <div className="p-1 rounded-md bg-white/20 mr-2">
             <Plus className="h-5 w-5" />
           </div>
-          Novo Curso
+          Nova Etapa de Ensino
         </Button>
       </div>
 
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
         {courses.map((course) => {
           const courseLevel = course.course_level || ''
-          const workloadHours = course.workload_hours || 0
+          const seriesCount = course.seriesCount || course.series?.length || 0
+          const series = course.series || []
 
           return (
             <Card
@@ -91,25 +92,32 @@ export default function CoursesList() {
                       {courseLevel}
                     </Badge>
                   )}
-                  {workloadHours > 0 && (
-                    <Badge variant="secondary" className="text-xs">
-                      <Hash className="h-3 w-3 mr-1" />
-                      {workloadHours}h
-                    </Badge>
-                  )}
+                  <Badge variant="secondary" className="text-xs">
+                    <Layers className="h-3 w-3 mr-1" />
+                    {seriesCount} série{seriesCount !== 1 ? 's' : ''}
+                  </Badge>
                 </CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="space-y-2">
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <Layers className="h-4 w-4" />
-                    <span>Clique para gerenciar disciplinas</span>
-                  </div>
-                  {course.description && (
-                    <div className="text-xs text-muted-foreground pt-1 border-t line-clamp-2">
-                      {course.description}
+                  {series.length > 0 && (
+                    <div className="flex flex-wrap gap-1">
+                      {series.slice(0, 5).map((s: { id: number; grade_name: string }) => (
+                        <Badge key={s.id} variant="outline" className="text-xs font-normal">
+                          {s.grade_name}
+                        </Badge>
+                      ))}
+                      {series.length > 5 && (
+                        <Badge variant="outline" className="text-xs font-normal">
+                          +{series.length - 5}
+                        </Badge>
+                      )}
                     </div>
                   )}
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground pt-2">
+                    <Hash className="h-4 w-4" />
+                    <span>Clique para gerenciar séries e disciplinas</span>
+                  </div>
                 </div>
               </CardContent>
             </Card>
@@ -117,7 +125,7 @@ export default function CoursesList() {
         })}
         {courses.length === 0 && (
           <div className="col-span-full text-center py-10 text-muted-foreground">
-            Nenhum curso cadastrado. Comece adicionando um novo curso.
+            Nenhuma etapa de ensino cadastrada. Comece adicionando uma nova etapa.
           </div>
         )}
       </div>

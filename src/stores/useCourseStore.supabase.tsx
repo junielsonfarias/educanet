@@ -106,12 +106,10 @@ export const useCourseStore = create<CourseState>((set, get) => ({
   fetchCourses: async () => {
     set({ loading: true, error: null });
     try {
-      const courses = await courseService.getAll({
-        sort: { column: 'name', ascending: true }
-      });
+      const courses = await courseService.getAllWithSeries();
       set({ courses, loading: false });
     } catch (error: unknown) {
-      const message = error?.message || 'Erro ao carregar cursos';
+      const message = (error as Error)?.message || 'Erro ao carregar cursos';
       set({ error: message, loading: false });
       toast.error(message);
     }
