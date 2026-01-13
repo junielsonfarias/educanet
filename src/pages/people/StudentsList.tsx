@@ -66,15 +66,14 @@ import {
 } from '@/components/ui/alert-dialog'
 
 export default function StudentsList() {
-  const { students: contextStudents, addStudent, updateStudent, deleteStudent } =
-    useStudentStore()
-  
-  // Supabase store
-  const { 
-    students: supabaseStudents, 
-    fetchStudents, 
-    loading: loadingSupabase 
-  } = useSupabaseStudentStore()
+  const {
+    students,
+    addStudent,
+    updateStudent,
+    deleteStudent,
+    fetchStudents,
+    loading: loadingSupabase
+  } = useStudentStore()
   
   const { currentUser } = useUserStore()
   const [searchTerm, setSearchTerm] = useState('')
@@ -101,9 +100,6 @@ export default function StudentsList() {
     fetchStudents()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
-  
-  // Usar dados do Supabase se disponíveis, senão fallback para context
-  const students = supabaseStudents.length > 0 ? supabaseStudents : contextStudents
 
   // Permissões serão verificadas via RequirePermission
 
