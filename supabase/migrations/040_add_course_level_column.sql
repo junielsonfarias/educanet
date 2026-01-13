@@ -90,7 +90,7 @@ CREATE POLICY "Admin pode gerenciar education_grades"
   USING (
     EXISTS (
       SELECT 1 FROM auth_users au
-      WHERE au.auth_id = auth.uid()
+      WHERE au.id = auth.uid()
       AND au.role IN ('Admin', 'Supervisor', 'SuperAdmin')
       AND au.deleted_at IS NULL
     )
