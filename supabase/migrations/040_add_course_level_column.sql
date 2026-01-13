@@ -87,14 +87,8 @@ CREATE POLICY "Todos podem ver education_grades"
 DROP POLICY IF EXISTS "Admin pode gerenciar education_grades" ON education_grades;
 CREATE POLICY "Admin pode gerenciar education_grades"
   ON education_grades FOR ALL
-  USING (
-    EXISTS (
-      SELECT 1 FROM auth_users au
-      WHERE au.id = auth.uid()
-      AND au.role IN ('Admin', 'Supervisor', 'SuperAdmin')
-      AND au.deleted_at IS NULL
-    )
-  );
+  USING (public.is_admin())
+  WITH CHECK (public.is_admin());
 
 -- 9. Comentário final
 COMMENT ON COLUMN courses.course_level IS 'Vincula o curso a um nível de ensino da tabela education_grades (ex: Fundamental I, Médio, etc)';
