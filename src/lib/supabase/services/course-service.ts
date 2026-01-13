@@ -165,6 +165,17 @@ class CourseService extends BaseService {
     try {
       const { data: { user } } = await supabase.auth.getUser();
 
+      // Obter person_id do usuário atual
+      let createdBy: number | null = null;
+      if (user?.id) {
+        const { data: authUser } = await supabase
+          .from('auth_users')
+          .select('person_id')
+          .eq('id', user.id)
+          .single();
+        createdBy = authUser?.person_id || 1;
+      }
+
       // Determinar o course_level baseado no código INEP
       const courseLevel = data.codigoCenso
         ? CODIGO_TO_LEVEL[data.codigoCenso] || data.name
@@ -181,7 +192,7 @@ class CourseService extends BaseService {
           course_level: courseLevel,
           description: data.description,
           workload_hours: data.workload_hours,
-          created_by: user?.id
+          created_by: createdBy || 1
         })
         .select()
         .single();
@@ -196,7 +207,7 @@ class CourseService extends BaseService {
               name: data.name,
               description: data.description,
               workload_hours: data.workload_hours,
-              created_by: user?.id
+              created_by: createdBy || 1
             })
             .select()
             .single();
