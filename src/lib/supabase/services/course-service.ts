@@ -60,21 +60,29 @@ class CourseService extends BaseService {
 
       if (coursesError) throw handleSupabaseError(coursesError);
 
-      // Buscar todas as séries
-      const { data: grades, error: gradesError } = await supabase
-        .from('education_grades')
-        .select('*')
-        .order('education_level', { ascending: true })
-        .order('grade_order', { ascending: true });
+      // Tentar buscar séries (pode não existir se migration não foi aplicada)
+      let grades: Record<string, unknown>[] = [];
+      try {
+        const { data: gradesData, error: gradesError } = await supabase
+          .from('education_grades')
+          .select('*')
+          .order('education_level', { ascending: true })
+          .order('grade_order', { ascending: true });
 
-      if (gradesError) throw handleSupabaseError(gradesError);
+        if (!gradesError && gradesData) {
+          grades = gradesData;
+        }
+      } catch {
+        // Tabela education_grades ainda não existe - migration 040 não aplicada
+        console.warn('Tabela education_grades não encontrada. Execute a migration 040.');
+      }
 
       // Associar séries aos cursos baseado no course_level
       const coursesWithSeries = (courses || []).map((course: Record<string, unknown>) => {
         const courseLevel = course.course_level as string;
-        const courseSeries = (grades || []).filter(
-          (g: Record<string, unknown>) => g.education_level === courseLevel
-        );
+        const courseSeries = courseLevel
+          ? grades.filter((g: Record<string, unknown>) => g.education_level === courseLevel)
+          : [];
         return {
           ...course,
           series: courseSeries,
@@ -162,65 +170,96 @@ class CourseService extends BaseService {
         ? CODIGO_TO_LEVEL[data.codigoCenso] || data.name
         : data.course_level || data.name;
 
-      // 1. Criar o curso
-      const { data: course, error: courseError } = await supabase
+      // 1. Criar o curso (tentar com course_level, se falhar usar sem)
+      let course: Record<string, unknown> | null = null;
+
+      // Primeiro tentar com course_level
+      const { data: courseData, error: courseError } = await supabase
         .from('courses')
         .insert({
           name: data.name,
           course_level: courseLevel,
           description: data.description,
           workload_hours: data.workload_hours,
-          created_by: user?.id || 1
+          created_by: user?.id
         })
         .select()
         .single();
 
-      if (courseError) throw handleSupabaseError(courseError);
-
-      // 2. Criar as séries em education_grades (se não existirem)
-      if (data.series && data.series.length > 0) {
-        for (const serie of data.series) {
-          // Verificar se a série já existe
-          const { data: existingGrade } = await supabase
-            .from('education_grades')
-            .select('id')
-            .eq('education_level', courseLevel)
-            .eq('grade_name', serie.name)
+      if (courseError) {
+        // Se erro for por coluna não existir, tentar sem course_level
+        if (courseError.message?.includes('course_level')) {
+          console.warn('Coluna course_level não existe. Execute a migration 040.');
+          const { data: basicCourse, error: basicError } = await supabase
+            .from('courses')
+            .insert({
+              name: data.name,
+              description: data.description,
+              workload_hours: data.workload_hours,
+              created_by: user?.id
+            })
+            .select()
             .single();
 
-          if (!existingGrade) {
-            // Inserir nova série
-            await supabase
-              .from('education_grades')
-              .insert({
-                education_level: courseLevel,
-                grade_name: serie.name,
-                grade_order: serie.order,
-                is_final_grade: serie.is_final || false,
-              });
-          }
+          if (basicError) throw handleSupabaseError(basicError);
+          course = basicCourse;
+        } else {
+          throw handleSupabaseError(courseError);
         }
+      } else {
+        course = courseData;
+      }
 
-        // Atualizar next_grade_id das séries
-        const { data: grades } = await supabase
-          .from('education_grades')
-          .select('*')
-          .eq('education_level', courseLevel)
-          .order('grade_order', { ascending: true });
-
-        if (grades && grades.length > 1) {
-          for (let i = 0; i < grades.length - 1; i++) {
-            await supabase
+      // 2. Tentar criar as séries em education_grades (se a tabela existir)
+      if (data.series && data.series.length > 0) {
+        try {
+          for (const serie of data.series) {
+            // Verificar se a série já existe
+            const { data: existingGrade } = await supabase
               .from('education_grades')
-              .update({ next_grade_id: grades[i + 1].id })
-              .eq('id', grades[i].id);
+              .select('id')
+              .eq('education_level', courseLevel)
+              .eq('grade_name', serie.name)
+              .maybeSingle();
+
+            if (!existingGrade) {
+              // Inserir nova série
+              await supabase
+                .from('education_grades')
+                .insert({
+                  education_level: courseLevel,
+                  grade_name: serie.name,
+                  grade_order: serie.order,
+                  is_final_grade: serie.is_final || false,
+                });
+            }
           }
+
+          // Atualizar next_grade_id das séries
+          const { data: grades } = await supabase
+            .from('education_grades')
+            .select('*')
+            .eq('education_level', courseLevel)
+            .order('grade_order', { ascending: true });
+
+          if (grades && grades.length > 1) {
+            for (let i = 0; i < grades.length - 1; i++) {
+              await supabase
+                .from('education_grades')
+                .update({ next_grade_id: grades[i + 1].id })
+                .eq('id', grades[i].id);
+            }
+          }
+        } catch (seriesError) {
+          // Tabela education_grades não existe - ignorar silenciosamente
+          console.warn('Não foi possível criar séries. Execute a migration 040.');
         }
       }
 
       // Retornar curso com séries
       return {
         ...course,
+        course_level: courseLevel,
         series: data.series || [],
         seriesCount: data.series?.length || 0,
       };
