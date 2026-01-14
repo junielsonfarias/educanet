@@ -2,7 +2,7 @@
 
 **Data de Criacao:** 13 de Janeiro de 2026
 **Ultima Atualizacao:** 13 de Janeiro de 2026
-**Versao do Documento:** 3.4
+**Versao do Documento:** 3.5
 **Status Geral:** 100% COMPLETO E FUNCIONAL
 **Tempo Total de Desenvolvimento:** ~28 horas
 
@@ -821,6 +821,25 @@ Esta secao registra todas as alteracoes significativas realizadas no projeto.
   - Visualizacao de motivo de erro quando aplicavel
 - Componentes usam RequirePermission para controle de acesso
 - Total de arquivos criados: 3 paginas/componentes novos
+
+### 13/01/2026 - Versao 3.5
+**Melhoria Visual do Tema Claro - Area Administrativa:**
+
+**Mudancas Implementadas:**
+- Criada paleta de cores azul claro para a area administrativa
+- Portal institucional mantem cores neutras (branco/cinza)
+- Nova classe `.admin-theme` aplica paleta azul no tema claro
+
+**Paleta Azul Claro (Tema Administrativo):**
+- Background: Azul muito suave (HSL 210 50% 98%)
+- Cards: Branco azulado (HSL 210 60% 99%)
+- Secundario: Azul claro suave (HSL 210 55% 94%)
+- Bordas: Azul acinzentado (HSL 210 35% 86%)
+- Sidebar: Azul claro pronunciado (HSL 210 45% 96%)
+
+**Arquivos modificados:**
+- `src/main.css` - Adicionada classe `.admin-theme` com paleta azul
+- `src/components/Layout.tsx` - Aplicada classe no layout administrativo
 
 ### 13/01/2026 - Versao 3.4
 **Correcao do Salvamento de Configuracoes Gerais (QEdu):**

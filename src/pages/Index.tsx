@@ -22,25 +22,28 @@ import { useSettingsStore } from '@/stores/useSettingsStore.supabase'
 import { format, parseISO } from 'date-fns'
 import { ServiceCard } from '@/lib/mock-data'
 import { HeroCarousel } from '@/components/public/HeroCarousel'
-import { useEffect, useMemo } from 'react'
+import { FacebookFeedModal } from '@/components/public/FacebookFeedModal'
+import { InstagramFeedModal } from '@/components/public/InstagramFeedModal'
+import { useEffect, useMemo, useState } from 'react'
 import { Skeleton } from '@/components/ui/skeleton'
 
 export default function InstitutionalHome() {
   // Context store (mantém hero section e configurações)
   const { news: contextNews, documents: contextDocuments, getContent } = usePublicContentStore()
-  const { settings } = useSettingsStore()
-  
+  const { settings, fetchSettings } = useSettingsStore()
+
   // Supabase store (dados do banco)
-  const { 
-    publishedContents, 
-    fetchPublishedContents, 
-    loading 
+  const {
+    publishedContents,
+    fetchPublishedContents,
+    loading
   } = useSupabasePublicContentStore()
 
   const semedInfo = getContent('semed_info')
-  
-  // Buscar conteúdos publicados do Supabase
+
+  // Buscar configurações e conteúdos publicados do Supabase
   useEffect(() => {
+    fetchSettings()
     fetchPublishedContents({
       contentType: 'Noticia',
       limit: 3,
@@ -78,6 +81,15 @@ export default function InstitutionalHome() {
   const serviceCards = useMemo(() => {
     return Array.isArray(settings?.serviceCards) ? settings.serviceCards : []
   }, [settings?.serviceCards])
+
+  // Estado para os modais das redes sociais
+  const [facebookModalOpen, setFacebookModalOpen] = useState(false)
+  const [instagramModalOpen, setInstagramModalOpen] = useState(false)
+
+  // URLs das redes sociais
+  const facebookPageUrl = `https://facebook.com/${((settings.facebookHandle as string) || 'semed_oficial').replace('@', '')}`
+  const instagramProfileUrl = `https://instagram.com/${((settings.instagramHandle as string) || (settings.facebookHandle as string) || 'semed_oficial').replace('@', '')}`
+  const instagramHandle = (settings.instagramHandle as string) || (settings.facebookHandle as string) || '@semed_oficial'
 
   // Helper to get icon component
   const getIcon = (iconName: string) => {
@@ -444,64 +456,75 @@ export default function InstitutionalHome() {
               <div className="bg-gradient-to-b from-[#1877F2]/10 to-background p-6">
                 <div className="flex items-center gap-4 mb-6 bg-white p-4 rounded-xl shadow-sm">
                   <div className="h-16 w-16 rounded-full border-4 border-[#1877F2]/20 overflow-hidden shrink-0">
-                    <img
-                      src={`https://img.usecurling.com/i?q=school&shape=outline&color=blue`}
-                      className="w-full h-full object-cover"
-                      alt="Logo"
-                    />
+                    {settings.secretaryLogo ? (
+                      <img
+                        src={settings.secretaryLogo as string}
+                        className="w-full h-full object-cover"
+                        alt="Logo"
+                      />
+                    ) : (
+                      <img
+                        src={`https://img.usecurling.com/i?q=school&shape=outline&color=blue`}
+                        className="w-full h-full object-cover"
+                        alt="Logo"
+                      />
+                    )}
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="font-bold text-lg truncate">
-                      {settings.educationSecretaryName}
+                      {(settings.educationSecretaryName as string) || 'Secretaria de Educação'}
                     </p>
                     <p className="text-sm text-muted-foreground font-medium flex items-center gap-1">
                       <Facebook className="h-3 w-3" />
-                      {settings.facebookHandle || '@semed_oficial'}
+                      {(settings.facebookHandle as string) || '@semed_oficial'}
                     </p>
                   </div>
-                  <Button
-                    size="sm"
-                    className="bg-[#1877F2] hover:bg-[#166fe5] text-white shrink-0"
+                  <a
+                    href={facebookPageUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
                   >
-                    Seguir
-                  </Button>
+                    <Button
+                      size="sm"
+                      className="bg-[#1877F2] hover:bg-[#166fe5] text-white shrink-0"
+                    >
+                      Seguir
+                    </Button>
+                  </a>
                 </div>
 
+                {/* Grid de imagens - clicáveis para abrir modal */}
                 <div className="grid grid-cols-2 gap-3 mb-6">
-                  {[1, 2, 3, 4]
-                    .map((i) => {
-                      const card = serviceCards[i - 1]
-                      if (!card || !card.active) return null
-                      return { index: i, card }
-                    })
-                    .filter((item) => item !== null)
-                    .map((item) => (
-                      <div
-                        key={`service-${item.index}`}
-                        className="aspect-square rounded-lg overflow-hidden relative group cursor-pointer"
-                      >
-                        <img
-                          src={`https://img.usecurling.com/p/400/400?q=school%20activity%20${item.index}`}
-                          className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
-                          alt={`Post ${item.index}`}
-                        />
-                        <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                          <Facebook className="text-white h-8 w-8 drop-shadow-lg" />
-                        </div>
+                  {[1, 2, 3, 4].map((i) => (
+                    <button
+                      key={`fb-post-${i}`}
+                      onClick={() => setFacebookModalOpen(true)}
+                      className="aspect-square rounded-lg overflow-hidden relative group cursor-pointer"
+                    >
+                      <img
+                        src={`https://img.usecurling.com/p/400/400?q=education%20school%20${i}`}
+                        className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
+                        alt={`Post ${i}`}
+                      />
+                      <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                        <Facebook className="text-white h-8 w-8 drop-shadow-lg" />
                       </div>
-                    ))}
+                    </button>
+                  ))}
                 </div>
 
                 <div className="flex justify-center gap-4">
                   <Button
                     variant="outline"
                     className="w-full gap-2 border-[#1877F2] text-[#1877F2] hover:bg-[#1877F2] hover:text-white"
+                    onClick={() => setFacebookModalOpen(true)}
                   >
-                    <Facebook className="h-4 w-4" /> Ver Página no Facebook
+                    <Facebook className="h-4 w-4" /> Ver Publicações
                   </Button>
                   <Button
                     variant="outline"
                     className="w-full gap-2 border-pink-500 text-pink-600 hover:bg-pink-500 hover:text-white"
+                    onClick={() => setInstagramModalOpen(true)}
                   >
                     <Instagram className="h-4 w-4" /> Instagram
                   </Button>
@@ -511,6 +534,23 @@ export default function InstitutionalHome() {
           </Card>
         </div>
       </div>
+
+      {/* Modal do Facebook Feed */}
+      <FacebookFeedModal
+        open={facebookModalOpen}
+        onOpenChange={setFacebookModalOpen}
+        pageUrl={facebookPageUrl}
+        pageName={(settings.educationSecretaryName as string) || 'Secretaria de Educação'}
+      />
+
+      {/* Modal do Instagram Feed */}
+      <InstagramFeedModal
+        open={instagramModalOpen}
+        onOpenChange={setInstagramModalOpen}
+        profileUrl={instagramProfileUrl}
+        profileName={(settings.educationSecretaryName as string) || 'Secretaria de Educação'}
+        profileHandle={instagramHandle.startsWith('@') ? instagramHandle : `@${instagramHandle}`}
+      />
     </div>
   )
 }

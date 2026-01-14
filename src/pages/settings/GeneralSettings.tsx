@@ -6,6 +6,7 @@ import {
   FileText,
   Settings as SettingsIcon,
   Facebook,
+  Instagram,
   Type,
   BarChart,
 } from 'lucide-react'
@@ -39,6 +40,7 @@ interface SettingsFormData {
   municipalityLogo: string
   secretaryLogo: string
   facebookHandle: string
+  instagramHandle: string
   footerText: string
   qeduMunicipalityId: string
   defaultRecoveryStrategy: string
@@ -50,6 +52,7 @@ const defaultFormData: SettingsFormData = {
   municipalityLogo: '',
   secretaryLogo: '',
   facebookHandle: '',
+  instagramHandle: '',
   footerText: '',
   qeduMunicipalityId: '',
   defaultRecoveryStrategy: 'replace_if_higher',
@@ -77,6 +80,7 @@ export default function GeneralSettings() {
         municipalityLogo: (settings.municipalityLogo as string) || '',
         secretaryLogo: (settings.secretaryLogo as string) || '',
         facebookHandle: (settings.facebookHandle as string) || '',
+        instagramHandle: (settings.instagramHandle as string) || '',
         footerText: (settings.footerText as string) || '',
         qeduMunicipalityId: (settings.qeduMunicipalityId as string) || '',
         defaultRecoveryStrategy: (settings.defaultRecoveryStrategy as string) || 'replace_if_higher',
@@ -143,6 +147,7 @@ export default function GeneralSettings() {
         municipalityLogo: formData.municipalityLogo || null,
         secretaryLogo: formData.secretaryLogo || null,
         facebookHandle: formData.facebookHandle || null,
+        instagramHandle: formData.instagramHandle || null,
         footerText: formData.footerText || null,
         qeduMunicipalityId: formData.qeduMunicipalityId || null,
         defaultRecoveryStrategy: formData.defaultRecoveryStrategy || null,
@@ -426,7 +431,24 @@ export default function GeneralSettings() {
                     </div>
                     <p className="text-xs text-muted-foreground">
                       O identificador da página do Facebook (ex: @semedssbvpa)
-                      para exibir o feed.
+                      para exibir no portal.
+                    </p>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="instagramHandle">Instagram Handle</Label>
+                    <div className="relative">
+                      <Instagram className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                      <Input
+                        id="instagramHandle"
+                        value={formData.instagramHandle}
+                        onChange={handleChange}
+                        placeholder="@semed_oficial"
+                        className="pl-9"
+                      />
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      O identificador do perfil do Instagram (ex: @semedssbvpa)
+                      para exibir no portal.
                     </p>
                   </div>
                 </div>

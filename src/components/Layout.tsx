@@ -20,17 +20,20 @@ export default function Layout() {
   }
 
   // Rotas administrativas precisam de autenticação
+  // Classe admin-theme aplica paleta azul no tema claro
   return (
     <ProtectedRoute>
-      <SidebarProvider>
-        <AppSidebar />
-        <SidebarInset>
-          <Header />
-          <div className="flex flex-1 flex-col gap-4 p-4 pt-0 md:p-8 md:pt-6 bg-secondary/30 min-h-[calc(100vh-4rem)]">
-            <Outlet />
-          </div>
-        </SidebarInset>
-      </SidebarProvider>
+      <div className="admin-theme">
+        <SidebarProvider>
+          <AppSidebar />
+          <SidebarInset>
+            <Header />
+            <div className="flex flex-1 flex-col gap-4 p-4 pt-0 md:p-8 md:pt-6 bg-secondary/30 min-h-[calc(100vh-4rem)]">
+              <Outlet />
+            </div>
+          </SidebarInset>
+        </SidebarProvider>
+      </div>
     </ProtectedRoute>
   )
 }
