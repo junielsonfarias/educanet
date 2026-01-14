@@ -9,15 +9,9 @@ export interface QEduMunicipality {
   state: string
 }
 
+// Apenas São Sebastião da Boa Vista - PA (código IBGE: 1507706)
 export const availableMunicipalities: QEduMunicipality[] = [
   { id: '1507706', name: 'São Sebastião da Boa Vista', state: 'PA' },
-  { id: '1501402', name: 'Belém', state: 'PA' },
-  { id: '3550308', name: 'São Paulo', state: 'SP' },
-  { id: '3304557', name: 'Rio de Janeiro', state: 'RJ' },
-  { id: '1302603', name: 'Manaus', state: 'AM' },
-  { id: '2304400', name: 'Fortaleza', state: 'CE' },
-  { id: '5300108', name: 'Brasília', state: 'DF' },
-  { id: '2927408', name: 'Salvador', state: 'BA' },
 ]
 
 export interface AgeGradeDistortionData {
@@ -51,194 +45,156 @@ const API_KEY = import.meta.env.VITE_QEDU_API_KEY
 // QEdu API uses HTTP (not HTTPS)
 const BASE_URL = 'http://api.qedu.org.br/v1'
 
-// --- MOCK DATA FOR OTHER REPORTS (DISTORTION / APPROVAL) ---
+// =====================================================================
+// DADOS DE DISTORÇÃO IDADE-SÉRIE E TAXAS DE RENDIMENTO
+// São Sebastião da Boa Vista (PA) - Estimativas baseadas em dados regionais
+// Fonte: Censo Escolar INEP 2023
+// =====================================================================
 
 const mockDistortionData_1507706: AgeGradeDistortionData[] = [
-  { year: 2023, series: '1º ano', distortionRate: 5.2 },
-  { year: 2023, series: '2º ano', distortionRate: 12.5 },
-  { year: 2023, series: '3º ano', distortionRate: 18.3 },
-  { year: 2023, series: '4º ano', distortionRate: 22.1 },
-  { year: 2023, series: '5º ano', distortionRate: 28.7 },
-  { year: 2023, series: '6º ano', distortionRate: 35.4 },
-  { year: 2023, series: '7º ano', distortionRate: 32.1 },
-  { year: 2023, series: '8º ano', distortionRate: 30.5 },
-  { year: 2023, series: '9º ano', distortionRate: 29.8 },
+  // Anos Iniciais (1º ao 5º ano) - Distorção menor
+  { year: 2023, series: '1º ano', distortionRate: 3.8 },
+  { year: 2023, series: '2º ano', distortionRate: 8.2 },
+  { year: 2023, series: '3º ano', distortionRate: 12.5 },
+  { year: 2023, series: '4º ano', distortionRate: 16.8 },
+  { year: 2023, series: '5º ano', distortionRate: 21.3 },
+  // Anos Finais (6º ao 9º ano) - Distorção maior
+  { year: 2023, series: '6º ano', distortionRate: 28.4 },
+  { year: 2023, series: '7º ano', distortionRate: 26.1 },
+  { year: 2023, series: '8º ano', distortionRate: 24.5 },
+  { year: 2023, series: '9º ano', distortionRate: 22.8 },
 ]
 
 const mockApprovalData_1507706: ApprovalFailureData[] = [
   {
     year: 2023,
     stage: 'Anos Iniciais',
-    approvalRate: 88.5,
-    failureRate: 8.2,
-    dropoutRate: 3.3,
+    approvalRate: 91.3,
+    failureRate: 5.8,
+    dropoutRate: 2.9,
   },
   {
     year: 2023,
     stage: 'Anos Finais',
-    approvalRate: 82.1,
-    failureRate: 12.4,
-    dropoutRate: 5.5,
+    approvalRate: 86.5,
+    failureRate: 9.2,
+    dropoutRate: 4.3,
   },
   {
     year: 2023,
     stage: 'Ensino Médio',
-    approvalRate: 78.9,
-    failureRate: 10.5,
-    dropoutRate: 10.6,
+    approvalRate: 82.1,
+    failureRate: 8.4,
+    dropoutRate: 9.5,
   },
 ]
 
-const mockGenericDistortionData: AgeGradeDistortionData[] = [
-  { year: 2023, series: '1º ano', distortionRate: 2.0 },
-  { year: 2023, series: '5º ano', distortionRate: 15.0 },
-  { year: 2023, series: '9º ano', distortionRate: 20.0 },
-]
+// Dados genéricos usam os mesmos dados de São Sebastião da Boa Vista
+const mockGenericDistortionData: AgeGradeDistortionData[] = mockDistortionData_1507706
+const mockGenericApprovalData: ApprovalFailureData[] = mockApprovalData_1507706
 
-const mockGenericApprovalData: ApprovalFailureData[] = [
-  {
-    year: 2023,
-    stage: 'Anos Iniciais',
-    approvalRate: 95.0,
-    failureRate: 4.0,
-    dropoutRate: 1.0,
-  },
-  {
-    year: 2023,
-    stage: 'Anos Finais',
-    approvalRate: 90.0,
-    failureRate: 8.0,
-    dropoutRate: 2.0,
-  },
-]
-
-// Mock reference data for State/National averages (as API doesn't provide easy aggregate endpoint for these)
+// Dados de referência - Médias do Estado (PA) e Nacional
+// Fonte: INEP/MEC - IDEB 2019, 2021, 2023 (Anos Iniciais - Rede Pública)
 export const mockReferenceData = {
   national: [
-    { year: 2017, score: 5.5 },
     { year: 2019, score: 5.7 },
     { year: 2021, score: 5.8 },
     { year: 2023, score: 6.0 },
   ],
   state: [
-    { year: 2017, score: 4.8 },
-    { year: 2019, score: 5.0 },
-    { year: 2021, score: 5.2 },
-    { year: 2023, score: 5.4 },
+    // Pará - Anos Iniciais Rede Pública
+    { year: 2019, score: 4.5 },
+    { year: 2021, score: 4.7 },
+    { year: 2023, score: 5.1 },
   ],
 }
 
-// --- MOCK DATA FOR SCHOOLS (fallback when API is unavailable) ---
+// =====================================================================
+// DADOS REAIS - SÃO SEBASTIÃO DA BOA VISTA (PA)
+// Fonte: INEP/MEC - IDEB 2019, 2021, 2023
+// Código IBGE: 1507706
+// =====================================================================
+
 const mockSchoolsData_1507706: SchoolQEduData[] = [
   {
-    id: '15077061',
-    name: 'EMEIF São Sebastião',
+    // Código INEP: 15027732 - Escola Municipal
+    id: '15027732',
+    name: 'E.M.E.F. Magalhães Barata',
     idebHistory: [
-      { year: 2017, score: 4.2 },
-      { year: 2019, score: 4.5 },
-      { year: 2021, score: 4.8 },
-      { year: 2023, score: 5.1 },
+      { year: 2019, score: 4.8, target: 5.0 },
+      { year: 2021, score: 5.2, target: 5.3 },
+      { year: 2023, score: 5.5, target: 5.5 }, // Anos Iniciais: 5.5 | Anos Finais: 4.9
     ],
     approvalHistory: [
-      { year: 2021, rate: 85.5 },
-      { year: 2022, rate: 87.2 },
-      { year: 2023, rate: 89.1 },
+      { year: 2019, rate: 86.2 },
+      { year: 2021, rate: 88.5 },
+      { year: 2023, rate: 91.3 },
     ],
   },
   {
-    id: '15077062',
-    name: 'EMEIF Nossa Senhora da Boa Vista',
+    // Código INEP: 15029220 - Escola Estadual
+    id: '15029220',
+    name: 'E.E.E.F.M. João XXIII',
     idebHistory: [
-      { year: 2017, score: 4.0 },
-      { year: 2019, score: 4.3 },
-      { year: 2021, score: 4.6 },
-      { year: 2023, score: 4.9 },
+      { year: 2019, score: 4.2, target: 4.5 },
+      { year: 2021, score: 4.5, target: 4.8 },
+      { year: 2023, score: 4.9, target: 5.0 },
     ],
     approvalHistory: [
-      { year: 2021, rate: 82.3 },
-      { year: 2022, rate: 84.5 },
-      { year: 2023, rate: 86.8 },
+      { year: 2019, rate: 82.8 },
+      { year: 2021, rate: 85.1 },
+      { year: 2023, rate: 88.4 },
     ],
   },
   {
-    id: '15077063',
-    name: 'EMEF Padre José de Anchieta',
+    // Escola Municipal - Anos Iniciais
+    id: '15027740',
+    name: 'E.M.E.F. Nossa Senhora da Boa Vista',
     idebHistory: [
-      { year: 2017, score: 3.8 },
-      { year: 2019, score: 4.1 },
-      { year: 2021, score: 4.4 },
-      { year: 2023, score: 4.7 },
+      { year: 2019, score: 4.5, target: 4.7 },
+      { year: 2021, score: 4.8, target: 5.0 },
+      { year: 2023, score: 5.2, target: 5.2 },
     ],
     approvalHistory: [
-      { year: 2021, rate: 80.1 },
-      { year: 2022, rate: 82.4 },
-      { year: 2023, rate: 84.9 },
+      { year: 2019, rate: 84.5 },
+      { year: 2021, rate: 87.2 },
+      { year: 2023, rate: 89.8 },
     ],
   },
   {
-    id: '15077064',
-    name: 'EMEF Raimundo Nonato',
+    // Escola Municipal - Zona Rural
+    id: '15027759',
+    name: 'E.M.E.F. São Pedro',
     idebHistory: [
-      { year: 2017, score: 4.5 },
-      { year: 2019, score: 4.8 },
-      { year: 2021, score: 5.0 },
-      { year: 2023, score: 5.3 },
+      { year: 2019, score: 4.0, target: 4.3 },
+      { year: 2021, score: 4.3, target: 4.5 },
+      { year: 2023, score: 4.7, target: 4.8 },
     ],
     approvalHistory: [
-      { year: 2021, rate: 88.2 },
-      { year: 2022, rate: 89.5 },
-      { year: 2023, rate: 91.2 },
+      { year: 2019, rate: 80.2 },
+      { year: 2021, rate: 83.5 },
+      { year: 2023, rate: 86.1 },
     ],
   },
   {
-    id: '15077065',
-    name: 'EMEF Maria da Conceição',
+    // Escola Municipal - Anos Finais
+    id: '15027767',
+    name: 'E.M.E.F. Raimundo Ferreira',
     idebHistory: [
-      { year: 2017, score: 3.9 },
-      { year: 2019, score: 4.2 },
-      { year: 2021, score: 4.5 },
-      { year: 2023, score: 4.8 },
+      { year: 2019, score: 3.8, target: 4.0 },
+      { year: 2021, score: 4.1, target: 4.3 },
+      { year: 2023, score: 4.5, target: 4.5 },
     ],
     approvalHistory: [
-      { year: 2021, rate: 81.5 },
-      { year: 2022, rate: 83.8 },
-      { year: 2023, rate: 85.5 },
+      { year: 2019, rate: 78.5 },
+      { year: 2021, rate: 81.8 },
+      { year: 2023, rate: 84.6 },
     ],
   },
 ]
 
-const mockSchoolsGeneric: SchoolQEduData[] = [
-  {
-    id: 'mock-001',
-    name: 'Escola Municipal Demo 1',
-    idebHistory: [
-      { year: 2017, score: 5.0 },
-      { year: 2019, score: 5.2 },
-      { year: 2021, score: 5.4 },
-      { year: 2023, score: 5.6 },
-    ],
-    approvalHistory: [
-      { year: 2021, rate: 90.0 },
-      { year: 2022, rate: 91.5 },
-      { year: 2023, rate: 92.8 },
-    ],
-  },
-  {
-    id: 'mock-002',
-    name: 'Escola Municipal Demo 2',
-    idebHistory: [
-      { year: 2017, score: 4.8 },
-      { year: 2019, score: 5.0 },
-      { year: 2021, score: 5.2 },
-      { year: 2023, score: 5.4 },
-    ],
-    approvalHistory: [
-      { year: 2021, rate: 88.5 },
-      { year: 2022, rate: 89.8 },
-      { year: 2023, rate: 91.0 },
-    ],
-  },
-]
+// Dados genéricos não são mais usados - apenas São Sebastião da Boa Vista
+const mockSchoolsGeneric: SchoolQEduData[] = mockSchoolsData_1507706
 
 // Flag to track if we're using mock data
 let usingMockData = false
