@@ -55,7 +55,6 @@ import EvaluationRulesList from './pages/academic/EvaluationRulesList'
 import AssessmentTypesList from './pages/academic/AssessmentTypesList'
 import DigitalClassDiary from './pages/academic/DigitalClassDiary'
 import LessonPlanning from './pages/academic/LessonPlanning'
-import ClassCouncil from './pages/academic/ClassCouncil'
 import NotFound from './pages/NotFound'
 import Layout from './components/Layout'
 import PublicLayout from './components/PublicLayout'
@@ -96,7 +95,6 @@ import { ProtocolProvider } from './stores/useProtocolStore'
 import { NotificationProvider } from './stores/useNotificationStore'
 import { AppointmentProvider } from './stores/useAppointmentStore'
 import { QueueProvider } from './stores/useQueueStore'
-import { CouncilProvider } from './stores/useCouncilStore'
 import { AttachmentProvider } from './stores/useAttachmentStore'
 import { StaffProvider } from './stores/useStaffStore'
 
@@ -121,7 +119,6 @@ const App = () => (
                                     <NotificationProvider>
                                       <AppointmentProvider>
                                         <QueueProvider>
-                                          <CouncilProvider>
                                             <AttachmentProvider>
                                                 <StaffProvider>
                                                   <BrowserRouter
@@ -305,10 +302,6 @@ const App = () => (
                                         path="/academico/planejamento"
                                         element={<LessonPlanning />}
                                       />
-                                      <Route
-                                        path="/academico/conselho-classe"
-                                        element={<ClassCouncil />}
-                                      />
 
                                       {/* Calendar */}
                                       <Route
@@ -450,7 +443,6 @@ const App = () => (
                                                 </BrowserRouter>
                                               </StaffProvider>
                                           </AttachmentProvider>
-                                        </CouncilProvider>
                                       </QueueProvider>
                                     </AppointmentProvider>
                                   </NotificationProvider>

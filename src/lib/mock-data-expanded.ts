@@ -13,7 +13,6 @@ import {
   AttendanceRecord,
   Occurrence,
   Staff,
-  ClassCouncil,
   StudentTransfer,
   DocumentAttachment,
   Protocol,

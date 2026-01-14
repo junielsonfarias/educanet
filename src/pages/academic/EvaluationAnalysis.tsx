@@ -42,7 +42,7 @@ import { useToast } from '@/hooks/use-toast'
 export default function EvaluationAnalysis() {
   const { students } = useStudentStore()
   const { schools } = useSchoolStore()
-  const { assessments, assessmentTypes } = useAssessmentStore()
+  const { assessments = [], assessmentTypes = [] } = useAssessmentStore()
   const { etapasEnsino } = useCourseStore()
   const { toast } = useToast()
 

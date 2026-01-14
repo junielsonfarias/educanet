@@ -10,10 +10,12 @@ import { handleSupabaseError } from '../helpers';
 
 export interface SettingsData {
   key: string;
-  value: string | number | boolean | Record<string, unknown>;
+  value: string | number | boolean | Record<string, unknown> | null;
   category?: string;
   description?: string;
 }
+
+export type SettingValue = string | number | boolean | Record<string, unknown> | null;
 
 class SettingsService extends BaseService {
   constructor() {
@@ -22,85 +24,97 @@ class SettingsService extends BaseService {
 
   /**
    * Buscar configuração por chave
+   * NOTA: A coluna "key" é palavra reservada no PostgreSQL
    */
-  async getByKey(key: string): Promise<any> {
+  async getByKey(keyName: string): Promise<Record<string, unknown> | null> {
     try {
       const { data, error } = await supabase
         .from('system_settings')
-        .select('*')
-        .eq('key', key)
+        .select('id, key, value, category, description, created_at, updated_at')
+        .eq('key', keyName)
         .is('deleted_at', null)
-        .single();
+        .maybeSingle();
 
       if (error) {
+        // PGRST116 = no rows returned (não é erro)
         if (error.code === 'PGRST116') return null;
-        throw handleSupabaseError(error);
+        console.warn('Error fetching setting by key:', error);
+        return null;
       }
 
       return data;
     } catch (error) {
       console.error('Error in SettingsService.getByKey:', error);
-      throw error;
+      return null;
     }
   }
 
   /**
    * Buscar configurações por categoria
    */
-  async getByCategory(category: string): Promise<any[]> {
+  async getByCategory(category: string): Promise<Record<string, unknown>[]> {
     try {
       const { data, error } = await supabase
         .from('system_settings')
-        .select('*')
+        .select('id, key, value, category, description, created_at, updated_at')
         .eq('category', category)
         .is('deleted_at', null)
         .order('key', { ascending: true });
 
-      if (error) throw handleSupabaseError(error);
+      if (error) {
+        console.warn('Error fetching settings by category:', error);
+        return [];
+      }
       return data || [];
     } catch (error) {
       console.error('Error in SettingsService.getByCategory:', error);
-      throw error;
+      return [];
     }
   }
 
   /**
    * Buscar todas as configurações
    */
-  async getAllSettings(): Promise<Record<string, any>> {
+  async getAllSettings(): Promise<Record<string, unknown>> {
     try {
       const { data, error } = await supabase
         .from('system_settings')
-        .select('*')
+        .select('id, key, value, category, description')
         .is('deleted_at', null);
 
-      if (error) throw handleSupabaseError(error);
+      if (error) {
+        console.warn('Error fetching all settings:', error);
+        // Retornar objeto vazio em vez de lançar erro
+        return {};
+      }
 
       // Converter array em objeto {key: value}
-      const settings: Record<string, any> = {};
+      const settings: Record<string, unknown> = {};
       (data || []).forEach((setting: Record<string, unknown>) => {
-        settings[setting.key] = setting.value;
+        const key = setting.key as string;
+        settings[key] = setting.value;
       });
 
       return settings;
     } catch (error) {
       console.error('Error in SettingsService.getAllSettings:', error);
-      throw error;
+      // Retornar objeto vazio em caso de erro para não quebrar a UI
+      return {};
     }
   }
 
   /**
    * Salvar ou atualizar configuração
    */
-  async setSetting(key: string, value: string | number | boolean | Record<string, unknown>, options?: {
+  async setSetting(keyName: string, value: string | number | boolean | Record<string, unknown> | null, options?: {
     category?: string;
     description?: string;
-  }): Promise<any> {
+  }): Promise<Record<string, unknown> | null> {
     try {
       const { data: { user } } = await supabase.auth.getUser();
 
       // Verificar se já existe
-      const existing = await this.getByKey(key);
+      const existing = await this.getByKey(keyName);
 
       if (existing) {
         // Atualizar
@@ -110,29 +124,36 @@ class SettingsService extends BaseService {
             value,
             category: options?.category,
             description: options?.description,
-            updated_by: user?.id || 1
+            updated_by: user?.id || null
           })
-          .eq('key', key)
-          .select()
-          .single();
+          .eq('key', keyName)
+          .is('deleted_at', null)
+          .select('id, key, value, category, description')
+          .maybeSingle();
 
-        if (error) throw handleSupabaseError(error);
+        if (error) {
+          console.error('Error updating setting:', error);
+          throw handleSupabaseError(error);
+        }
         return data;
       } else {
-        // Criar
+        // Criar nova configuração
         const { data, error } = await supabase
           .from('system_settings')
           .insert({
-            key,
+            key: keyName,
             value,
             category: options?.category,
             description: options?.description,
-            created_by: user?.id || 1
+            created_by: user?.id || null
           })
-          .select()
-          .single();
+          .select('id, key, value, category, description')
+          .maybeSingle();
 
-        if (error) throw handleSupabaseError(error);
+        if (error) {
+          console.error('Error inserting setting:', error);
+          throw handleSupabaseError(error);
+        }
         return data;
       }
     } catch (error) {
@@ -144,10 +165,10 @@ class SettingsService extends BaseService {
   /**
    * Salvar múltiplas configurações
    */
-  async setMultiple(settings: Record<string, any>, category?: string): Promise<void> {
+  async setMultiple(settings: Record<string, string | number | boolean | Record<string, unknown> | null>, category?: string): Promise<void> {
     try {
-      const promises = Object.entries(settings).map(([key, value]) =>
-        this.setSetting(key, value, { category })
+      const promises = Object.entries(settings).map(([keyName, value]) =>
+        this.setSetting(keyName, value, { category })
       );
 
       await Promise.all(promises);
@@ -158,16 +179,20 @@ class SettingsService extends BaseService {
   }
 
   /**
-   * Deletar configuração
+   * Deletar configuração (soft delete)
    */
-  async deleteSetting(key: string): Promise<void> {
+  async deleteSetting(keyName: string): Promise<void> {
     try {
       const { error } = await supabase
         .from('system_settings')
         .update({ deleted_at: new Date().toISOString() })
-        .eq('key', key);
+        .eq('key', keyName)
+        .is('deleted_at', null);
 
-      if (error) throw handleSupabaseError(error);
+      if (error) {
+        console.error('Error deleting setting:', error);
+        throw handleSupabaseError(error);
+      }
     } catch (error) {
       console.error('Error in SettingsService.deleteSetting:', error);
       throw error;

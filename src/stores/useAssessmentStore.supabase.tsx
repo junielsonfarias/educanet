@@ -7,7 +7,9 @@
 
 import { create } from 'zustand';
 import { gradeService } from '@/lib/supabase/services/grade-service';
+import { assessmentTypeService } from '@/lib/supabase/services/assessment-type-service';
 import type { GradeData } from '@/lib/supabase/services/grade-service';
+import type { AssessmentType as AssessmentTypeDB, AssessmentTypeCreateData, AssessmentTypeUpdateData } from '@/lib/supabase/services/assessment-type-service';
 import { toast } from 'sonner';
 
 interface Grade {
@@ -33,9 +35,12 @@ interface AssessmentState {
   grades: Grade[];
   studentGrades: StudentGrade[];
   currentGrade: Grade | null;
+  assessmentTypes: AssessmentTypeDB[];
+  assessments: Record<string, unknown>[];
   loading: boolean;
+  loadingTypes: boolean;
   error: string | null;
-  
+
   // Ações - Notas
   fetchGrades: (options?: {
     classId?: number;
@@ -50,28 +55,37 @@ interface AssessmentState {
     evaluationId?: number;
     subjectId?: number;
   }) => Promise<void>;
-  
-  // CRUD
+
+  // CRUD Notas
   saveGrade: (data: GradeData) => Promise<Grade | null>;
   updateGrade: (id: number, data: Partial<GradeData>) => Promise<Grade | null>;
   deleteGrade: (id: number) => Promise<void>;
-  
+
   // Lançamento em lote
   saveGradeBatch: (grades: GradeData[]) => Promise<void>;
-  
+
   // Médias e cálculos
   calculateAverage: (studentId: number, subjectId: number, periodId?: number) => Promise<number>;
   calculateClassAverage: (classId: number, evaluationId: number) => Promise<number>;
-  
+
   // Boletim
-  fetchReportCard: (studentId: number, periodId: number) => Promise<any>;
-  
+  fetchReportCard: (studentId: number, periodId: number) => Promise<Record<string, unknown>>;
+
   // Estatísticas
   fetchStats: (options?: {
     classId?: number;
     periodId?: number;
-  }) => Promise<any>;
-  
+  }) => Promise<Record<string, unknown>>;
+
+  // ==================== TIPOS DE AVALIAÇÃO ====================
+  fetchAssessmentTypes: (options?: {
+    schoolId?: number;
+    courseId?: number;
+  }) => Promise<void>;
+  createAssessmentType: (data: AssessmentTypeCreateData) => Promise<AssessmentTypeDB | null>;
+  updateAssessmentType: (id: number, data: AssessmentTypeUpdateData) => Promise<AssessmentTypeDB | null>;
+  deleteAssessmentType: (id: number) => Promise<void>;
+
   // Utilitários
   clearError: () => void;
   setCurrentGrade: (grade: Grade | null) => void;
@@ -82,7 +96,10 @@ export const useAssessmentStore = create<AssessmentState>((set, get) => ({
   grades: [],
   studentGrades: [],
   currentGrade: null,
+  assessmentTypes: [],
+  assessments: [],
   loading: false,
+  loadingTypes: false,
   error: null,
 
   // ==================== BUSCAR NOTAS ====================
@@ -297,6 +314,75 @@ export const useAssessmentStore = create<AssessmentState>((set, get) => ({
     }
   },
 
+  // ==================== TIPOS DE AVALIAÇÃO ====================
+
+  fetchAssessmentTypes: async (options = {}) => {
+    set({ loadingTypes: true, error: null });
+    try {
+      const types = await assessmentTypeService.getAll(options);
+      set({ assessmentTypes: types, loadingTypes: false });
+    } catch (error: unknown) {
+      const message = (error as Error)?.message || 'Erro ao carregar tipos de avaliação';
+      set({ error: message, loadingTypes: false });
+      toast.error(message);
+    }
+  },
+
+  createAssessmentType: async (data: AssessmentTypeCreateData) => {
+    set({ loadingTypes: true, error: null });
+    try {
+      const created = await assessmentTypeService.create(data);
+      const { assessmentTypes } = get();
+      set({
+        assessmentTypes: [...assessmentTypes, created],
+        loadingTypes: false
+      });
+      toast.success('Tipo de avaliação criado com sucesso!');
+      return created;
+    } catch (error: unknown) {
+      const message = (error as Error)?.message || 'Erro ao criar tipo de avaliação';
+      set({ error: message, loadingTypes: false });
+      toast.error(message);
+      return null;
+    }
+  },
+
+  updateAssessmentType: async (id: number, data: AssessmentTypeUpdateData) => {
+    set({ loadingTypes: true, error: null });
+    try {
+      const updated = await assessmentTypeService.update(id, data);
+      const { assessmentTypes } = get();
+      set({
+        assessmentTypes: assessmentTypes.map(t => t.id === id ? updated : t),
+        loadingTypes: false
+      });
+      toast.success('Tipo de avaliação atualizado com sucesso!');
+      return updated;
+    } catch (error: unknown) {
+      const message = (error as Error)?.message || 'Erro ao atualizar tipo de avaliação';
+      set({ error: message, loadingTypes: false });
+      toast.error(message);
+      return null;
+    }
+  },
+
+  deleteAssessmentType: async (id: number) => {
+    set({ loadingTypes: true, error: null });
+    try {
+      await assessmentTypeService.delete(id);
+      const { assessmentTypes } = get();
+      set({
+        assessmentTypes: assessmentTypes.filter(t => t.id !== id),
+        loadingTypes: false
+      });
+      toast.success('Tipo de avaliação excluído com sucesso!');
+    } catch (error: unknown) {
+      const message = (error as Error)?.message || 'Erro ao excluir tipo de avaliação';
+      set({ error: message, loadingTypes: false });
+      toast.error(message);
+    }
+  },
+
   // ==================== UTILITÁRIOS ====================
 
   clearError: () => set({ error: null }),
@@ -306,4 +392,5 @@ export const useAssessmentStore = create<AssessmentState>((set, get) => ({
 
 // Exportar tipos para uso em componentes
 export type { AssessmentState, Grade, StudentGrade };
+export type { AssessmentTypeDB as AssessmentType } from '@/lib/supabase/services/assessment-type-service';
 

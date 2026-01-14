@@ -47,6 +47,31 @@ interface CourseStats {
   coursesByLevel: Record<string, number>;
 }
 
+interface SerieAno {
+  id: number;
+  name: string;
+  numero?: number;
+  evaluationRuleId?: string;
+  subjects?: SubjectItem[];
+}
+
+interface SubjectItem {
+  id: number;
+  name: string;
+  workload: number;
+}
+
+interface SerieAnoFormData {
+  name?: string;
+  numero?: number;
+  evaluationRuleId?: string;
+}
+
+interface SubjectFormData {
+  name?: string;
+  workload?: number;
+}
+
 interface CourseState {
   // Estado
   courses: Course[];
@@ -71,6 +96,17 @@ interface CourseState {
 
   // Turmas do curso
   fetchCourseClasses: (courseId: number, options?: FetchOptions) => Promise<Record<string, unknown>[]>;
+
+  // Ações - Séries/Anos
+  addSerieAno: (courseId: number, data: SerieAnoFormData) => Promise<void>;
+  updateSerieAno: (courseId: number, serieId: number, data: SerieAnoFormData) => Promise<void>;
+  deleteSerieAno: (courseId: number, serieId: number) => Promise<void>;
+  fetchSeriesWithSubjects: (courseId: number) => Promise<SerieAno[]>;
+
+  // Ações - Disciplinas em Séries
+  addSubjectToSeries: (courseId: number, serieId: number, data: SubjectFormData) => Promise<void>;
+  updateSubjectInSeries: (courseId: number, serieId: number, subjectId: number, data: SubjectFormData) => Promise<void>;
+  removeSubjectFromSeries: (courseId: number, serieId: number, subjectId: number) => Promise<void>;
 
   // Ações - Disciplinas
   fetchSubjects: () => Promise<void>;
@@ -261,6 +297,137 @@ export const useCourseStore = create<CourseState>((set, get) => ({
       const message = (error as Error)?.message || 'Erro ao carregar turmas do curso';
       console.error('Toast:',message);
       return [];
+    }
+  },
+
+  // ==================== SÉRIES/ANOS ====================
+
+  addSerieAno: async (courseId: number, data: SerieAnoFormData) => {
+    set({ loading: true, error: null });
+    try {
+      await courseService.addSeries(courseId, {
+        name: data.name || '',
+        numero: data.numero,
+        evaluationRuleId: data.evaluationRuleId
+      });
+
+      // Recarregar dados do curso
+      await get().fetchCourses();
+      set({ loading: false });
+
+      console.log('Toast:', 'Série/Ano adicionada com sucesso!');
+    } catch (error: unknown) {
+      const message = (error as Error)?.message || 'Erro ao adicionar série/ano';
+      set({ error: message, loading: false });
+      console.error('Toast:', message);
+    }
+  },
+
+  updateSerieAno: async (_courseId: number, serieId: number, data: SerieAnoFormData) => {
+    set({ loading: true, error: null });
+    try {
+      await courseService.updateSeries(serieId, {
+        name: data.name,
+        numero: data.numero,
+        evaluationRuleId: data.evaluationRuleId
+      });
+
+      // Recarregar dados do curso
+      await get().fetchCourses();
+      set({ loading: false });
+
+      console.log('Toast:', 'Série/Ano atualizada com sucesso!');
+    } catch (error: unknown) {
+      const message = (error as Error)?.message || 'Erro ao atualizar série/ano';
+      set({ error: message, loading: false });
+      console.error('Toast:', message);
+    }
+  },
+
+  deleteSerieAno: async (_courseId: number, serieId: number) => {
+    set({ loading: true, error: null });
+    try {
+      await courseService.deleteSeries(serieId);
+
+      // Recarregar dados
+      await get().fetchCourses();
+      set({ loading: false });
+
+      console.log('Toast:', 'Série/Ano removida com sucesso!');
+    } catch (error: unknown) {
+      const message = (error as Error)?.message || 'Erro ao remover série/ano';
+      set({ error: message, loading: false });
+      console.error('Toast:', message);
+    }
+  },
+
+  fetchSeriesWithSubjects: async (courseId: number) => {
+    try {
+      const result = await courseService.getCourseSeriesWithSubjects(courseId);
+      return result.seriesAnos;
+    } catch (error: unknown) {
+      const message = (error as Error)?.message || 'Erro ao carregar séries';
+      console.error('Toast:', message);
+      return [];
+    }
+  },
+
+  // ==================== DISCIPLINAS EM SÉRIES ====================
+
+  addSubjectToSeries: async (courseId: number, serieId: number, data: SubjectFormData) => {
+    set({ loading: true, error: null });
+    try {
+      await courseService.addSubjectToSeries(courseId, serieId, {
+        name: data.name || '',
+        workload: data.workload
+      });
+
+      // Recarregar dados
+      await get().fetchCourses();
+      set({ loading: false });
+
+      console.log('Toast:', 'Disciplina adicionada à série!');
+    } catch (error: unknown) {
+      const message = (error as Error)?.message || 'Erro ao adicionar disciplina';
+      set({ error: message, loading: false });
+      console.error('Toast:', message);
+    }
+  },
+
+  updateSubjectInSeries: async (_courseId: number, _serieId: number, subjectId: number, data: SubjectFormData) => {
+    set({ loading: true, error: null });
+    try {
+      await courseService.updateSubjectInSeries(subjectId, {
+        name: data.name,
+        workload: data.workload
+      });
+
+      // Recarregar dados
+      await get().fetchCourses();
+      set({ loading: false });
+
+      console.log('Toast:', 'Disciplina atualizada!');
+    } catch (error: unknown) {
+      const message = (error as Error)?.message || 'Erro ao atualizar disciplina';
+      set({ error: message, loading: false });
+      console.error('Toast:', message);
+    }
+  },
+
+  removeSubjectFromSeries: async (_courseId: number, _serieId: number, subjectId: number) => {
+    set({ loading: true, error: null });
+    try {
+      await courseService.removeSubjectFromSeries(subjectId);
+
+      // Recarregar dados
+      await get().fetchCourses();
+      set({ loading: false });
+
+      console.log('Toast:', 'Disciplina removida da série!');
+    } catch (error: unknown) {
+      const message = (error as Error)?.message || 'Erro ao remover disciplina';
+      set({ error: message, loading: false });
+      console.error('Toast:', message);
     }
   },
 

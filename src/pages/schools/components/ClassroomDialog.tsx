@@ -18,13 +18,6 @@ import {
   FormMessage,
   FormDescription,
 } from '@/components/ui/form'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
@@ -38,14 +31,15 @@ import {
   safeMap,
   safeFlatMap,
 } from '@/lib/array-utils'
+import { cn } from '@/lib/utils'
 
 const classroomSchema = z.object({
   name: z.string().min(2, 'Nome da turma obrigatório'),
   acronym: z.string().optional(),
   shift: z.enum(['Matutino', 'Vespertino', 'Noturno', 'Integral']),
-  etapaEnsinoId: z.string().min(1, 'Etapa de Ensino obrigatória'), // NOVO: Campo obrigatório do Censo
-  serieAnoId: z.string().optional(), // NOVO: Preferencial
-  gradeId: z.string().optional(), // Mantido para compatibilidade
+  etapaEnsinoId: z.string().min(1, 'Etapa de Ensino obrigatória'),
+  serieAnoId: z.string().optional(),
+  gradeId: z.string().optional(),
   operatingHours: z.string().optional(),
   minStudents: z.coerce.number().min(0).optional(),
   maxDependencySubjects: z.coerce.number().min(0).optional(),
@@ -71,18 +65,28 @@ const classroomSchema = z.object({
         message: validateTipoRegimeCode(val || '').error || 'Código de tipo de regime inválido',
       }),
     ),
-  // Context fields for when created from list
   schoolId: z.string().optional(),
   yearId: z.string().optional(),
 })
+
+interface SerieAno {
+  id: string
+  name: string
+  numero?: number
+}
 
 interface ClassroomDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   onSubmit: (data: Record<string, unknown>) => void
-  etapasEnsino?: any[] // Etapas de ensino (opcional, pode ser carregado do Supabase)
-  schools?: School[] // Optional, used when creating from ClassesList
-  initialData?: any // For editing
+  etapasEnsino?: Array<{
+    id: string
+    name: string
+    codigoCenso?: string
+    seriesAnos?: SerieAno[]
+  }>
+  schools?: School[]
+  initialData?: Record<string, unknown>
 }
 
 const daysOfWeek = [
@@ -94,6 +98,15 @@ const daysOfWeek = [
   { id: 'sab', label: 'Sábado' },
 ]
 
+// Classe CSS para selects nativos (mesmo estilo do shadcn/ui)
+const selectClassName = cn(
+  'flex h-10 w-full items-center justify-between rounded-md border border-input',
+  'bg-background px-3 py-2 text-sm ring-offset-background',
+  'focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary/50',
+  'transition-all duration-200 hover:border-primary/30',
+  'disabled:cursor-not-allowed disabled:opacity-50'
+)
+
 export function ClassroomDialog({
   open,
   onOpenChange,
@@ -103,16 +116,16 @@ export function ClassroomDialog({
   initialData,
 }: ClassroomDialogProps) {
   const { teachers, loading: teachersLoading, fetchTeachers } = useTeacherStore()
-  
+
   const etapasEnsino = etapasEnsinoProp || []
-  
+
   // Carregar professores se necessário
   useEffect(() => {
     if (open && teachers.length === 0 && !teachersLoading) {
       fetchTeachers()
     }
   }, [open, teachers.length, teachersLoading, fetchTeachers])
-  
+
   const form = useForm<z.infer<typeof classroomSchema>>({
     resolver: zodResolver(classroomSchema),
     defaultValues: {
@@ -133,11 +146,11 @@ export function ClassroomDialog({
     },
   })
 
-  // Flatten seriesAnos from etapasEnsino com referência à etapa (memoizado para evitar recálculos)
+  // Flatten seriesAnos from etapasEnsino com referência à etapa (memoizado)
   const flattenGrades = useMemo(
     () =>
       safeFlatMap(etapasEnsino, (etapa) =>
-        safeMap(etapa.seriesAnos, (s: any) => ({
+        safeMap(etapa.seriesAnos, (s: SerieAno) => ({
           ...s,
           courseName: etapa.name,
           etapaEnsinoId: etapa.id,
@@ -150,37 +163,30 @@ export function ClassroomDialog({
   useEffect(() => {
     if (open) {
       if (initialData) {
-        // Tenta encontrar a etapa de ensino baseado no gradeId/serieAnoId
-        const serieAnoId = initialData.serieAnoId || initialData.gradeId
+        const serieAnoId = (initialData.serieAnoId || initialData.gradeId) as string | undefined
         const etapaEnsinoIdFromSerieAno =
           serieAnoId && flattenGrades.length > 0
             ? flattenGrades.find((s) => s.id === serieAnoId)?.etapaEnsinoId || ''
             : ''
 
         form.reset({
-          name: initialData.name,
-          acronym: initialData.acronym || '',
-          shift: initialData.shift,
-          etapaEnsinoId: initialData.etapaEnsinoId || etapaEnsinoIdFromSerieAno,
-          serieAnoId: initialData.serieAnoId || initialData.gradeId || '',
-          gradeId: initialData.gradeId || initialData.serieAnoId || '',
-          operatingHours: initialData.operatingHours || '',
-          minStudents: initialData.minStudents || 0,
-          maxDependencySubjects: initialData.maxDependencySubjects || 0,
-          operatingDays: initialData.operatingDays || [
-            'seg',
-            'ter',
-            'qua',
-            'qui',
-            'sex',
-          ],
-          isMultiGrade: initialData.isMultiGrade || false,
-          maxCapacity: initialData.maxCapacity || 30,
-          regentTeacherId: initialData.regentTeacherId || '',
-          educationModality: initialData.educationModality || '',
-          tipoRegime: initialData.tipoRegime || '',
-          schoolId: initialData.schoolId || '',
-          yearId: initialData.yearId || '',
+          name: initialData.name as string || '',
+          acronym: initialData.acronym as string || '',
+          shift: (initialData.shift as 'Matutino' | 'Vespertino' | 'Noturno' | 'Integral') || 'Matutino',
+          etapaEnsinoId: (initialData.etapaEnsinoId as string) || etapaEnsinoIdFromSerieAno,
+          serieAnoId: (initialData.serieAnoId || initialData.gradeId) as string || '',
+          gradeId: (initialData.gradeId || initialData.serieAnoId) as string || '',
+          operatingHours: initialData.operatingHours as string || '',
+          minStudents: (initialData.minStudents as number) || 0,
+          maxDependencySubjects: (initialData.maxDependencySubjects as number) || 0,
+          operatingDays: (initialData.operatingDays as string[]) || ['seg', 'ter', 'qua', 'qui', 'sex'],
+          isMultiGrade: (initialData.isMultiGrade as boolean) || false,
+          maxCapacity: (initialData.maxCapacity as number) || 30,
+          regentTeacherId: initialData.regentTeacherId as string || '',
+          educationModality: initialData.educationModality as string || '',
+          tipoRegime: initialData.tipoRegime as string || '',
+          schoolId: initialData.schoolId as string || '',
+          yearId: initialData.yearId as string || '',
         })
       } else {
         form.reset({
@@ -213,12 +219,13 @@ export function ClassroomDialog({
   const selectedSchool = schools?.find((s) => s.id === selectedSchoolId)
   const academicYears = selectedSchool?.academicYears || []
 
-  // Filtra séries/anos baseado na etapa de ensino selecionada (memoizado para evitar recálculos)
+  // Filtra séries/anos baseado na etapa de ensino selecionada (memoizado)
   const selectedEtapa = useMemo(
     () => safeFind(etapasEnsino, (e) => e.id === selectedEtapaEnsinoId),
     [etapasEnsino, selectedEtapaEnsinoId],
   )
-  // Ordena séries/anos por número (campo numero) se disponível (memoizado)
+
+  // Ordena séries/anos por número se disponível (memoizado)
   const availableSeriesAnos = useMemo(() => {
     if (!selectedEtapa || !Array.isArray(selectedEtapa.seriesAnos)) {
       return []
@@ -256,7 +263,7 @@ export function ClassroomDialog({
     const selectedGrade = serieAnoId
       ? flattenGrades.find((g) => g.id === serieAnoId)
       : null
-    const selectedEtapa = safeFind(etapasEnsino, (e) => e.id === data.etapaEnsinoId)
+    const selectedEtapaData = safeFind(etapasEnsino, (e) => e.id === data.etapaEnsinoId)
 
     // Validação: série/ano deve pertencer à etapa de ensino selecionada
     if (selectedGrade && selectedGrade.etapaEnsinoId !== data.etapaEnsinoId) {
@@ -272,12 +279,11 @@ export function ClassroomDialog({
       ...data,
       serieAnoId: serieAnoId || undefined,
       serieAnoName: selectedGrade ? selectedGrade.name : isMultiGrade ? 'Multissérie' : undefined,
-      etapaEnsinoName: selectedEtapa ? selectedEtapa.name : '',
-      etapaEnsinoCodigo: selectedEtapa ? selectedEtapa.codigoCenso : '',
-      // Mantém campos legados para compatibilidade
+      etapaEnsinoName: selectedEtapaData ? selectedEtapaData.name : '',
+      etapaEnsinoCodigo: selectedEtapaData ? selectedEtapaData.codigoCenso : '',
       gradeId: serieAnoId || undefined,
       gradeName: selectedGrade ? selectedGrade.name : isMultiGrade ? 'Multissérie' : undefined,
-      studentCount: initialData?.studentCount || 0,
+      studentCount: (initialData?.studentCount as number) || 0,
     }
 
     onSubmit(submitData)
@@ -309,25 +315,22 @@ export function ClassroomDialog({
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Escola</FormLabel>
-                      <Select
-                        onValueChange={field.onChange}
-                        defaultValue={field.value}
-                      >
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Selecione..." />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
+                      <FormControl>
+                        <select
+                          className={selectClassName}
+                          value={field.value || ''}
+                          onChange={(e) => field.onChange(e.target.value)}
+                        >
+                          <option value="">Selecione...</option>
                           {(schools || [])
                             .filter((s) => Boolean(s) && Boolean(s.id) && Boolean(s.name))
                             .map((s) => (
-                              <SelectItem key={s.id} value={s.id}>
+                              <option key={s.id} value={s.id}>
                                 {s.name}
-                              </SelectItem>
+                              </option>
                             ))}
-                        </SelectContent>
-                      </Select>
+                        </select>
+                      </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -338,26 +341,23 @@ export function ClassroomDialog({
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Ano Letivo</FormLabel>
-                      <Select
-                        onValueChange={field.onChange}
-                        defaultValue={field.value}
-                        disabled={!selectedSchoolId}
-                      >
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Selecione..." />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
+                      <FormControl>
+                        <select
+                          className={selectClassName}
+                          value={field.value || ''}
+                          onChange={(e) => field.onChange(e.target.value)}
+                          disabled={!selectedSchoolId}
+                        >
+                          <option value="">Selecione...</option>
                           {academicYears
                             .filter((y) => Boolean(y) && Boolean(y.id) && Boolean(y.name))
                             .map((y) => (
-                              <SelectItem key={y.id} value={y.id}>
+                              <option key={y.id} value={y.id}>
                                 {y.name}
-                              </SelectItem>
+                              </option>
                             ))}
-                        </SelectContent>
-                      </Select>
+                        </select>
+                      </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -401,22 +401,18 @@ export function ClassroomDialog({
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Turno</FormLabel>
-                    <Select
-                      onValueChange={field.onChange}
-                      defaultValue={field.value}
-                    >
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value="Matutino">Matutino</SelectItem>
-                        <SelectItem value="Vespertino">Vespertino</SelectItem>
-                        <SelectItem value="Noturno">Noturno</SelectItem>
-                        <SelectItem value="Integral">Integral</SelectItem>
-                      </SelectContent>
-                    </Select>
+                    <FormControl>
+                      <select
+                        className={selectClassName}
+                        value={field.value}
+                        onChange={(e) => field.onChange(e.target.value)}
+                      >
+                        <option value="Matutino">Matutino</option>
+                        <option value="Vespertino">Vespertino</option>
+                        <option value="Noturno">Noturno</option>
+                        <option value="Integral">Integral</option>
+                      </select>
+                    </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -450,30 +446,27 @@ export function ClassroomDialog({
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Etapa de Ensino *</FormLabel>
-                  <Select
-                    onValueChange={(value) => {
-                      field.onChange(value)
-                      // Limpa a seleção de série/ano quando muda a etapa
-                      form.setValue('serieAnoId', '')
-                      form.setValue('gradeId', '')
-                    }}
-                    defaultValue={field.value}
-                  >
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Selecione a Etapa de Ensino..." />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
+                  <FormControl>
+                    <select
+                      className={selectClassName}
+                      value={field.value || ''}
+                      onChange={(e) => {
+                        field.onChange(e.target.value)
+                        // Limpa a seleção de série/ano quando muda a etapa
+                        form.setValue('serieAnoId', '')
+                        form.setValue('gradeId', '')
+                      }}
+                    >
+                      <option value="">Selecione a Etapa de Ensino...</option>
                       {(etapasEnsino || [])
                         .filter((e) => Boolean(e) && Boolean(e.id) && Boolean(e.name))
                         .map((etapa) => (
-                          <SelectItem key={etapa.id} value={etapa.id}>
+                          <option key={etapa.id} value={etapa.id}>
                             {etapa.name} {etapa.codigoCenso && `(Código: ${etapa.codigoCenso})`}
-                          </SelectItem>
+                          </option>
                         ))}
-                    </SelectContent>
-                  </Select>
+                    </select>
+                  </FormControl>
                   <FormDescription>
                     Etapa de ensino conforme Censo Escolar (obrigatório)
                   </FormDescription>
@@ -493,28 +486,27 @@ export function ClassroomDialog({
                       ? 'Série Principal (Referência)'
                       : 'Série/Ano'}
                   </FormLabel>
-                  <Select
-                    onValueChange={(value) => {
-                      field.onChange(value)
-                      // Mantém compatibilidade com gradeId
-                      form.setValue('gradeId', value)
-                    }}
-                    defaultValue={field.value || form.watch('gradeId')}
-                    disabled={!selectedEtapaEnsinoId}
-                  >
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder={selectedEtapaEnsinoId ? "Selecione..." : "Selecione primeiro a Etapa de Ensino"} />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
+                  <FormControl>
+                    <select
+                      className={selectClassName}
+                      value={field.value || form.watch('gradeId') || ''}
+                      onChange={(e) => {
+                        field.onChange(e.target.value)
+                        // Mantém compatibilidade com gradeId
+                        form.setValue('gradeId', e.target.value)
+                      }}
+                      disabled={!selectedEtapaEnsinoId}
+                    >
+                      <option value="">
+                        {selectedEtapaEnsinoId ? "Selecione..." : "Selecione primeiro a Etapa de Ensino"}
+                      </option>
                       {availableSeriesAnos.map((serieAno) => (
-                        <SelectItem key={serieAno.id} value={serieAno.id}>
+                        <option key={serieAno.id} value={serieAno.id}>
                           {serieAno.name}
-                        </SelectItem>
+                        </option>
                       ))}
-                    </SelectContent>
-                  </Select>
+                    </select>
+                  </FormControl>
                   <FormDescription>
                     Série ou ano escolar da turma
                   </FormDescription>
@@ -587,23 +579,20 @@ export function ClassroomDialog({
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Modalidade de Ensino</FormLabel>
-                    <Select
-                      onValueChange={field.onChange}
-                      defaultValue={field.value}
-                    >
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Selecione..." />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value="Regular">Ensino Regular</SelectItem>
-                        <SelectItem value="EJA">EJA - Educação de Jovens e Adultos</SelectItem>
-                        <SelectItem value="Especial">Educação Especial</SelectItem>
-                        <SelectItem value="Integral">Tempo Integral</SelectItem>
-                        <SelectItem value="Tecnico">Ensino Técnico</SelectItem>
-                      </SelectContent>
-                    </Select>
+                    <FormControl>
+                      <select
+                        className={selectClassName}
+                        value={field.value || ''}
+                        onChange={(e) => field.onChange(e.target.value)}
+                      >
+                        <option value="">Selecione...</option>
+                        <option value="Regular">Ensino Regular</option>
+                        <option value="EJA">EJA - Educação de Jovens e Adultos</option>
+                        <option value="Especial">Educação Especial</option>
+                        <option value="Integral">Tempo Integral</option>
+                        <option value="Tecnico">Ensino Técnico</option>
+                      </select>
+                    </FormControl>
                     <FormDescription>
                       Modalidade conforme Censo Escolar
                     </FormDescription>
@@ -620,20 +609,17 @@ export function ClassroomDialog({
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Tipo de Regime</FormLabel>
-                  <Select
-                    onValueChange={field.onChange}
-                    defaultValue={field.value}
-                  >
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Selecione..." />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      <SelectItem value="Seriado">Seriado</SelectItem>
-                      <SelectItem value="Nao Seriado">Não Seriado</SelectItem>
-                    </SelectContent>
-                  </Select>
+                  <FormControl>
+                    <select
+                      className={selectClassName}
+                      value={field.value || ''}
+                      onChange={(e) => field.onChange(e.target.value)}
+                    >
+                      <option value="">Selecione...</option>
+                      <option value="Seriado">Seriado</option>
+                      <option value="Nao Seriado">Não Seriado</option>
+                    </select>
+                  </FormControl>
                   <FormDescription>
                     Tipo de regime da turma conforme Censo Escolar
                   </FormDescription>
@@ -648,33 +634,30 @@ export function ClassroomDialog({
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Professor Regente</FormLabel>
-                  <Select
-                    onValueChange={field.onChange}
-                    defaultValue={field.value}
-                  >
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Selecione o professor regente (opcional)" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
+                  <FormControl>
+                    <select
+                      className={selectClassName}
+                      value={field.value || ''}
+                      onChange={(e) => field.onChange(e.target.value)}
+                    >
+                      <option value="">Selecione o professor regente (opcional)</option>
                       {teachers
                         .filter((t) => {
                           if (!t || !t.person) return false
                           return t.employment_status === 'active'
                         })
                         .map((teacher) => {
-                          const teacherName = teacher.person 
+                          const teacherName = teacher.person
                             ? `${teacher.person.first_name} ${teacher.person.last_name}`
                             : 'Professor'
                           return (
-                            <SelectItem key={teacher.id} value={teacher.id.toString()}>
+                            <option key={teacher.id} value={teacher.id.toString()}>
                               {teacherName}
-                            </SelectItem>
+                            </option>
                           )
                         })}
-                    </SelectContent>
-                  </Select>
+                    </select>
+                  </FormControl>
                   <FormDescription>
                     Professor responsável pela turma (opcional).
                   </FormDescription>

@@ -34,6 +34,8 @@ import { personService } from './person-service';
 import { transferService } from './transfer-service';
 import { preEnrollmentService } from './pre-enrollment-service';
 import { reenrollmentService } from './reenrollment-service';
+import { evaluationRulesService } from './evaluation-rules-service';
+import { assessmentTypeService } from './assessment-type-service';
 
 // Services Específicos - Re-export
 export { studentService } from './student-service';
@@ -60,6 +62,8 @@ export { personService } from './person-service';
 export { transferService } from './transfer-service';
 export { preEnrollmentService } from './pre-enrollment-service';
 export { reenrollmentService } from './reenrollment-service';
+export { evaluationRulesService } from './evaluation-rules-service';
+export { assessmentTypeService } from './assessment-type-service';
 
 // Types específicos dos services
 export type { EnrollmentData, TransferData } from './enrollment-service';
@@ -113,6 +117,8 @@ export type {
   PreviaRematricula,
   ResultadoExecucao
 } from './reenrollment-service';
+export type { EvaluationRule, EvaluationRuleFormData } from './evaluation-rules-service';
+export type { AssessmentType, AssessmentTypeCreateData, AssessmentTypeUpdateData } from './assessment-type-service';
 
 // Default exports
 export default {
@@ -140,6 +146,8 @@ export default {
   personService,
   transferService,
   preEnrollmentService,
-  reenrollmentService
+  reenrollmentService,
+  evaluationRulesService,
+  assessmentTypeService
 };
 

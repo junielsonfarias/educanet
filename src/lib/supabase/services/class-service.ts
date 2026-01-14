@@ -619,6 +619,168 @@ class ClassService extends BaseService<Class> {
       throw error;
     }
   }
+
+  // ==================== MÉTODOS COM EDUCATION_GRADE_ID ====================
+
+  /**
+   * Criar turma com série específica
+   */
+  async createClass(data: {
+    name: string;
+    school_id: number;
+    course_id: number;
+    academic_period_id: number;
+    education_grade_id?: number;
+    homeroom_teacher_id?: number;
+    capacity?: number;
+    shift?: string;
+  }): Promise<Record<string, unknown>> {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+
+      // Obter person_id
+      let createdBy = 1;
+      if (user?.id) {
+        const { data: authUser } = await supabase
+          .from('auth_users')
+          .select('person_id')
+          .eq('id', user.id)
+          .single();
+        createdBy = authUser?.person_id || 1;
+      }
+
+      const { data: newClass, error } = await supabase
+        .from('classes')
+        .insert({
+          name: data.name,
+          school_id: data.school_id,
+          course_id: data.course_id,
+          academic_period_id: data.academic_period_id,
+          education_grade_id: data.education_grade_id,
+          homeroom_teacher_id: data.homeroom_teacher_id,
+          capacity: data.capacity || 35,
+          shift: data.shift || 'Manhã',
+          created_by: createdBy
+        })
+        .select()
+        .single();
+
+      if (error) throw handleSupabaseError(error);
+      return newClass;
+    } catch (error) {
+      console.error('Error in ClassService.createClass:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Atualizar série da turma
+   */
+  async updateClassGrade(classId: number, educationGradeId: number): Promise<void> {
+    try {
+      const { error } = await supabase
+        .from('classes')
+        .update({
+          education_grade_id: educationGradeId,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', classId);
+
+      if (error) throw handleSupabaseError(error);
+    } catch (error) {
+      console.error('Error in ClassService.updateClassGrade:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Buscar turmas por série
+   */
+  async getByGrade(educationGradeId: number, options?: {
+    schoolId?: number;
+    academicYearId?: number;
+  }): Promise<ClassWithDetails[]> {
+    try {
+      let query = supabase
+        .from('classes')
+        .select(`
+          *,
+          school:schools(*),
+          course:courses(*),
+          academic_year:academic_years(*),
+          education_grade:education_grades(*)
+        `)
+        .eq('education_grade_id', educationGradeId)
+        .is('deleted_at', null);
+
+      if (options?.schoolId) {
+        query = query.eq('school_id', options.schoolId);
+      }
+
+      if (options?.academicYearId) {
+        query = query.eq('academic_year_id', options.academicYearId);
+      }
+
+      const { data, error } = await query.order('name');
+
+      if (error) throw handleSupabaseError(error);
+      return (data || []) as ClassWithDetails[];
+    } catch (error) {
+      console.error('Error in ClassService.getByGrade:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Buscar turma com informações completas incluindo série e regra de avaliação
+   */
+  async getClassWithGradeInfo(classId: number): Promise<Record<string, unknown> | null> {
+    try {
+      const { data, error } = await supabase
+        .from('classes')
+        .select(`
+          *,
+          school:schools(*),
+          course:courses(*),
+          academic_year:academic_years(*),
+          education_grade:education_grades(*)
+        `)
+        .eq('id', classId)
+        .is('deleted_at', null)
+        .single();
+
+      if (error) {
+        if (error.code === 'PGRST116') return null;
+        throw handleSupabaseError(error);
+      }
+
+      // Buscar regra de avaliação aplicável
+      let evaluationRule = null;
+      if (data?.education_grade_id || data?.course_id) {
+        const { data: rule } = await supabase
+          .from('evaluation_rules')
+          .select('*')
+          .or(`education_grade_id.eq.${data.education_grade_id},course_id.eq.${data.course_id}`)
+          .is('deleted_at', null)
+          .limit(1)
+          .maybeSingle();
+
+        evaluationRule = rule;
+      }
+
+      // Buscar estatísticas
+      const stats = await this.getClassStats(classId);
+
+      return {
+        ...data,
+        evaluation_rule: evaluationRule,
+        stats
+      };
+    } catch (error) {
+      console.error('Error in ClassService.getClassWithGradeInfo:', error);
+      throw error;
+    }
+  }
 }
 
 export const classService = new ClassService();

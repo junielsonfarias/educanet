@@ -1457,7 +1457,7 @@ export const mockTeachers: Teacher[] = expandedMockTeachers.length > 0 ? expande
   },
 ]
 
-export type UserRole = 'admin' | 'supervisor' | 'coordinator' | 'administrative'
+export type UserRole = 'admin' | 'supervisor' | 'coordinator' | 'administrative' | 'user'
 
 export interface User {
   id: string
@@ -1850,71 +1850,9 @@ export const mockAlertRules: AlertRule[] = [
   },
 ]
 
-// --- Interfaces para Conselho de Classe ---
-
-export interface CouncilMember {
-  id: string
-  name: string
-  role: 'director' | 'coordinator' | 'teacher' | 'pedagogue' | 'other'
-  signature?: string
-}
-
-export interface StudentCouncilAnalysis {
-  studentId: string
-  studentName: string
-  overallPerformance: 'excellent' | 'good' | 'regular' | 'poor'
-  attendanceRate: number
-  averageGrade: number
-  subjectsWithIssues: Array<{
-    subjectId: string
-    subjectName: string
-    periodId: string
-    periodName: string
-    grade: number
-    issue: string
-  }>
-  recoveryActivities: Array<{
-    subjectId: string
-    subjectName: string
-    activity: string
-    deadline?: string
-  }>
-  observations: string
-  finalDecision: 'approved' | 'approved_with_recovery' | 'dependency' | 'retained' | 'pending'
-  dependencySubjects?: string[]
-}
-
-export interface ClassCouncil {
-  id: string
-  schoolId: string
-  academicYearId: string
-  classroomId: string
-  classroomName: string
-  date: string
-  periodId: string
-  periodName: string
-  type: 'bimestral' | 'final' | 'extraordinary'
-  status: 'scheduled' | 'in_progress' | 'completed' | 'cancelled'
-  members: CouncilMember[]
-  studentsAnalysis: StudentCouncilAnalysis[]
-  generalObservations: string
-  decisions: Array<{
-    id: string
-    description: string
-    responsible: string
-    deadline?: string
-  }>
-  minutes: string
-  createdAt: string
-  updatedAt: string
-  createdBy: string
-}
-
-export const mockClassCouncils: ClassCouncil[] = []
-
 // --- Interfaces para Anexos de Documentos ---
 
-export type AttachmentEntityType = 'student' | 'teacher' | 'school' | 'enrollment' | 'assessment' | 'occurrence' | 'protocol' | 'council'
+export type AttachmentEntityType = 'student' | 'teacher' | 'school' | 'enrollment' | 'assessment' | 'occurrence' | 'protocol'
 
 export type AttachmentCategory =
   | 'identity'

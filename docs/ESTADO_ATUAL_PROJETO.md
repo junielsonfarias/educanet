@@ -2,7 +2,7 @@
 
 **Data de Criacao:** 13 de Janeiro de 2026
 **Ultima Atualizacao:** 13 de Janeiro de 2026
-**Versao do Documento:** 2.7
+**Versao do Documento:** 3.4
 **Status Geral:** 100% COMPLETO E FUNCIONAL
 **Tempo Total de Desenvolvimento:** ~28 horas
 
@@ -20,12 +20,12 @@ O **EduGestao Municipal** (EduCanet) e um sistema completo de gestao educacional
 |---------|-------|
 | Linhas de Codigo | ~29.000 |
 | Arquivos Criados | 77+ |
-| Tabelas no Banco | 52 |
-| Migrations SQL | 39 |
-| Services Backend | 17 |
-| Stores Frontend | 13 |
-| Metodos de Service | 265+ |
-| Acoes de Store | 220+ |
+| Tabelas no Banco | 54 |
+| Migrations SQL | 42 |
+| Services Backend | 19 |
+| Stores Frontend | 14 |
+| Metodos de Service | 277+ |
+| Acoes de Store | 234+ |
 | Politicas RLS | 110+ |
 | Permissoes | 85+ |
 | Roles | 8 |
@@ -207,6 +207,7 @@ educanet/
 - `evaluation_instances` - Provas, trabalhos
 - `grades` - Notas dos alunos
 - `class_teacher_subjects` - Alocacao professor-disciplina-turma
+- `evaluation_rules` - Regras de avaliacao (nota minima, frequencia, calculo) (NOVA)
 
 **Grupo 6: Frequencia**
 - `attendance` - Registros de presenca/falta
@@ -275,12 +276,13 @@ educanet/
 | TransferService | 18 | Transferencias de alunos |
 | PreEnrollmentService | 28 | Pre-matricula online |
 | ReenrollmentService | 25 | Rematricula automatica |
+| EvaluationRulesService | 12 | Regras de avaliacao |
 
-**Total: 265+ metodos implementados**
+**Total: 277+ metodos implementados**
 
 ---
 
-## 6. STORES FRONTEND (13 completos)
+## 6. STORES FRONTEND (14 completos)
 
 | Store | Acoes | Responsabilidade |
 |-------|-------|------------------|
@@ -298,8 +300,9 @@ educanet/
 | useTransferStore.supabase | 20 | Transferencias de alunos |
 | usePreEnrollmentStore.supabase | 28 | Pre-matricula online |
 | useReenrollmentStore.supabase | 25 | Rematricula automatica |
+| useEvaluationRulesStore.supabase | 14 | Regras de avaliacao |
 
-**Total: 220+ acoes implementadas**
+**Total: 234+ acoes implementadas**
 
 ---
 
@@ -546,6 +549,22 @@ Configuracoes
 - Substituidos `error: any` por `error: unknown`
 - Substituidos tipos de interface por `Record<string, unknown>`
 - Restam alguns `any` em callbacks e funcoes utilitarias
+
+### 10.4 Correcoes na Pagina de Configuracoes (13/01/2026)
+
+**Problema:** Pagina de configuracoes gerais nao salvava dados (municipio QEdu).
+- Erro React DOM: `NotFoundError: Failed to execute 'insertBefore' on 'Node'`
+- Erro HTTP 406 nas queries de settings
+
+**Arquivos Corrigidos:**
+- `src/pages/settings/GeneralSettings.tsx` - Renderizacao condicional do botao de salvar
+- `src/lib/supabase/services/settings-service.ts` - Tipagem e robustez nas queries
+
+**Correcoes Aplicadas:**
+1. Substituida renderizacao condicional separada por ternario unico no botao
+2. Adicionado tratamento mais robusto de erros no settings-service
+3. Usado `maybeSingle()` no lugar de `single()` para evitar erros quando nao ha dados
+4. Corrigidos tipos de retorno para `Record<string, unknown>`
 
 ---
 
@@ -803,6 +822,98 @@ Esta secao registra todas as alteracoes significativas realizadas no projeto.
 - Componentes usam RequirePermission para controle de acesso
 - Total de arquivos criados: 3 paginas/componentes novos
 
+### 13/01/2026 - Versao 3.4
+**Correcao do Salvamento de Configuracoes Gerais (QEdu):**
+
+**Problema Identificado:**
+- Ao selecionar municipio do QEdu e clicar em salvar, nada acontecia
+- O componente chamava `updateSettings(formData)` que nao existe no store Supabase
+- O store tem `setMultiple`, nao `updateSettings`
+
+**Correcoes Aplicadas:**
+- Adicionado interface `SettingsFormData` com tipagem correta
+- Adicionado `useEffect` para carregar configuracoes ao montar componente
+- Adicionado `useEffect` para sincronizar formData com settings do store
+- Corrigida funcao `handleSave` para usar apenas `settingsService.setMultiple()`
+- Adicionado estado `saving` para feedback visual
+- Adicionado indicador de loading no botao de salvar
+- Removida chamada inexistente `updateSettings()`
+
+**Arquivos modificados:**
+- `src/pages/settings/GeneralSettings.tsx` (CORRIGIDO)
+
+### 13/01/2026 - Versao 3.3
+**Otimizacao do Sistema de Tipos de Avaliacao:**
+
+**Analise e Correcao de Mapeamento de Campos:**
+- Verificado fluxo completo: Migration -> Service -> Store -> Componentes
+- Identificados e corrigidos problemas de mapeamento camelCase/snake_case
+
+**Formulario Completo (AssessmentTypeFormDialog):**
+- Nome e Codigo (code)
+- Descricao
+- Peso (weight), Nota Maxima (max_score), Nota Minima (passing_score)
+- Periodo de Aplicacao (bimestral, semestral, anual)
+- Checkboxes: isRecovery, excludeFromAverage, replacesLowest, isMandatory
+
+**Tabela Melhorada (AssessmentTypesList):**
+- Nova coluna: Nota Maxima
+- Nova coluna: Periodo de Aplicacao
+- Tooltips para descricoes longas
+- Funcoes de conversao camelCase <-> snake_case
+
+**Correcoes de Mapeamento:**
+- `formDataToServiceData()` - Converte form para API
+- `serviceDataToFormData()` - Converte API para form
+- Removida dependencia de cursos/etapasEnsino (desnecessaria)
+
+**Arquivos modificados:**
+- `src/pages/academic/components/AssessmentTypeFormDialog.tsx` (REESCRITO)
+- `src/pages/academic/AssessmentTypesList.tsx` (OTIMIZADO)
+
+### 13/01/2026 - Versao 3.2
+**Sistema de Tipos de Avaliacao e Correcoes de Permissoes:**
+
+**Implementacao Completa de Tipos de Avaliacao:**
+- Criada migration `042_create_assessment_types.sql`:
+  - Tabela `assessment_types` com campos completos (nome, codigo, peso, nota maxima, etc.)
+  - Indices otimizados para buscas
+  - Politicas RLS usando funcao `public.is_admin()`
+  - Trigger para atualizacao automatica de `updated_at`
+  - 9 tipos de avaliacao pre-cadastrados (AB1, AB2, TRAB, PART, REC, RECF, SISAM, SIM, PEXT)
+- Criado `assessment-type-service.ts`:
+  - Metodos: getAll, getById, getByGrade, getRecoveryTypes, create, update, delete
+  - Metodos adicionais: toggleActive, reorder, duplicate
+- Atualizado `useAssessmentStore.supabase.tsx`:
+  - Adicionados estados: assessmentTypes, loadingTypes
+  - Adicionadas acoes: fetchAssessmentTypes, createAssessmentType, updateAssessmentType, deleteAssessmentType
+- Atualizado `AssessmentTypesList.tsx`:
+  - Cards de estatisticas (Total, Recuperacoes, Nao Contabilizam)
+  - Tabela com CRUD completo
+  - Integracao com Supabase services
+- Atualizado `AssessmentTypeFormDialog.tsx`:
+  - Removida dependencia de mock-data
+  - Validacao com Zod
+
+**Correcao do Sistema de Permissoes:**
+- Adicionada role 'user' ao tipo UserRole em `mock-data.ts`
+- Adicionado mapeamento de permissoes para role 'user' em `usePermissions.ts`
+- Corrigido problema onde botoes de CRUD nao apareciam para usuarios sem role atribuida
+
+**Remocao de Funcionalidade:**
+- Removida funcionalidade "Conselho de Classe" (ClassCouncil)
+- Arquivos removidos: ClassCouncil.tsx, CouncilFormDialog.tsx, CouncilDetailsDialog.tsx, useCouncilStore.tsx
+- Removidas rotas e menus relacionados
+
+**Arquivos criados/modificados:**
+- `supabase/migrations/042_create_assessment_types.sql` (NOVO)
+- `src/lib/supabase/services/assessment-type-service.ts` (NOVO)
+- `src/stores/useAssessmentStore.supabase.tsx` (MODIFICADO)
+- `src/pages/academic/AssessmentTypesList.tsx` (MODIFICADO)
+- `src/pages/academic/components/AssessmentTypeFormDialog.tsx` (MODIFICADO)
+- `src/lib/mock-data.ts` (MODIFICADO)
+- `src/hooks/usePermissions.ts` (MODIFICADO)
+
 ### 13/01/2026 - Versao 2.0
 **Pagina de Pre-Matricula Online (Supabase):**
 - Criado `PreEnrollmentManager.supabase.tsx` - Pagina completa de gerenciamento:
@@ -900,6 +1011,68 @@ Esta secao registra todas as alteracoes significativas realizadas no projeto.
   - Resultados: definirResultadoFinal, definirResultadosEmLote
 - Total de stores: 13 (antes 10)
 - Total de acoes: 220+ (antes 149)
+
+### 13/01/2026 - Versao 3.0
+**Integracao Frontend com Relacionamentos Academicos:**
+- Criado `evaluation-rules-service.ts` com 12 metodos:
+  - CRUD: getAll, getById, create, update, delete, duplicate
+  - Consultas: getByCourse, getByGrade, getRuleForClass
+  - Validacao: checkApprovalStatus (verifica aprovacao por nota e frequencia)
+- Atualizado `enrollment-service.ts`:
+  - Adicionado campo `education_grade_id` ao EnrollmentData
+  - Adicionado join com `education_grades` em todas as queries
+  - Novos metodos: getByGrade, updateEducationGrade, promoteStudent
+  - Adicionado filtro `educationGradeId` em getBySchool
+- Atualizado index de services com exports do evaluationRulesService
+- Criado `useEvaluationRulesStore.supabase.tsx` com 14 acoes:
+  - CRUD: fetchRules, fetchRuleById, createRule, updateRule, deleteRule, duplicateRule
+  - Consultas: fetchRulesByCourse, fetchRulesByGrade, fetchRuleForClass
+  - Validacao: checkApprovalStatus
+  - Utilitarios: setCurrentRule, clearError, reset
+- Total de services: 18 (antes 17)
+- Total de stores: 14 (antes 13)
+- Total de metodos service: 277+ (antes 265+)
+- Total de acoes store: 234+ (antes 220+)
+
+### 13/01/2026 - Versao 2.9
+**Correcao de Relacionamentos Academicos - Migration 041:**
+- Criada migration `041_fix_academic_relationships.sql` para corrigir relacoes
+- Adicionada coluna `education_grade_id` em:
+  - `classes` - Vincular turmas a series especificas
+  - `student_enrollments` - Vincular matriculas a series
+  - `course_subjects` - Associar disciplinas a series
+  - `evaluation_instances` - Vincular avaliacoes a series e periodos
+- Criada tabela `evaluation_rules` para regras de avaliacao:
+  - Nota minima de aprovacao
+  - Frequencia minima
+  - Numero de avaliacoes por periodo
+  - Tipo de calculo de media
+- Criada view `vw_curriculum_structure` para estrutura curricular completa
+- Criada funcao `fn_get_student_grade_info()` para buscar serie do aluno
+- Inseridas 5 regras de avaliacao padrao (Infantil, Fund I/II, Medio, EJA)
+- FKs formais entre education_grades, courses, classes e enrollments
+- Total de tabelas: 53 (antes 52)
+
+### 13/01/2026 - Versao 2.8
+**Correcao CourseDetails.tsx e Adicao de Metodos de Series:**
+- Corrigido erro `TypeError: Cannot read properties of undefined` no CourseDetails.tsx
+- Adicionados 8 novos metodos ao `course-service.ts`:
+  - `addSeries()` - Adicionar serie/ano a um curso
+  - `updateSeries()` - Atualizar serie/ano existente
+  - `deleteSeries()` - Remover serie/ano
+  - `addSubjectToSeries()` - Adicionar disciplina a uma serie
+  - `updateSubjectInSeries()` - Atualizar disciplina em uma serie
+  - `removeSubjectFromSeries()` - Remover disciplina de uma serie
+  - `getCourseSeriesWithSubjects()` - Buscar series com disciplinas
+- Adicionadas 7 novas acoes ao `useCourseStore.supabase.tsx`:
+  - `addSerieAno`, `updateSerieAno`, `deleteSerieAno`, `fetchSeriesWithSubjects`
+  - `addSubjectToSeries`, `updateSubjectInSeries`, `removeSubjectFromSeries`
+- Atualizado CourseDetails.tsx para usar os novos metodos do store Supabase
+- Adicionado carregamento automatico de cursos via useEffect
+- Corrigida conversao de IDs (string para number) para compatibilidade
+- Build executado com sucesso sem erros TypeScript
+- Total de metodos course-service: 25+ (antes 17)
+- Total de acoes useCourseStore: 30+ (antes 23)
 
 ### 13/01/2026 - Versao 1.7
 **Service de Rematricula Automatica:**
@@ -1057,6 +1230,68 @@ Esta secao registra todas as alteracoes significativas realizadas no projeto.
 - Usuarios autenticados podem visualizar todos os dados
 - Acesso anonimo mantido para public_contents
 - Migration: `039_admin_full_access_policies.sql`
+
+### 13/01/2026 - Versao 3.1
+**Implementação Completa de Tipos de Avaliação:**
+- Criada tabela `assessment_types` no banco de dados (migration 042)
+- Campos: name, code, description, weight, max_score, passing_score
+- Flags: exclude_from_average, is_recovery, replaces_lowest, is_mandatory
+- Suporte a séries aplicáveis (applicable_grade_ids)
+- Dados iniciais: AB1, AB2, Trabalho, Participação, Recuperação, SISAM, Simulado
+
+**Service e Store:**
+- Criado `assessment-type-service.ts` com CRUD completo
+- Atualizado `useAssessmentStore.supabase.tsx` com funções de gerenciamento
+- Adicionado `loadingTypes` para estado de carregamento separado
+
+**Interface Atualizada:**
+- Página de Tipos de Avaliação com cards de estatísticas
+- Botão "Novo Tipo" visível para admins
+- Tabela com código, peso, tipo (Regular/Recuperação), média
+- Integração completa com Supabase
+
+**Arquivos criados/modificados:**
+- supabase/migrations/042_create_assessment_types.sql
+- src/lib/supabase/services/assessment-type-service.ts
+- src/lib/supabase/services/index.ts
+- src/stores/useAssessmentStore.supabase.tsx
+- src/pages/academic/AssessmentTypesList.tsx
+- src/pages/academic/components/AssessmentTypeFormDialog.tsx
+
+### 13/01/2026 - Versao 3.0
+**Correção de Erros em Análise de Avaliações:**
+- Corrigido erro "Cannot read properties of undefined (reading 'map')" em EvaluationAnalysis.tsx
+- Adicionados `assessmentTypes` e `assessments` ao useAssessmentStore.supabase.tsx
+- Adicionado fallback com array vazio no componente para evitar erros de undefined
+- Arquivos modificados: useAssessmentStore.supabase.tsx, EvaluationAnalysis.tsx
+
+### 13/01/2026 - Versao 2.9
+**Remoção do Módulo Conselho de Classe:**
+- Funcionalidade removida completamente por estar incompleta (sem tabela no banco)
+- Arquivos removidos:
+  - src/pages/academic/ClassCouncil.tsx
+  - src/pages/academic/components/CouncilFormDialog.tsx
+  - src/pages/academic/components/CouncilDetailsDialog.tsx
+  - src/stores/useCouncilStore.tsx
+- Rota /academico/conselho-classe removida do App.tsx
+- Item removido do menu lateral (AppSidebar.tsx)
+- Interfaces e dados mock removidos de mock-data.ts e mock-data-expanded.ts
+
+### 13/01/2026 - Versao 2.8
+**Correção de Conflito de Portais em Dialogs:**
+- Corrigido erro "Failed to execute 'removeChild' on 'Node'" nos dialogs de turmas e regras de avaliação
+- Problema causado por conflito entre portais do Radix UI Select dentro de Dialog
+- Solução: Convertidos todos os Select do Radix UI para elementos `<select>` HTML nativos
+- Arquivos modificados:
+  - src/pages/schools/components/ClassroomDialog.tsx (8 selects convertidos)
+  - src/pages/academic/components/EvaluationRuleFormDialog.tsx (6 selects convertidos)
+
+**Criação do Store Centralizado de Turmas:**
+- Criado useClassStore.supabase.tsx com gerenciamento completo de turmas
+- Funcionalidades: CRUD, filtros, estatísticas, matrícula de alunos, alocação de professores
+- Integrado com ClassesList.tsx para carregamento de education_grades
+- Transformação de education_grades para formato etapasEnsino
+- Arquivo criado: src/stores/useClassStore.supabase.tsx
 
 ### 13/01/2026 - Versao 2.7
 **Sistema de Etapas de Ensino com Séries:**

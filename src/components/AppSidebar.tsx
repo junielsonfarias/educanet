@@ -133,11 +133,6 @@ const academicItems = [
     icon: PenTool,
   },
   {
-    title: 'Conselho de Classe',
-    url: '/academico/conselho-classe',
-    icon: Users,
-  },
-  {
     title: 'Lançamento de Notas',
     url: '/avaliacao/lancamento',
     icon: ClipboardCheck,

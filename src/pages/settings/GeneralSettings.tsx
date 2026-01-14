@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import {
   Save,
   Upload,
@@ -28,18 +28,61 @@ import {
 } from '@/components/ui/select'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useSettingsStore } from '@/stores/useSettingsStore.supabase'
-import { useToast } from '@/hooks/use-toast'
 import { toast } from 'sonner'
 import { Textarea } from '@/components/ui/textarea'
 import { availableMunicipalities } from '@/services/qedu-service'
 
-export default function GeneralSettings() {
-  const { settings, updateSettings } = useSettingsStore()
-  const { toast: toastHook } = useToast()
+// Interface para o formulário de configurações
+interface SettingsFormData {
+  municipalityName: string
+  educationSecretaryName: string
+  municipalityLogo: string
+  secretaryLogo: string
+  facebookHandle: string
+  footerText: string
+  qeduMunicipalityId: string
+  defaultRecoveryStrategy: string
+}
 
-  const [formData, setFormData] = useState(settings)
+const defaultFormData: SettingsFormData = {
+  municipalityName: '',
+  educationSecretaryName: '',
+  municipalityLogo: '',
+  secretaryLogo: '',
+  facebookHandle: '',
+  footerText: '',
+  qeduMunicipalityId: '',
+  defaultRecoveryStrategy: 'replace_if_higher',
+}
+
+export default function GeneralSettings() {
+  const { settings, fetchSettings, loading } = useSettingsStore()
+
+  const [formData, setFormData] = useState<SettingsFormData>(defaultFormData)
+  const [saving, setSaving] = useState(false)
   const municipalityLogoInputRef = useRef<HTMLInputElement>(null)
   const secretaryLogoInputRef = useRef<HTMLInputElement>(null)
+
+  // Carregar configurações ao montar o componente
+  useEffect(() => {
+    fetchSettings()
+  }, [fetchSettings])
+
+  // Atualizar formData quando settings mudar
+  useEffect(() => {
+    if (settings && Object.keys(settings).length > 0) {
+      setFormData({
+        municipalityName: (settings.municipalityName as string) || '',
+        educationSecretaryName: (settings.educationSecretaryName as string) || '',
+        municipalityLogo: (settings.municipalityLogo as string) || '',
+        secretaryLogo: (settings.secretaryLogo as string) || '',
+        facebookHandle: (settings.facebookHandle as string) || '',
+        footerText: (settings.footerText as string) || '',
+        qeduMunicipalityId: (settings.qeduMunicipalityId as string) || '',
+        defaultRecoveryStrategy: (settings.defaultRecoveryStrategy as string) || 'replace_if_higher',
+      })
+    }
+  }, [settings])
 
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
@@ -88,31 +131,39 @@ export default function GeneralSettings() {
   }
 
   const handleSave = async () => {
+    setSaving(true)
     try {
       // Salvar no Supabase usando settingsService
       const { settingsService } = await import('@/lib/supabase/services')
-      
-      // Salvar cada campo de configuração no Supabase
-      await settingsService.setMultiple({
-        municipalityName: formData.municipalityName,
-        educationSecretaryName: formData.educationSecretaryName,
+
+      // Preparar dados para salvar (remover valores vazios como null)
+      const dataToSave: Record<string, string | null> = {
+        municipalityName: formData.municipalityName || null,
+        educationSecretaryName: formData.educationSecretaryName || null,
         municipalityLogo: formData.municipalityLogo || null,
         secretaryLogo: formData.secretaryLogo || null,
         facebookHandle: formData.facebookHandle || null,
         footerText: formData.footerText || null,
         qeduMunicipalityId: formData.qeduMunicipalityId || null,
-      }, 'general')
+        defaultRecoveryStrategy: formData.defaultRecoveryStrategy || null,
+      }
 
-      // Também atualizar o store local para compatibilidade
-      updateSettings(formData)
-      
+      // Salvar cada campo de configuração no Supabase
+      await settingsService.setMultiple(dataToSave, 'general')
+
+      // Recarregar configurações do servidor
+      await fetchSettings()
+
       toast.success('Configurações salvas', {
-        description: 'As alterações foram aplicadas ao sistema e estão disponíveis em todos os navegadores.',
+        description: 'As alterações foram aplicadas ao sistema.',
       })
-    } catch {
+    } catch (error) {
+      console.error('Erro ao salvar configurações:', error)
       toast.error('Erro ao salvar', {
         description: 'Não foi possível salvar as configurações. Tente novamente.',
       })
+    } finally {
+      setSaving(false)
     }
   }
 
@@ -500,9 +551,9 @@ export default function GeneralSettings() {
       </Tabs>
 
       <div className="flex justify-end">
-        <Button size="lg" onClick={handleSave}>
-          <Save className="mr-2 h-4 w-4" />
-          Salvar Configurações
+        <Button size="lg" onClick={handleSave} disabled={saving || loading}>
+          <Save className={`mr-2 h-4 w-4 ${saving ? 'animate-spin' : ''}`} />
+          {saving ? 'Salvando...' : 'Salvar Configurações'}
         </Button>
       </div>
     </div>

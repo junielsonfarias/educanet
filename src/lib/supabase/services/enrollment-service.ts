@@ -14,6 +14,7 @@ export interface EnrollmentData {
   school_id: number;
   course_id: number;
   academic_year_id: number;
+  education_grade_id?: number;
   enrollment_date?: string;
   status?: string;
   notes?: string;
@@ -49,6 +50,7 @@ class EnrollmentService extends BaseService<StudentEnrollment> {
           school:schools(*),
           course:courses(*),
           academic_year:academic_years(*),
+          education_grade:education_grades(id, grade_name, grade_order),
           class_enrollments(
             *,
             class:classes(*)
@@ -86,7 +88,8 @@ class EnrollmentService extends BaseService<StudentEnrollment> {
           *,
           school:schools(*),
           course:courses(*),
-          academic_year:academic_years(*)
+          academic_year:academic_years(*),
+          education_grade:education_grades(id, grade_name, grade_order)
         `)
         .eq('student_profile_id', studentProfileId)
         .is('deleted_at', null);
@@ -116,6 +119,7 @@ class EnrollmentService extends BaseService<StudentEnrollment> {
     academicYearId?: number;
     status?: string;
     courseId?: number;
+    educationGradeId?: number;
   }): Promise<EnrollmentWithDetails[]> {
     try {
       let query = supabase
@@ -127,7 +131,8 @@ class EnrollmentService extends BaseService<StudentEnrollment> {
             person:people(*)
           ),
           course:courses(*),
-          academic_year:academic_years(*)
+          academic_year:academic_years(*),
+          education_grade:education_grades(id, grade_name, grade_order)
         `)
         .eq('school_id', schoolId)
         .is('deleted_at', null);
@@ -144,12 +149,63 @@ class EnrollmentService extends BaseService<StudentEnrollment> {
         query = query.eq('course_id', options.courseId);
       }
 
+      if (options?.educationGradeId) {
+        query = query.eq('education_grade_id', options.educationGradeId);
+      }
+
       const { data, error } = await query.order('enrollment_date', { ascending: false });
 
       if (error) throw handleSupabaseError(error);
       return (data || []) as EnrollmentWithDetails[];
     } catch (error) {
       console.error('Error in EnrollmentService.getBySchool:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Buscar matrículas por série/ano
+   */
+  async getByGrade(educationGradeId: number, options?: {
+    schoolId?: number;
+    academicYearId?: number;
+    status?: string;
+  }): Promise<EnrollmentWithDetails[]> {
+    try {
+      let query = supabase
+        .from('student_enrollments')
+        .select(`
+          *,
+          student_profile:student_profiles(
+            *,
+            person:people(*)
+          ),
+          school:schools(*),
+          course:courses(*),
+          academic_year:academic_years(*),
+          education_grade:education_grades(id, grade_name, grade_order)
+        `)
+        .eq('education_grade_id', educationGradeId)
+        .is('deleted_at', null);
+
+      if (options?.schoolId) {
+        query = query.eq('school_id', options.schoolId);
+      }
+
+      if (options?.academicYearId) {
+        query = query.eq('academic_year_id', options.academicYearId);
+      }
+
+      if (options?.status) {
+        query = query.eq('status', options.status);
+      }
+
+      const { data, error } = await query.order('enrollment_date', { ascending: false });
+
+      if (error) throw handleSupabaseError(error);
+      return (data || []) as EnrollmentWithDetails[];
+    } catch (error) {
+      console.error('Error in EnrollmentService.getByGrade:', error);
       throw error;
     }
   }
@@ -171,7 +227,8 @@ class EnrollmentService extends BaseService<StudentEnrollment> {
             person:people(*)
           ),
           school:schools(*),
-          course:courses(*)
+          course:courses(*),
+          education_grade:education_grades(id, grade_name, grade_order)
         `)
         .eq('academic_year_id', academicYearId)
         .is('deleted_at', null);
@@ -527,7 +584,8 @@ class EnrollmentService extends BaseService<StudentEnrollment> {
           *,
           school:schools(*),
           course:courses(*),
-          academic_year:academic_years(*)
+          academic_year:academic_years(*),
+          education_grade:education_grades(id, grade_name, grade_order)
         `)
         .eq('student_profile_id', studentProfileId)
         .eq('academic_year_id', academicYearId)
@@ -545,6 +603,73 @@ class EnrollmentService extends BaseService<StudentEnrollment> {
       return data as unknown as EnrollmentWithDetails;
     } catch (error) {
       console.error('Error in EnrollmentService.getActiveEnrollment:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Atualizar série/ano de uma matrícula
+   */
+  async updateEducationGrade(
+    enrollmentId: number,
+    educationGradeId: number
+  ): Promise<StudentEnrollment> {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+
+      const { data: enrollment, error } = await supabase
+        .from('student_enrollments')
+        .update({
+          education_grade_id: educationGradeId,
+          updated_by: user?.id || 1
+        })
+        .eq('id', enrollmentId)
+        .select()
+        .single();
+
+      if (error) throw handleSupabaseError(error);
+      return enrollment as StudentEnrollment;
+    } catch (error) {
+      console.error('Error in EnrollmentService.updateEducationGrade:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Promover aluno para próxima série
+   * Atualiza o education_grade_id para a próxima série ordenada
+   */
+  async promoteStudent(
+    enrollmentId: number,
+    targetGradeId: number,
+    notes?: string
+  ): Promise<StudentEnrollment> {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+
+      const { data: enrollment, error } = await supabase
+        .from('student_enrollments')
+        .update({
+          education_grade_id: targetGradeId,
+          notes: notes ? `Promovido: ${notes}` : 'Promoção de série',
+          updated_by: user?.id || 1
+        })
+        .eq('id', enrollmentId)
+        .select()
+        .single();
+
+      if (error) throw handleSupabaseError(error);
+
+      // Registrar no histórico
+      await this.addStatusHistory(
+        enrollmentId,
+        'Matriculado',
+        `Promoção para nova série. ${notes || ''}`
+      );
+
+      return enrollment as StudentEnrollment;
+    } catch (error) {
+      console.error('Error in EnrollmentService.promoteStudent:', error);
       throw error;
     }
   }

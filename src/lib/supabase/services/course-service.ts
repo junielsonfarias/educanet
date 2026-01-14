@@ -463,6 +463,351 @@ class CourseService extends BaseService {
   }
 
   /**
+   * Adicionar série/ano a um nível de ensino
+   */
+  async addSeries(courseId: number, data: {
+    name: string;
+    numero?: number;
+    evaluationRuleId?: string;
+  }): Promise<Record<string, unknown>> {
+    try {
+      // Primeiro buscar o curso para pegar o education_level
+      const { data: course, error: courseError } = await supabase
+        .from('courses')
+        .select('education_level')
+        .eq('id', courseId)
+        .single();
+
+      if (courseError) throw handleSupabaseError(courseError);
+
+      // Buscar a maior ordem atual
+      const { data: existingGrades } = await supabase
+        .from('education_grades')
+        .select('grade_order')
+        .eq('education_level', course.education_level)
+        .order('grade_order', { ascending: false })
+        .limit(1);
+
+      const maxOrder = existingGrades?.[0]?.grade_order || 0;
+
+      // Inserir a nova série
+      const { data: newGrade, error } = await supabase
+        .from('education_grades')
+        .insert({
+          education_level: course.education_level,
+          grade_name: data.name,
+          grade_order: data.numero || (maxOrder + 1),
+          is_final_grade: false,
+        })
+        .select()
+        .single();
+
+      if (error) throw handleSupabaseError(error);
+
+      return newGrade;
+    } catch (error) {
+      console.error('Error in CourseService.addSeries:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Atualizar série/ano
+   */
+  async updateSeries(seriesId: number, data: {
+    name?: string;
+    numero?: number;
+    evaluationRuleId?: string;
+  }): Promise<Record<string, unknown>> {
+    try {
+      const updateData: Record<string, unknown> = {};
+      if (data.name) updateData.grade_name = data.name;
+      if (data.numero) updateData.grade_order = data.numero;
+
+      const { data: updated, error } = await supabase
+        .from('education_grades')
+        .update(updateData)
+        .eq('id', seriesId)
+        .select()
+        .single();
+
+      if (error) throw handleSupabaseError(error);
+      return updated;
+    } catch (error) {
+      console.error('Error in CourseService.updateSeries:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Remover série/ano
+   */
+  async deleteSeries(seriesId: number): Promise<void> {
+    try {
+      const { error } = await supabase
+        .from('education_grades')
+        .delete()
+        .eq('id', seriesId);
+
+      if (error) throw handleSupabaseError(error);
+    } catch (error) {
+      console.error('Error in CourseService.deleteSeries:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Adicionar disciplina a uma série específica
+   */
+  async addSubjectToSeries(courseId: number, seriesId: number, data: {
+    name: string;
+    workload?: number;
+    is_mandatory?: boolean;
+    semester?: number;
+  }): Promise<Record<string, unknown>> {
+    try {
+      // Buscar ou criar a disciplina
+      let subject: Record<string, unknown> | null = null;
+
+      // Verificar se a disciplina já existe
+      const { data: existingSubject } = await supabase
+        .from('subjects')
+        .select('*')
+        .eq('name', data.name)
+        .is('deleted_at', null)
+        .maybeSingle();
+
+      if (existingSubject) {
+        subject = existingSubject;
+      } else {
+        // Criar nova disciplina
+        const { data: { user } } = await supabase.auth.getUser();
+
+        // Obter person_id
+        let createdBy = 1;
+        if (user?.id) {
+          const { data: authUser } = await supabase
+            .from('auth_users')
+            .select('person_id')
+            .eq('id', user.id)
+            .single();
+          createdBy = authUser?.person_id || 1;
+        }
+
+        const { data: newSubject, error: subjectError } = await supabase
+          .from('subjects')
+          .insert({
+            name: data.name,
+            workload_hours: data.workload,
+            created_by: createdBy
+          })
+          .select()
+          .single();
+
+        if (subjectError) throw handleSupabaseError(subjectError);
+        subject = newSubject;
+      }
+
+      // Vincular disciplina ao curso na série específica usando education_grade_id
+      const { data: { user } } = await supabase.auth.getUser();
+
+      // Obter person_id
+      let createdBy = 1;
+      if (user?.id) {
+        const { data: authUser } = await supabase
+          .from('auth_users')
+          .select('person_id')
+          .eq('id', user.id)
+          .single();
+        createdBy = authUser?.person_id || 1;
+      }
+
+      const { data: courseSubject, error } = await supabase
+        .from('course_subjects')
+        .insert({
+          course_id: courseId,
+          subject_id: subject!.id,
+          education_grade_id: seriesId,
+          workload_hours: data.workload,
+          is_mandatory: data.is_mandatory ?? true,
+          semester: data.semester,
+          created_by: createdBy
+        })
+        .select()
+        .single();
+
+      if (error) throw handleSupabaseError(error);
+
+      return {
+        id: courseSubject.id,
+        name: data.name,
+        workload: data.workload || subject!.workload_hours,
+        subject_id: subject!.id,
+        course_subject_id: courseSubject.id,
+        education_grade_id: seriesId,
+        is_mandatory: data.is_mandatory ?? true
+      };
+    } catch (error) {
+      console.error('Error in CourseService.addSubjectToSeries:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Atualizar disciplina em uma série
+   */
+  async updateSubjectInSeries(courseSubjectId: number, data: {
+    name?: string;
+    workload?: number;
+  }): Promise<Record<string, unknown>> {
+    try {
+      // Buscar o course_subject para obter subject_id
+      const { data: courseSubject, error: csError } = await supabase
+        .from('course_subjects')
+        .select('subject_id, workload_hours')
+        .eq('id', courseSubjectId)
+        .single();
+
+      if (csError) throw handleSupabaseError(csError);
+
+      // Atualizar a disciplina se necessário
+      if (data.name) {
+        await supabase
+          .from('subjects')
+          .update({ name: data.name })
+          .eq('id', courseSubject.subject_id);
+      }
+
+      // Atualizar a carga horária no vínculo
+      if (data.workload !== undefined) {
+        await supabase
+          .from('course_subjects')
+          .update({ workload_hours: data.workload })
+          .eq('id', courseSubjectId);
+      }
+
+      return { id: courseSubjectId, ...data };
+    } catch (error) {
+      console.error('Error in CourseService.updateSubjectInSeries:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Remover disciplina de uma série
+   */
+  async removeSubjectFromSeries(courseSubjectId: number): Promise<void> {
+    try {
+      const { error } = await supabase
+        .from('course_subjects')
+        .update({ deleted_at: new Date().toISOString() })
+        .eq('id', courseSubjectId);
+
+      if (error) throw handleSupabaseError(error);
+    } catch (error) {
+      console.error('Error in CourseService.removeSubjectFromSeries:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Buscar séries de um curso com suas disciplinas
+   */
+  async getCourseSeriesWithSubjects(courseId: number): Promise<{
+    seriesAnos: Array<{
+      id: number;
+      name: string;
+      numero: number;
+      evaluationRuleId?: number;
+      subjects: Array<{
+        id: number;
+        name: string;
+        workload: number;
+        is_mandatory: boolean;
+      }>;
+    }>;
+  }> {
+    try {
+      // Buscar o curso com seu education_level
+      const { data: course, error: courseError } = await supabase
+        .from('courses')
+        .select('education_level')
+        .eq('id', courseId)
+        .single();
+
+      if (courseError) throw handleSupabaseError(courseError);
+
+      // Buscar séries do nível de ensino (por course_id ou education_level)
+      const { data: grades, error: gradesError } = await supabase
+        .from('education_grades')
+        .select('*')
+        .or(`course_id.eq.${courseId},education_level.eq.${course.education_level}`)
+        .order('grade_order', { ascending: true });
+
+      if (gradesError) throw handleSupabaseError(gradesError);
+
+      // Buscar disciplinas do curso usando education_grade_id
+      const { data: courseSubjects, error: subjectsError } = await supabase
+        .from('course_subjects')
+        .select(`
+          id,
+          education_grade_id,
+          workload_hours,
+          is_mandatory,
+          semester,
+          subject:subjects(id, name, workload_hours)
+        `)
+        .eq('course_id', courseId)
+        .is('deleted_at', null);
+
+      if (subjectsError) throw handleSupabaseError(subjectsError);
+
+      // Buscar regras de avaliação
+      const { data: evaluationRules } = await supabase
+        .from('evaluation_rules')
+        .select('id, education_grade_id, course_id')
+        .or(`course_id.eq.${courseId},education_grade_id.in.(${(grades || []).map((g: Record<string, unknown>) => g.id).join(',')})`)
+        .is('deleted_at', null);
+
+      // Montar estrutura de séries com disciplinas
+      const seriesAnos = (grades || []).map((grade: Record<string, unknown>) => {
+        const gradeId = grade.id as number;
+
+        // Buscar disciplinas desta série usando education_grade_id
+        const gradeSubjects = (courseSubjects || [])
+          .filter((cs: Record<string, unknown>) => cs.education_grade_id === gradeId)
+          .map((cs: Record<string, unknown>) => {
+            const subject = cs.subject as Record<string, unknown> | null;
+            return {
+              id: cs.id as number,
+              name: subject?.name as string || '',
+              workload: (cs.workload_hours as number) || (subject?.workload_hours as number) || 0,
+              is_mandatory: (cs.is_mandatory as boolean) ?? true
+            };
+          });
+
+        // Buscar regra de avaliação da série
+        const gradeRule = (evaluationRules || []).find(
+          (r: Record<string, unknown>) => r.education_grade_id === gradeId || r.course_id === courseId
+        );
+
+        return {
+          id: gradeId,
+          name: grade.grade_name as string,
+          numero: grade.grade_order as number,
+          evaluationRuleId: gradeRule?.id as number | undefined,
+          subjects: gradeSubjects
+        };
+      });
+
+      return { seriesAnos };
+    } catch (error) {
+      console.error('Error in CourseService.getCourseSeriesWithSubjects:', error);
+      return { seriesAnos: [] };
+    }
+  }
+
+  /**
    * Buscar estatísticas
    */
   async getStats(): Promise<{

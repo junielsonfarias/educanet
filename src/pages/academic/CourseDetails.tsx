@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import {
   ArrowLeft,
@@ -9,6 +9,7 @@ import {
   FileBadge,
   Edit,
   Hash,
+  Loader2,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
@@ -49,7 +50,7 @@ import {
 } from '@/components/ui/alert-dialog'
 
 interface SerieAno {
-  id: string;
+  id: number | string;
   name: string;
   numero?: number;
   evaluationRuleId?: string;
@@ -57,7 +58,7 @@ interface SerieAno {
 }
 
 interface SubjectItem {
-  id: string;
+  id: number | string;
   name: string;
   workload: number;
 }
@@ -83,37 +84,66 @@ export default function CourseDetails() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const {
-    etapasEnsino,
-    evaluationRules,
+    courses,
+    loading,
+    fetchCourses,
+    updateCourse,
     addSerieAno,
     updateSerieAno,
-    addSubject,
-    updateSubject,
-    removeSubject,
-    updateEtapaEnsino,
-    // Aliases para compatibilidade
-    courses,
-    addGrade,
-    updateGrade,
-    updateCourse,
+    addSubjectToSeries,
+    updateSubjectInSeries,
+    removeSubjectFromSeries,
   } = useCourseStore()
+
+  // Carregar cursos ao montar o componente
+  useEffect(() => {
+    if (courses.length === 0) {
+      fetchCourses()
+    }
+  }, [courses.length, fetchCourses])
+
+  // Alias para compatibilidade com código antigo
+  const etapasEnsino = courses || []
+  const evaluationRules: { id: string; name: string }[] = []
   const { toast } = useToast()
 
   const [isGradeDialogOpen, setIsGradeDialogOpen] = useState(false)
   const [isSubjectDialogOpen, setIsSubjectDialogOpen] = useState(false)
   const [isCourseDialogOpen, setIsCourseDialogOpen] = useState(false)
 
-  const [selectedSerieAnoId, setSelectedSerieAnoId] = useState<string | null>(null)
+  const [selectedSerieAnoId, setSelectedSerieAnoId] = useState<number | string | null>(null)
   const [editingSerieAno, setEditingSerieAno] = useState<SerieAno | null>(null)
   const [editingSubject, setEditingSubject] = useState<SubjectItem | null>(null)
   const [deleteSubjectData, setDeleteSubjectData] = useState<{
-    serieAnoId: string
-    subjectId: string
+    serieAnoId: number | string
+    subjectId: number | string
   } | null>(null)
 
-  const etapaEnsino = etapasEnsino.find((e) => e.id === id)
-  // Alias para compatibilidade
-  const course = etapaEnsino
+  // Converter id para número para busca
+  const courseId = id ? Number(id) : null
+
+  // Buscar etapa de ensino pelo ID
+  const etapaEnsino = courseId
+    ? etapasEnsino.find((e) => Number(e.id) === courseId)
+    : null
+
+  // Mapear series do formato do banco para o formato do componente
+  const seriesAnos: SerieAno[] = etapaEnsino?.series?.map((s: Record<string, unknown>) => ({
+    id: s.id as number,
+    name: (s.grade_name || s.name) as string,
+    numero: (s.grade_order || s.numero) as number,
+    subjects: [] // Disciplinas serão carregadas separadamente se necessário
+  })) || []
+
+  // Exibir loading enquanto carrega
+  if (loading && courses.length === 0) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <span className="ml-2">Carregando...</span>
+      </div>
+    )
+  }
 
   if (!etapaEnsino) {
     return (
@@ -127,12 +157,14 @@ export default function CourseDetails() {
   }
 
   // Handlers for EtapaEnsino
-  const handleUpdateEtapaEnsino = (data: CourseFormData) => {
-    updateEtapaEnsino(etapaEnsino.id, data)
-    toast({
-      title: 'Etapa de Ensino atualizada',
-      description: 'Alterações salvas com sucesso.',
-    })
+  const handleUpdateEtapaEnsino = async (data: CourseFormData) => {
+    if (courseId) {
+      await updateCourse(courseId, data)
+      toast({
+        title: 'Etapa de Ensino atualizada',
+        description: 'Alterações salvas com sucesso.',
+      })
+    }
   }
 
   // Alias para compatibilidade
@@ -152,59 +184,60 @@ export default function CourseDetails() {
     setIsGradeDialogOpen(true)
   }
 
-  // Alias para compatibilidade
-  const openEditGradeDialog = openEditSerieAnoDialog
+  const handleSerieAnoSubmit = async (data: SerieAnoFormData) => {
+    if (!courseId) return
 
-  const handleSerieAnoSubmit = (data: SerieAnoFormData) => {
     if (editingSerieAno) {
-      updateSerieAno(etapaEnsino.id, editingSerieAno.id, data)
+      await updateSerieAno(courseId, Number(editingSerieAno.id), data)
       toast({ title: 'Série/Ano atualizada', description: 'Alterações salvas.' })
     } else {
-      addSerieAno(etapaEnsino.id, data)
+      await addSerieAno(courseId, data)
       toast({ title: 'Série/Ano adicionada', description: 'Nova série/ano criada.' })
     }
+    setIsGradeDialogOpen(false)
   }
 
   // Alias para compatibilidade
   const handleGradeSubmit = handleSerieAnoSubmit
 
   // Handlers for Subject
-  const openAddSubjectDialog = (serieAnoId: string) => {
+  const openAddSubjectDialog = (serieAnoId: number | string) => {
     setSelectedSerieAnoId(serieAnoId)
     setEditingSubject(null)
     setIsSubjectDialogOpen(true)
   }
 
-  const openEditSubjectDialog = (serieAnoId: string, subject: SubjectItem) => {
+  const openEditSubjectDialog = (serieAnoId: number | string, subject: SubjectItem) => {
     setSelectedSerieAnoId(serieAnoId)
     setEditingSubject(subject)
     setIsSubjectDialogOpen(true)
   }
 
-  const handleSubjectSubmit = (data: SubjectFormData) => {
-    if (!selectedSerieAnoId) return
+  const handleSubjectSubmit = async (data: SubjectFormData) => {
+    if (!selectedSerieAnoId || !courseId) return
 
     if (editingSubject) {
-      updateSubject(etapaEnsino.id, selectedSerieAnoId, editingSubject.id, data)
+      await updateSubjectInSeries(courseId, Number(selectedSerieAnoId), Number(editingSubject.id), data)
       toast({
         title: 'Disciplina atualizada',
         description: 'Alterações salvas.',
       })
     } else {
-      addSubject(etapaEnsino.id, selectedSerieAnoId, data)
+      await addSubjectToSeries(courseId, Number(selectedSerieAnoId), data)
       toast({
         title: 'Disciplina adicionada',
         description: 'Disciplina criada com sucesso.',
       })
     }
+    setIsSubjectDialogOpen(false)
   }
 
-  const handleDeleteSubject = () => {
-    if (deleteSubjectData) {
-      removeSubject(
-        etapaEnsino.id,
-        deleteSubjectData.serieAnoId,
-        deleteSubjectData.subjectId,
+  const handleDeleteSubject = async () => {
+    if (deleteSubjectData && courseId) {
+      await removeSubjectFromSeries(
+        courseId,
+        Number(deleteSubjectData.serieAnoId),
+        Number(deleteSubjectData.subjectId),
       )
       toast({
         title: 'Disciplina removida',
@@ -273,21 +306,21 @@ export default function CourseDetails() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            {safeLength(etapaEnsino.seriesAnos) === 0 ? (
+            {safeLength(seriesAnos) === 0 ? (
               <div className="text-center py-8 text-muted-foreground">
                 Nenhuma série/ano cadastrada nesta etapa de ensino.
               </div>
             ) : (
               <Accordion type="single" collapsible className="w-full">
                 {/* Ordena séries/anos por número se disponível */}
-                {[...safeArray(etapaEnsino.seriesAnos)]
+                {[...safeArray(seriesAnos)]
                   .sort((a: SerieAno, b: SerieAno) => {
-                    const numA = a.numero || parseInt(a.name) || 0
-                    const numB = b.numero || parseInt(b.name) || 0
+                    const numA = a.numero || parseInt(String(a.name)) || 0
+                    const numB = b.numero || parseInt(String(b.name)) || 0
                     return numA - numB
                   })
                   .map((serieAno) => (
-                  <AccordionItem key={serieAno.id} value={serieAno.id}>
+                  <AccordionItem key={String(serieAno.id)} value={String(serieAno.id)}>
                     <AccordionTrigger className="hover:no-underline group">
                       <div className="flex items-center gap-4 w-full pr-4">
                         <div className="flex items-center gap-2">
@@ -425,7 +458,7 @@ export default function CourseDetails() {
         onOpenChange={setIsSubjectDialogOpen}
         onSubmit={handleSubjectSubmit}
         gradeName={
-          safeFind(safeArray(etapaEnsino.seriesAnos), (s) => s.id === selectedSerieAnoId)?.name || 'Série'
+          safeFind(safeArray(seriesAnos), (s) => String(s.id) === String(selectedSerieAnoId))?.name || 'Série'
         }
         initialData={editingSubject}
       />
