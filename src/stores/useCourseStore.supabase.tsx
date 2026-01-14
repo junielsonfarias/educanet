@@ -223,20 +223,21 @@ export const useCourseStore = create<CourseState>((set, get) => ({
   deleteCourse: async (id: number) => {
     set({ loading: true, error: null });
     try {
-      await courseService.delete(id);
-      
+      // Usar o método com limpeza de vínculos
+      await courseService.deleteCourseWithCleanup(id);
+
       const { courses } = get();
-      set({ 
+      set({
         courses: courses.filter(c => c.id !== id),
         currentCourse: get().currentCourse?.id === id ? null : get().currentCourse,
-        loading: false 
+        loading: false
       });
-      
-      console.log('Toast:','Curso removido com sucesso!');
+
+      console.log('Toast:','Etapa de ensino removida com sucesso! Vínculos limpos.');
     } catch (error: unknown) {
-      const message = error?.message || 'Erro ao remover curso';
+      const message = (error as Error)?.message || 'Erro ao remover etapa de ensino';
       set({ error: message, loading: false });
-      console.error('Toast:',message);
+      console.error('Toast:', message);
     }
   },
 

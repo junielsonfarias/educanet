@@ -50,24 +50,10 @@ import { useClassStore } from '@/stores/useClassStore.supabase'
 import { useAcademicYearStore } from '@/stores/useAcademicYearStore.supabase'
 import { useCourseStore } from '@/stores/useCourseStore.supabase'
 import { useAuth } from '@/hooks/useAuth'
-import { ClassroomDialog } from '@/pages/schools/components/ClassroomDialog'
+import { ClassFormDialogUnified } from '@/pages/schools/components/ClassFormDialogUnified'
 import { toast } from 'sonner'
 import type { ClassWithFullInfo } from '@/lib/supabase/services'
-
-interface ClassFormData {
-  schoolId?: string
-  yearId?: string
-  courseId?: string
-  name?: string
-  shift?: string
-  maxCapacity?: number
-  capacity?: number
-  room?: string
-  etapaEnsinoId?: string
-  serieAnoId?: string
-  regentTeacherId?: string
-  education_grade_id?: number
-}
+import type { School as SchoolType } from '@/lib/database-types'
 
 export default function ClassesList() {
   const navigate = useNavigate()
@@ -81,12 +67,10 @@ export default function ClassesList() {
     loading: classesLoading,
     fetchClasses,
     fetchEducationGrades,
-    createClass,
-    updateClass,
     deleteClass,
   } = useClassStore()
   const { academicYears, fetchAcademicYears } = useAcademicYearStore()
-  const { courses, fetchCourses } = useCourseStore()
+  const { fetchCourses } = useCourseStore()
 
   // Filters
   const [searchTerm, setSearchTerm] = useState('')
@@ -113,37 +97,6 @@ export default function ClassesList() {
     }
     loadData()
   }, [fetchSchools, fetchClasses, fetchEducationGrades, fetchAcademicYears, fetchCourses])
-
-  // Transformar education_grades para o formato esperado pelo ClassroomDialog
-  const etapasEnsino = useMemo(() => {
-    // Agrupar por education_level
-    const grouped: Record<string, { id: string; name: string; seriesAnos: any[] }> = {}
-
-    educationGrades.forEach((grade) => {
-      const level = grade.education_level || 'Outros'
-
-      if (!grouped[level]) {
-        grouped[level] = {
-          id: level,
-          name: level,
-          seriesAnos: [],
-        }
-      }
-
-      grouped[level].seriesAnos.push({
-        id: grade.id.toString(),
-        name: grade.grade_name,
-        order: grade.grade_order,
-      })
-    })
-
-    // Ordenar séries dentro de cada etapa
-    Object.values(grouped).forEach((etapa) => {
-      etapa.seriesAnos.sort((a, b) => a.order - b.order)
-    })
-
-    return Object.values(grouped)
-  }, [educationGrades])
 
   // Adaptar classes para estrutura do componente
   const allClasses = useMemo(() => {
@@ -189,101 +142,95 @@ export default function ClassesList() {
     [allClasses],
   )
 
-  // Filtering
-  const filteredClasses = allClasses.filter((cls) => {
-    if (!cls) return false
-    const matchesSearch = (cls.name || '')
-      .toLowerCase()
-      .includes(searchTerm.toLowerCase())
-    const matchesSchool =
-      schoolFilter === 'all' || cls.schoolId === schoolFilter
-    const matchesGrade =
-      gradeFilter === 'all' ||
-      cls.gradeName === gradeFilter ||
-      cls.serieAnoName === gradeFilter
-    const matchesShift = shiftFilter === 'all' || cls.shift === shiftFilter
-    const matchesYear = yearFilter === 'all' || cls.yearName === yearFilter
+  // Filtering - uses classesFilteredByRole which is already filtered by user role
+  const filteredClasses = useMemo(() => {
+    return classesFilteredByRole.filter((cls) => {
+      if (!cls) return false
+      const matchesSearch = (cls.name || '')
+        .toLowerCase()
+        .includes(searchTerm.toLowerCase())
+      const matchesSchool =
+        schoolFilter === 'all' || cls.schoolId === schoolFilter
+      const matchesGrade =
+        gradeFilter === 'all' ||
+        cls.gradeName === gradeFilter ||
+        cls.serieAnoName === gradeFilter
+      const matchesShift = shiftFilter === 'all' || cls.shift === shiftFilter
+      const matchesYear = yearFilter === 'all' || cls.yearName === yearFilter
 
-    return (
-      matchesSearch &&
-      matchesSchool &&
-      matchesGrade &&
-      matchesShift &&
-      matchesYear
-    )
-  })
+      return (
+        matchesSearch &&
+        matchesSchool &&
+        matchesGrade &&
+        matchesShift &&
+        matchesYear
+      )
+    })
+  }, [classesFilteredByRole, searchTerm, schoolFilter, gradeFilter, shiftFilter, yearFilter])
 
-  // Permissions
+  // Permissions based on user role
   const canManage = (schoolId?: string) => {
     if (!userData) return false
     const role = userData.role
     if (role === 'Admin' || role === 'Supervisor') return true
+    if (role === 'Coordenador' || role === 'Diretor') {
+      // Coordenador/Diretor só pode gerenciar turmas de suas escolas
+      return schoolId === userData.schoolId?.toString()
+    }
     return false
   }
 
-  // Determine schools available for creation
+  // Filter schools based on user role (Admin: Todas, Polo: Escolas do polo, Escola: Suas)
   const safeSchools = Array.isArray(schools) ? schools : []
-  const availableSchools = safeSchools.filter((s) => canManage(s.id.toString()))
+  const filteredSchoolsByRole = useMemo(() => {
+    if (!userData) return []
+    const role = userData.role
+
+    // Admin e Supervisor veem todas as escolas
+    if (role === 'Admin' || role === 'Supervisor') {
+      return safeSchools
+    }
+
+    // Coordenador de Polo vê apenas escolas do polo
+    if (role === 'Coordenador de Polo' && userData.poloId) {
+      return safeSchools.filter((s: SchoolType) => s.polo_id === userData.poloId)
+    }
+
+    // Coordenador, Diretor, Professor veem apenas sua escola
+    if (['Coordenador', 'Diretor', 'Professor'].includes(role) && userData.schoolId) {
+      return safeSchools.filter((s: SchoolType) => s.id === userData.schoolId)
+    }
+
+    return []
+  }, [safeSchools, userData])
+
+  // Filter classes based on user role hierarchy
+  const classesFilteredByRole = useMemo(() => {
+    if (!userData) return allClasses
+    const role = userData.role
+
+    // Admin e Supervisor veem todas as turmas
+    if (role === 'Admin' || role === 'Supervisor') {
+      return allClasses
+    }
+
+    // Coordenador de Polo vê turmas das escolas do polo
+    if (role === 'Coordenador de Polo' && userData.poloId) {
+      const poloSchoolIds = filteredSchoolsByRole.map((s: SchoolType) => s.id.toString())
+      return allClasses.filter((cls) => poloSchoolIds.includes(cls.schoolId))
+    }
+
+    // Coordenador, Diretor, Professor veem apenas turmas da sua escola
+    if (['Coordenador', 'Diretor', 'Professor'].includes(role) && userData.schoolId) {
+      return allClasses.filter((cls) => cls.schoolId === userData.schoolId?.toString())
+    }
+
+    return []
+  }, [allClasses, userData, filteredSchoolsByRole])
+
+  // Determine schools available for creation
+  const availableSchools = filteredSchoolsByRole.filter((s: SchoolType) => canManage(s.id.toString()))
   const canCreate = availableSchools.length > 0 || userData?.role === 'Admin'
-
-  const handleCreate = async (data: ClassFormData) => {
-    try {
-      if (!data.schoolId || !data.yearId) {
-        toast.error('Escola e ano letivo são obrigatórios')
-        return
-      }
-
-      // Encontrar o academic_period_id baseado no yearId
-      const academicYear = academicYears.find(
-        (y) => y.id.toString() === data.yearId
-      )
-
-      const classData = {
-        name: data.name || '',
-        school_id: parseInt(data.schoolId),
-        course_id: data.courseId ? parseInt(data.courseId) : 1,
-        academic_period_id: academicYear?.id || parseInt(data.yearId),
-        education_grade_id: data.serieAnoId ? parseInt(data.serieAnoId) : undefined,
-        homeroom_teacher_id: data.regentTeacherId ? parseInt(data.regentTeacherId) : undefined,
-        capacity: data.maxCapacity || data.capacity || 30,
-        shift: data.shift || 'Matutino',
-      }
-
-      const result = await createClass(classData)
-
-      if (result) {
-        setIsDialogOpen(false)
-        toast.success('Turma criada com sucesso!')
-      }
-    } catch (error: unknown) {
-      toast.error((error as Error)?.message || 'Erro ao criar turma')
-    }
-  }
-
-  const handleUpdate = async (data: ClassFormData) => {
-    if (editingClass) {
-      try {
-        const classData = {
-          name: data.name || editingClass.name,
-          shift: data.shift || editingClass.shift,
-          capacity: data.maxCapacity || data.capacity || editingClass.capacity,
-          course_id: data.courseId ? parseInt(data.courseId) : editingClass.course_id,
-          education_grade_id: data.serieAnoId ? parseInt(data.serieAnoId) : undefined,
-          homeroom_teacher_id: data.regentTeacherId ? parseInt(data.regentTeacherId) : undefined,
-        }
-
-        const result = await updateClass(editingClass.id, classData)
-
-        if (result) {
-          setIsDialogOpen(false)
-          setEditingClass(null)
-          toast.success('Turma atualizada com sucesso!')
-        }
-      } catch (error: unknown) {
-        toast.error((error as Error)?.message || 'Erro ao atualizar turma')
-      }
-    }
-  }
 
   const handleDelete = async () => {
     if (deleteId) {
@@ -425,7 +372,7 @@ export default function ClassesList() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Todas as Escolas</SelectItem>
-                {safeSchools.map((s) => (
+                {filteredSchoolsByRole.map((s: SchoolType) => (
                   <SelectItem key={s.id} value={s.id.toString()}>
                     {s.trade_name || s.name}
                   </SelectItem>
@@ -636,20 +583,30 @@ export default function ClassesList() {
         </div>
       )}
 
-      <ClassroomDialog
+      <ClassFormDialogUnified
         open={isDialogOpen}
-        onOpenChange={setIsDialogOpen}
-        onSubmit={editingClass ? handleUpdate : handleCreate}
-        etapasEnsino={etapasEnsino}
-        schools={userData?.role === 'Admin' ? safeSchools : availableSchools}
-        initialData={
+        onOpenChange={(open) => {
+          setIsDialogOpen(open)
+          if (!open) setEditingClass(null)
+        }}
+        onSuccess={() => {
+          setIsDialogOpen(false)
+          setEditingClass(null)
+          fetchClasses()
+          toast.success(editingClass ? 'Turma atualizada com sucesso!' : 'Turma criada com sucesso!')
+        }}
+        schools={filteredSchoolsByRole}
+        editingClass={
           editingClass
             ? {
-                ...editingClass,
-                schoolId: editingClass.school_id?.toString(),
-                yearId: editingClass.academic_year_id?.toString(),
-                courseId: editingClass.course_id?.toString(),
-                maxCapacity: editingClass.capacity,
+                id: editingClass.id,
+                name: editingClass.name,
+                code: editingClass.code,
+                shift: editingClass.shift || 'Manhã',
+                capacity: editingClass.capacity || 35,
+                course_id: editingClass.course_id,
+                education_grade_id: editingClass.education_grade_id,
+                academic_period_id: editingClass.academic_period_id,
               }
             : undefined
         }

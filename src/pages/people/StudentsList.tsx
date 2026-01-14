@@ -48,7 +48,7 @@ import {
 import { Badge } from '@/components/ui/badge'
 import { useStudentStore } from '@/stores/useStudentStore.supabase'
 import useUserStore from '@/stores/useUserStore'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { StudentFormDialog } from './components/StudentFormDialog'
 import { Student, Enrollment } from '@/lib/mock-data'
 import { useToast } from '@/hooks/use-toast'
@@ -93,13 +93,23 @@ export default function StudentsList() {
   const [deleteId, setDeleteId] = useState<string | null>(null)
 
   const navigate = useNavigate()
+  const [searchParams, setSearchParams] = useSearchParams()
   const { toast } = useToast()
-  
+
   // Buscar dados do Supabase na montagem do componente
   useEffect(() => {
     fetchStudents()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  // Abrir dialog automaticamente se action=new na URL
+  useEffect(() => {
+    if (searchParams.get('action') === 'new') {
+      setIsDialogOpen(true)
+      // Limpar o parâmetro da URL após abrir o dialog
+      setSearchParams({})
+    }
+  }, [searchParams, setSearchParams])
 
   // Permissões serão verificadas via RequirePermission
 

@@ -91,9 +91,13 @@ const studentSchema = z.object({
   usesTransport: z.enum(['yes', 'no']),
   transportRoute: z.string().optional(),
 
-  // Health
+  // Health / PCD
   hasSpecialNeeds: z.enum(['yes', 'no']),
   cid: z.string().optional(),
+  cidDescription: z.string().optional(),
+  hasMedicalReport: z.enum(['yes', 'no']).optional(),
+  medicalReportDate: z.string().optional(),
+  medicalReportNotes: z.string().optional(),
   observation: z.string().optional(),
   bloodType: z.enum(['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-', 'Não informado']).optional(),
   allergies: z.string().optional(),
@@ -155,6 +159,10 @@ export function StudentFormDialog({
       transportRoute: '',
       hasSpecialNeeds: 'no',
       cid: '',
+      cidDescription: '',
+      hasMedicalReport: 'no',
+      medicalReportDate: '',
+      medicalReportNotes: '',
       observation: '',
       enrollmentSchoolId: '',
       enrollmentYearId: '',
@@ -203,6 +211,10 @@ export function StudentFormDialog({
           transportRoute: initialData.transport?.routeNumber || '',
           hasSpecialNeeds: initialData.health?.hasSpecialNeeds ? 'yes' : 'no',
           cid: initialData.health?.cid || '',
+          cidDescription: (initialData as any).cidDescription || '',
+          hasMedicalReport: (initialData as any).hasMedicalReport ? 'yes' : 'no',
+          medicalReportDate: (initialData as any).medicalReportDate || '',
+          medicalReportNotes: (initialData as any).medicalReportNotes || '',
           observation: initialData.health?.observation || '',
           enrollmentSchoolId: '',
           enrollmentYearId: '',
@@ -248,6 +260,10 @@ export function StudentFormDialog({
           transportRoute: '',
           hasSpecialNeeds: 'no',
           cid: '',
+          cidDescription: '',
+          hasMedicalReport: 'no',
+          medicalReportDate: '',
+          medicalReportNotes: '',
           observation: '',
           enrollmentSchoolId: '',
           enrollmentYearId: '',
@@ -324,9 +340,20 @@ export function StudentFormDialog({
       health: {
         hasSpecialNeeds: values.hasSpecialNeeds === 'yes',
         cid: values.hasSpecialNeeds === 'yes' ? values.cid : undefined,
+        cidDescription: values.hasSpecialNeeds === 'yes' ? values.cidDescription : undefined,
+        hasMedicalReport: values.hasSpecialNeeds === 'yes' && values.hasMedicalReport === 'yes',
+        medicalReportDate: values.hasSpecialNeeds === 'yes' && values.hasMedicalReport === 'yes' ? values.medicalReportDate : undefined,
+        medicalReportNotes: values.hasSpecialNeeds === 'yes' && values.hasMedicalReport === 'yes' ? values.medicalReportNotes : undefined,
         observation:
           values.hasSpecialNeeds === 'yes' ? values.observation : undefined,
       },
+      // Campos PCD para student_profiles
+      is_pcd: values.hasSpecialNeeds === 'yes',
+      cid_code: values.hasSpecialNeeds === 'yes' ? values.cid : undefined,
+      cid_description: values.hasSpecialNeeds === 'yes' ? values.cidDescription : undefined,
+      has_medical_report: values.hasSpecialNeeds === 'yes' && values.hasMedicalReport === 'yes',
+      medical_report_date: values.hasSpecialNeeds === 'yes' && values.hasMedicalReport === 'yes' ? values.medicalReportDate : undefined,
+      medical_report_notes: values.hasSpecialNeeds === 'yes' && values.hasMedicalReport === 'yes' ? values.medicalReportNotes : undefined,
       susCard: values.susCard,
       birthCertificate: values.birthCertificate,
       nationality: values.nationality,
@@ -777,29 +804,105 @@ export function StudentFormDialog({
                     )}
                   />
                   {hasSpecialNeeds === 'yes' && (
-                    <>
+                    <div className="space-y-4 border rounded-lg p-4 bg-cyan-50/30">
+                      <h4 className="font-medium text-sm text-cyan-700 flex items-center gap-2">
+                        Dados PCD (Pessoa com Deficiência)
+                      </h4>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <FormField
+                          control={form.control}
+                          name="cid"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>CID (Código)</FormLabel>
+                              <FormControl>
+                                <Input placeholder="Ex: F84.0" {...field} />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={form.control}
+                          name="cidDescription"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Descrição da Deficiência</FormLabel>
+                              <FormControl>
+                                <Input placeholder="Ex: Transtorno do Espectro Autista" {...field} />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      </div>
+
                       <FormField
                         control={form.control}
-                        name="cid"
+                        name="hasMedicalReport"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>CID (Código Internacional de Doenças)</FormLabel>
-                            <FormControl>
-                              <Input placeholder="Ex: F84.0" {...field} />
-                            </FormControl>
+                            <FormLabel>Possui Laudo Médico?</FormLabel>
+                            <Select onValueChange={field.onChange} value={field.value}>
+                              <FormControl>
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Selecione" />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                <SelectItem value="yes">Sim</SelectItem>
+                                <SelectItem value="no">Não</SelectItem>
+                              </SelectContent>
+                            </Select>
                             <FormMessage />
                           </FormItem>
                         )}
                       />
+
+                      {form.watch('hasMedicalReport') === 'yes' && (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <FormField
+                            control={form.control}
+                            name="medicalReportDate"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Data do Laudo</FormLabel>
+                                <FormControl>
+                                  <Input type="date" {...field} />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                          <FormField
+                            control={form.control}
+                            name="medicalReportNotes"
+                            render={({ field }) => (
+                              <FormItem className="md:col-span-2">
+                                <FormLabel>Observações do Laudo</FormLabel>
+                                <FormControl>
+                                  <Textarea
+                                    placeholder="Informações adicionais do laudo médico..."
+                                    {...field}
+                                    rows={2}
+                                  />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                        </div>
+                      )}
+
                       <FormField
                         control={form.control}
                         name="observation"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>Observações sobre Necessidades Especiais</FormLabel>
+                            <FormLabel>Observações Gerais sobre Necessidades Especiais</FormLabel>
                             <FormControl>
                               <Textarea
-                                placeholder="Descreva as necessidades especiais do aluno..."
+                                placeholder="Descreva as necessidades especiais do aluno, adaptações necessárias, etc."
                                 {...field}
                                 rows={3}
                               />
@@ -808,7 +911,7 @@ export function StudentFormDialog({
                           </FormItem>
                         )}
                       />
-                    </>
+                    </div>
                   )}
                 </div>
 

@@ -35,6 +35,10 @@ export interface StudentFullInfo extends Student {
   person: Person;
   enrollments?: StudentEnrollment[];
   guardians?: Guardian[];
+  // Propriedades de compatibilidade com modelo antigo
+  name?: string; // Computado: person.first_name + ' ' + person.last_name
+  registration?: string; // Alias para registration_number
+  projectIds?: string[]; // Array vazio por padrão (projetos não implementados)
 }
 
 export interface TeacherFullInfo extends Teacher {
@@ -50,9 +54,9 @@ export interface StaffFullInfo extends Staff {
 }
 
 export interface ClassWithDetails extends Class {
-  school: School;
+  school?: School;
   course: Course;
-  academic_year: AcademicYear;
+  academic_period: AcademicPeriod;
 }
 
 export interface EnrollmentWithDetails extends StudentEnrollment {

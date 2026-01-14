@@ -38,10 +38,10 @@ interface SchoolState {
   fetchSchoolStats: (schoolId: number) => Promise<SchoolStats | null>;
   fetchGeneralStats: () => Promise<void>;
   fetchInfrastructure: (schoolId: number) => Promise<Infrastructure[]>;
-  fetchClasses: (schoolId: number, options?: { academicYearId?: number; shift?: string }) => Promise<ClassWithDetails[]>;
-  fetchTeachers: (schoolId: number, options?: { employmentStatus?: string }) => Promise<TeacherFullInfo[]>;
-  fetchStaff: (schoolId: number, options?: { employmentStatus?: string; positionId?: number; departmentId?: number }) => Promise<StaffFullInfo[]>;
-  fetchStudents: (schoolId: number, options?: { status?: string; academicYearId?: number; courseId?: number }) => Promise<StudentFullInfo[]>;
+  fetchClasses: (schoolId: number, options?: { academicPeriodId?: number }) => Promise<ClassWithDetails[]>;
+  fetchTeachers: (schoolId: number) => Promise<TeacherFullInfo[]>;
+  fetchStaff: (schoolId: number, options?: { positionId?: number; departmentId?: number }) => Promise<StaffFullInfo[]>;
+  fetchStudents: (schoolId: number, options?: { enrollmentStatus?: string; academicYearId?: number }) => Promise<StudentFullInfo[]>;
   checkAvailability: (schoolId: number) => Promise<{ capacity: number | null; enrolled: number; available: number; hasAvailability: boolean } | null>;
   
   // Ações CRUD
@@ -184,12 +184,12 @@ export const useSchoolStore = create<SchoolState>((set, get) => ({
     }
   },
 
-  fetchTeachers: async (schoolId: number, options = {}) => {
+  fetchTeachers: async (schoolId: number) => {
     try {
-      const teachers = await schoolService.getTeachers(schoolId, options);
+      const teachers = await schoolService.getTeachers(schoolId);
       return teachers;
     } catch (error: unknown) {
-      const message = error?.message || 'Erro ao carregar professores';
+      const message = (error as Error)?.message || 'Erro ao carregar professores';
       toast.error(message);
       return [];
     }

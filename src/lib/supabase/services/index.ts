@@ -36,6 +36,7 @@ import { preEnrollmentService } from './pre-enrollment-service';
 import { reenrollmentService } from './reenrollment-service';
 import { evaluationRulesService } from './evaluation-rules-service';
 import { assessmentTypeService } from './assessment-type-service';
+import { schoolCourseService } from './school-course-service';
 
 // Services Específicos - Re-export
 export { studentService } from './student-service';
@@ -64,6 +65,7 @@ export { preEnrollmentService } from './pre-enrollment-service';
 export { reenrollmentService } from './reenrollment-service';
 export { evaluationRulesService } from './evaluation-rules-service';
 export { assessmentTypeService } from './assessment-type-service';
+export { schoolCourseService } from './school-course-service';
 
 // Types específicos dos services
 export type { EnrollmentData, TransferData } from './enrollment-service';
@@ -119,6 +121,13 @@ export type {
 } from './reenrollment-service';
 export type { EvaluationRule, EvaluationRuleFormData } from './evaluation-rules-service';
 export type { AssessmentType, AssessmentTypeCreateData, AssessmentTypeUpdateData } from './assessment-type-service';
+export type {
+  SchoolAcademicYearCourse,
+  SchoolCourseWithDetails,
+  CreateSchoolCourseData,
+  EducationGrade,
+  SchoolCourseGrade
+} from './school-course-service';
 
 // Default exports
 export default {
@@ -148,6 +157,7 @@ export default {
   preEnrollmentService,
   reenrollmentService,
   evaluationRulesService,
-  assessmentTypeService
+  assessmentTypeService,
+  schoolCourseService
 };
 

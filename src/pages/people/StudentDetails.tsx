@@ -42,7 +42,7 @@ import {
   getClassroomFromEnrollment,
   getAcademicYearFromEnrollment,
 } from '@/lib/enrollment-utils'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { StudentFormDialog } from './components/StudentFormDialog'
 import { EnrollmentFormDialog } from './components/EnrollmentFormDialog'
 import { ProjectEnrollmentDialog } from './components/ProjectEnrollmentDialog'
@@ -67,11 +67,14 @@ export default function StudentDetails() {
   const navigate = useNavigate()
   const {
     getStudent,
+    fetchStudentById,
     updateStudent,
     addEnrollment,
     addProjectEnrollment,
     removeProjectEnrollment,
     updateEnrollment,
+    loading: studentLoading,
+    currentStudent,
   } = useStudentStore()
   const { schools } = useSchoolStore()
   const { assessments, assessmentTypes } = useAssessmentStore()
@@ -86,9 +89,30 @@ export default function StudentDetails() {
   const [isProjectDialogOpen, setIsProjectDialogOpen] = useState(false)
   const [isTransferDialogOpen, setIsTransferDialogOpen] = useState(false)
 
-  const student = getStudent(id || '')
+  // Carregar dados do aluno ao montar ou quando ID mudar
+  useEffect(() => {
+    if (id) {
+      const numericId = parseInt(id, 10)
+      if (!isNaN(numericId)) {
+        fetchStudentById(numericId)
+      }
+    }
+  }, [id, fetchStudentById])
+
+  // Buscar do estado local ou do currentStudent
+  const student = getStudent(id || '') || currentStudent
   const isAdminOrSupervisor =
     currentUser?.role === 'admin' || currentUser?.role === 'supervisor'
+
+  // Loading state
+  if (studentLoading) {
+    return (
+      <div className="flex flex-col items-center justify-center h-[50vh] gap-4">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+        <p className="text-muted-foreground">Carregando dados do aluno...</p>
+      </div>
+    )
+  }
 
   if (!student) {
     return (

@@ -60,6 +60,7 @@ import Layout from './components/Layout'
 import PublicLayout from './components/PublicLayout'
 import UsersList from './pages/settings/UsersList'
 import GeneralSettings from './pages/settings/GeneralSettings'
+import AcademicConfig from './pages/settings/AcademicConfig'
 import WebsiteContent from './pages/settings/website/WebsiteContent'
 import NewsManager from './pages/settings/website/NewsManager'
 import DocumentsManager from './pages/settings/website/DocumentsManager'
@@ -375,6 +376,10 @@ const App = () => (
                                       <Route
                                         path="/configuracoes/geral"
                                         element={<GeneralSettings />}
+                                      />
+                                      <Route
+                                        path="/configuracoes/academico"
+                                        element={<AcademicConfig />}
                                       />
                                       <Route
                                         path="/configuracoes/usuarios"

@@ -1,7 +1,4 @@
 import React, { useState, useEffect, useMemo, useCallback, memo } from 'react'
-import { useForm } from 'react-hook-form'
-import { zodResolver } from '@hookform/resolvers/zod'
-import * as z from 'zod'
 import { Loader2, Save, Filter, AlertCircle } from 'lucide-react'
 import {
   Card,
@@ -10,55 +7,54 @@ import {
   CardTitle,
   CardDescription,
 } from '@/components/ui/card'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
-import { Textarea } from '@/components/ui/textarea'
-import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
+import { Label } from '@/components/ui/label'
 import { toast } from 'sonner'
 import { useSchoolStore } from '@/stores/useSchoolStore.supabase'
 import { useCourseStore } from '@/stores/useCourseStore.supabase'
-import { useStudentStore } from '@/stores/useStudentStore.supabase'
 import { useAssessmentStore } from '@/stores/useAssessmentStore.supabase'
 import { useAcademicYearStore } from '@/stores/useAcademicYearStore.supabase'
 import { useAcademicPeriodStore } from '@/stores/useAcademicPeriodStore.supabase'
-import { 
-  classService, 
-  evaluationInstanceService,
-  enrollmentService 
+import {
+  classService,
+  evaluationInstanceService
 } from '@/lib/supabase/services'
 import { cn } from '@/lib/utils'
-import { RequirePermission } from '@/components/RequirePermission'
+
+// --- Select Style ---
+const selectClassName = cn(
+  'flex h-10 w-full items-center justify-between rounded-md border border-input',
+  'bg-background px-3 py-2 text-sm ring-offset-background',
+  'focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary/50',
+  'transition-all duration-200 hover:border-primary/30',
+  'disabled:cursor-not-allowed disabled:opacity-50'
+)
 
 // --- Storage Key for Persistence ---
-const STORAGE_KEY = 'edu_assessment_filters_v3_supabase'
+const STORAGE_KEY = 'edu_assessment_filters_v4'
 
-// --- Validation Schema ---
-const filterSchema = z.object({
-  schoolId: z.string().min(1, 'Selecione a escola'),
-  academicYearId: z.string().min(1, 'Selecione o ano letivo'),
-  academicPeriodId: z.string().min(1, 'Selecione o período'),
-  courseId: z.string().min(1, 'Selecione o curso'),
-  classId: z.string().min(1, 'Selecione a turma'),
-  subjectId: z.string().min(1, 'Selecione a disciplina'),
-})
+interface FilterState {
+  schoolId: string
+  academicYearId: string
+  academicPeriodId: string
+  courseId: string
+  classId: string
+  subjectId: string
+}
 
-type FilterValues = z.infer<typeof filterSchema>
+// --- Tipo para aluno retornado pelo classService ---
+interface ClassStudent {
+  id: number
+  order_number?: number
+  student_registration_number?: string
+  person?: {
+    first_name?: string
+    last_name?: string
+    full_name?: string
+  }
+}
 
 // --- Optimized Student Row Component ---
 const StudentRow = memo(
@@ -66,13 +62,11 @@ const StudentRow = memo(
     student,
     value,
     max,
-    isNumeric,
     onChange,
   }: {
-    student: any
+    student: ClassStudent
     value: string | number
     max: number
-    isNumeric: boolean
     onChange: (id: number, val: string | number) => void
   }) => {
     const [localValue, setLocalValue] = useState<string | number>(
@@ -83,64 +77,55 @@ const StudentRow = memo(
       setLocalValue(value !== undefined ? value : '')
     }, [value])
 
-    const handleChange = (
-      e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
-    ) => {
+    const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
       const val = e.target.value
       setLocalValue(val)
-
-      if (isNumeric) {
-        const num = parseFloat(val)
-        onChange(student.id, isNaN(num) ? '' : num)
-      } else {
-        onChange(student.id, val)
-      }
+      const num = parseFloat(val)
+      onChange(student.id, isNaN(num) ? '' : num)
     }
 
-    const studentName = `${student.first_name} ${student.last_name}`
-    const studentRegistration = student.registration_number || 'N/A'
+    // Usar estrutura do classService.getClassStudents
+    const studentName = student.person?.full_name ||
+      `${student.person?.first_name || ''} ${student.person?.last_name || ''}`.trim() ||
+      'Aluno'
+    const studentRegistration = student.student_registration_number || 'N/A'
+    const orderNumber = student.order_number || ''
 
     return (
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-3 border rounded-lg bg-card hover:bg-accent/5 transition-colors">
-        <div className="flex flex-col">
-          <span className="font-semibold text-sm">{studentName}</span>
-          <span className="text-xs text-muted-foreground">
-            Matrícula: {studentRegistration}
-          </span>
+        <div className="flex items-center gap-3">
+          <span className="text-muted-foreground text-sm w-6">{orderNumber}.</span>
+          <div className="flex flex-col">
+            <span className="font-semibold text-sm">{studentName}</span>
+            <span className="text-xs text-muted-foreground">
+              Matrícula: {studentRegistration}
+            </span>
+          </div>
         </div>
         <div className="w-full sm:w-[150px]">
-          {isNumeric ? (
-            <Input
-              type="number"
-              min={0}
-              max={max}
-              step="0.1"
-              placeholder="Nota"
-              className={cn(
-                'transition-all',
-                typeof localValue === 'number' && localValue < 6
-                  ? 'border-red-300 bg-red-50 text-red-900'
-                  : '',
-              )}
-              value={localValue}
-              onChange={handleChange}
-            />
-          ) : (
-            <Textarea
-              placeholder="Parecer..."
-              className="min-h-[40px] h-[40px] resize-none py-2"
-              value={localValue}
-              onChange={handleChange}
-            />
-          )}
+          <Input
+            type="number"
+            min={0}
+            max={max}
+            step="0.1"
+            placeholder="Nota"
+            className={cn(
+              'transition-all',
+              typeof localValue === 'number' && localValue < 6
+                ? 'border-red-300 bg-red-50 text-red-900'
+                : '',
+            )}
+            value={localValue}
+            onChange={handleChange}
+          />
         </div>
       </div>
     )
   },
   (prev, next) =>
     prev.value === next.value &&
-    prev.student.id === next.student.id &&
-    prev.isNumeric === next.isNumeric,
+    prev.student?.id === next.student?.id &&
+    prev.max === next.max,
 )
 
 StudentRow.displayName = 'StudentRow'
@@ -148,22 +133,45 @@ StudentRow.displayName = 'StudentRow'
 export default function AssessmentInput() {
   const { schools, loading: schoolsLoading, fetchSchools } = useSchoolStore()
   const { courses, subjects, loading: coursesLoading, fetchCourses, fetchSubjects } = useCourseStore()
-  const { students, loading: studentsLoading, fetchStudents } = useStudentStore()
-  const { 
-    grades, 
-    loading: gradesLoading, 
+  const {
+    grades,
+    loading: gradesLoading,
     saveGrade,
-    fetchClassGrades 
+    fetchClassGrades
   } = useAssessmentStore()
   const { academicYears, loading: yearsLoading, fetchAcademicYears } = useAcademicYearStore()
   const { academicPeriods, loading: periodsLoading, fetchAcademicPeriods } = useAcademicPeriodStore()
+
+  // Filtros simples com useState
+  const [filters, setFilters] = useState<FilterState>(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY)
+      if (saved) {
+        return JSON.parse(saved)
+      }
+    } catch {
+      // Ignore parse errors
+    }
+    return {
+      schoolId: '',
+      academicYearId: '',
+      academicPeriodId: '',
+      courseId: '',
+      classId: '',
+      subjectId: '',
+    }
+  })
 
   const [studentGrades, setStudentGrades] = useState<Record<number, number | string>>({})
   const [loading, setLoading] = useState(false)
   const [classes, setClasses] = useState<any[]>([])
   const [classesLoading, setClassesLoading] = useState(false)
-  const [evaluationInstances, setEvaluationInstances] = useState<any[]>([])
-  const [enrollments, setEnrollments] = useState<any[]>([])
+  const [classStudents, setClassStudents] = useState<any[]>([])
+
+  // Salvar filtros no localStorage
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(filters))
+  }, [filters])
 
   // Carregar dados iniciais
   useEffect(() => {
@@ -172,73 +180,32 @@ export default function AssessmentInput() {
     fetchSubjects()
     fetchAcademicYears()
     fetchAcademicPeriods()
-    fetchStudents()
-  }, [fetchSchools, fetchCourses, fetchSubjects, fetchAcademicYears, fetchAcademicPeriods, fetchStudents])
+  }, [fetchSchools, fetchCourses, fetchSubjects, fetchAcademicYears, fetchAcademicPeriods])
 
-  // Load saved filters
-  const defaultValues: FilterValues = useMemo(() => {
-    const saved = localStorage.getItem(STORAGE_KEY)
-    return saved
-      ? JSON.parse(saved)
-      : {
-          schoolId: '',
-          academicYearId: '',
-          academicPeriodId: '',
-          courseId: '',
-          classId: '',
-          subjectId: '',
-        }
-  }, [])
+  // --- Safe Arrays (memoized to prevent unnecessary re-renders) ---
+  const safeSchools = useMemo(() => Array.isArray(schools) ? schools : [], [schools])
+  const safeAcademicYears = useMemo(() => Array.isArray(academicYears) ? academicYears : [], [academicYears])
+  const safeCourses = useMemo(() => Array.isArray(courses) ? courses : [], [courses])
+  const safeSubjects = useMemo(() => Array.isArray(subjects) ? subjects : [], [subjects])
+  const safeGrades = useMemo(() => Array.isArray(grades) ? grades : [], [grades])
 
-  const form = useForm<FilterValues>({
-    resolver: zodResolver(filterSchema),
-    defaultValues,
-  })
-
-  // --- Watchers ---
-  const schoolId = form.watch('schoolId')
-  const academicYearId = form.watch('academicYearId')
-  const academicPeriodId = form.watch('academicPeriodId')
-  const courseId = form.watch('courseId')
-  const classId = form.watch('classId')
-  const subjectId = form.watch('subjectId')
-
-  // --- Persistent Storage ---
-  useEffect(() => {
-    const subscription = form.watch((value) => {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(value))
-    })
-    return () => subscription.unsubscribe()
-  }, [form])
-
-  // --- Safe Arrays ---
-  const safeSchools = Array.isArray(schools) ? schools : []
-  const safeAcademicYears = Array.isArray(academicYears) ? academicYears : []
-  const safeCourses = Array.isArray(courses) ? courses : []
-  const safeSubjects = Array.isArray(subjects) ? subjects : []
-  const safeStudents = Array.isArray(students) ? students : []
-  const safeGrades = Array.isArray(grades) ? grades : []
-
-  // --- Derived Options ---
-  
   // Filtrar períodos por ano letivo
   const filteredPeriods = useMemo(() => {
-    if (!academicYearId) return []
+    if (!filters.academicYearId) return []
     return (Array.isArray(academicPeriods) ? academicPeriods : []).filter(
-      (p) => p.academic_year_id?.toString() === academicYearId
+      (p) => p.academic_year_id?.toString() === filters.academicYearId
     )
-  }, [academicPeriods, academicYearId])
+  }, [academicPeriods, filters.academicYearId])
 
   // Buscar turmas quando escola e ano são selecionados
   useEffect(() => {
     const fetchClasses = async () => {
-      if (schoolId && academicYearId) {
+      if (filters.schoolId && filters.academicYearId) {
         setClassesLoading(true)
         try {
-          const classesData = await classService.getBySchool(parseInt(schoolId))
-          // Filtrar turmas pelo ano letivo
+          const classesData = await classService.getBySchool(parseInt(filters.schoolId))
           const filteredClasses = (classesData || []).filter(
-            (c) => c.academic_year_id?.toString() === academicYearId
+            (c) => c.academic_year_id?.toString() === filters.academicYearId
           )
           setClasses(filteredClasses)
         } catch {
@@ -252,105 +219,106 @@ export default function AssessmentInput() {
       }
     }
     fetchClasses()
-  }, [schoolId, academicYearId])
+  }, [filters.schoolId, filters.academicYearId])
 
   // Filtrar turmas por curso
   const filteredClasses = useMemo(() => {
-    if (!courseId) return classes
-    return classes.filter((c) => c.course_id?.toString() === courseId)
-  }, [classes, courseId])
+    if (!filters.courseId) return classes
+    return classes.filter((c) => c.course_id?.toString() === filters.courseId)
+  }, [classes, filters.courseId])
 
-  // --- Reset Effects for Dependent Fields ---
-  useEffect(() => {
-    if (schoolId) {
-      const validYear = safeAcademicYears.find((y) => y.id.toString() === academicYearId)
-      if (!validYear && academicYearId) form.setValue('academicYearId', '')
-    } else {
-      if (academicYearId) form.setValue('academicYearId', '')
-    }
-  }, [schoolId, academicYearId, safeAcademicYears, form])
+  // Handle filter changes
+  const handleFilterChange = useCallback((field: keyof FilterState, value: string) => {
+    setFilters(prev => {
+      const next = { ...prev, [field]: value }
 
-  useEffect(() => {
-    if (academicYearId) {
-      const validPeriod = filteredPeriods.find((p) => p.id.toString() === academicPeriodId)
-      if (!validPeriod && academicPeriodId) form.setValue('academicPeriodId', '')
-    } else {
-      if (academicPeriodId) form.setValue('academicPeriodId', '')
-    }
-  }, [academicYearId, academicPeriodId, filteredPeriods, form])
+      // Reset dependent fields
+      if (field === 'schoolId') {
+        next.academicYearId = ''
+        next.academicPeriodId = ''
+        next.courseId = ''
+        next.classId = ''
+        next.subjectId = ''
+      } else if (field === 'academicYearId') {
+        next.academicPeriodId = ''
+        next.courseId = ''
+        next.classId = ''
+        next.subjectId = ''
+      } else if (field === 'courseId') {
+        next.classId = ''
+      }
 
-  useEffect(() => {
-    if (courseId) {
-      const validClass = filteredClasses.find((c) => c.id.toString() === classId)
-      if (!validClass && classId) form.setValue('classId', '')
-    } else {
-      if (classId) form.setValue('classId', '')
-    }
-  }, [courseId, classId, filteredClasses, form])
+      return next
+    })
+  }, [])
 
-  useEffect(() => {
-    const validSubject = safeSubjects.find((s) => s.id.toString() === subjectId)
-    if (!validSubject && subjectId) form.setValue('subjectId', '')
-  }, [subjectId, safeSubjects, form])
+  // Estado para controlar se os dados foram carregados
+  const [dataLoaded, setDataLoaded] = useState(false)
 
-  // --- Load Grades Data ---
+  // --- Load Grades Data (manual trigger only) ---
   const loadData = useCallback(async () => {
-    if (!classId || !subjectId || !academicPeriodId) return
+    if (!filters.classId || !filters.subjectId || !filters.academicPeriodId) {
+      toast.warning('Preencha todos os filtros antes de carregar')
+      return
+    }
 
     setLoading(true)
+    setDataLoaded(false)
     try {
-      // Buscar matrículas da turma
-      const enrollmentsData = await enrollmentService.getEnrollmentsByClass(parseInt(classId))
-      setEnrollments(enrollmentsData || [])
+      // Buscar alunos da turma usando classService
+      const studentsData = await classService.getClassStudents(parseInt(filters.classId))
+      setClassStudents(studentsData || [])
 
-      // Buscar notas existentes
-      await fetchClassGrades(parseInt(classId))
+      // Tentar buscar notas existentes (pode não haver)
+      try {
+        await fetchClassGrades(parseInt(filters.classId))
+      } catch {
+        // Ignorar erro se não houver notas - é esperado
+        console.log('Nenhuma nota encontrada para esta turma')
+      }
 
-      // Inicializar studentGrades com notas existentes
-      const currentGrades: Record<number, number | string> = {}
-      
-      enrollmentsData?.forEach((enrollment: any) => {
-        const studentProfileId = enrollment.student_profile_id || enrollment.student_id
-        if (!studentProfileId) return
-
-        // Buscar nota do aluno
-        const grade = safeGrades.find(
-          (g) =>
-            g.student_profile_id === studentProfileId &&
-            g.evaluation_instance?.class_teacher_subject?.class_id?.toString() === classId &&
-            g.evaluation_instance?.class_teacher_subject?.subject_id?.toString() === subjectId
-        )
-        
-        if (grade) {
-          currentGrades[studentProfileId] = grade.grade_value || ''
-        }
-      })
-
-      setStudentGrades(currentGrades)
-    } catch {
-      toast.error('Erro ao carregar notas')
+      setStudentGrades({})
+      setDataLoaded(true)
+    } catch (error) {
+      console.error('Erro ao carregar alunos:', error)
+      toast.error('Erro ao carregar alunos da turma')
+      setDataLoaded(false)
     } finally {
       setLoading(false)
     }
-  }, [classId, subjectId, academicPeriodId, fetchClassGrades, safeGrades])
+  }, [filters.classId, filters.subjectId, filters.academicPeriodId, fetchClassGrades])
 
-  // Trigger load when filters are complete
+  // Reset quando filtros mudam (sem carregar automaticamente)
   useEffect(() => {
-    const basicFilters =
-      schoolId &&
-      academicYearId &&
-      academicPeriodId &&
-      courseId &&
-      classId &&
-      subjectId
+    setDataLoaded(false)
+    setStudentGrades({})
+    setClassStudents([])
+  }, [filters.schoolId, filters.academicYearId, filters.academicPeriodId, filters.courseId, filters.classId, filters.subjectId])
 
-    if (basicFilters) {
-      loadData()
-    } else {
-      setStudentGrades({})
-      setEnrollments([])
-    }
-  }, [schoolId, academicYearId, academicPeriodId, courseId, classId, subjectId, loadData])
+  // Inicializar studentGrades quando grades do store mudar (apenas se dados carregados)
+  useEffect(() => {
+    if (!dataLoaded || !filters.classId || !filters.subjectId || classStudents.length === 0) return
+
+    const currentGrades: Record<number, number | string> = {}
+
+    classStudents.forEach((student: any) => {
+      const studentProfileId = student.id
+      if (!studentProfileId) return
+
+      const grade = safeGrades.find(
+        (g: any) =>
+          g.student_profile_id === studentProfileId &&
+          g.evaluation_instance?.class_teacher_subject?.class_id?.toString() === filters.classId &&
+          g.evaluation_instance?.class_teacher_subject?.subject_id?.toString() === filters.subjectId
+      )
+
+      if (grade) {
+        currentGrades[studentProfileId] = (grade as any).grade_value || ''
+      }
+    })
+
+    setStudentGrades(currentGrades)
+  }, [dataLoaded, safeGrades, classStudents, filters.classId, filters.subjectId])
 
   const handleGradeChange = useCallback(
     (studentId: number, value: string | number) => {
@@ -360,35 +328,26 @@ export default function AssessmentInput() {
   )
 
   const handleSave = async () => {
-    const values = form.getValues()
-
     setLoading(true)
     let savedCount = 0
 
     try {
-      // Buscar instâncias de avaliação existentes para esta turma
-      const classIdNum = parseInt(values.classId)
+      const classIdNum = parseInt(filters.classId)
       const existingInstances = await evaluationInstanceService.getByClass(classIdNum)
-      
-      // Filtrar por disciplina se possível
+
       const instancesForSubject = existingInstances.filter((inst) => {
         const cts = inst.class_teacher_subject
-        return cts?.subject_id?.toString() === values.subjectId
+        return cts?.subject_id?.toString() === filters.subjectId
       })
 
-      // Usar a primeira instância encontrada ou criar uma nova se necessário
       let evaluationInstanceId: number | null = null
-      
+
       if (instancesForSubject.length > 0) {
-        // Usar a instância mais recente para esta disciplina
         evaluationInstanceId = instancesForSubject[0]?.id || null
       } else if (existingInstances.length > 0) {
-        // Usar a primeira instância da turma (pode ser de outra disciplina)
         evaluationInstanceId = existingInstances[0]?.id || null
       }
 
-      // Se não houver instância, criar uma nova
-      // TODO: Implementar criação de instância de avaliação quando class_teacher_subject estiver disponível
       if (!evaluationInstanceId) {
         toast.warning(
           'Instância de avaliação não encontrada. ' +
@@ -397,8 +356,8 @@ export default function AssessmentInput() {
         return
       }
 
-      for (const enrollment of enrollments) {
-        const studentProfileId = enrollment.student_profile_id || enrollment.student_id
+      for (const student of classStudents) {
+        const studentProfileId = student.id
         if (!studentProfileId) continue
 
         const value = studentGrades[studentProfileId]
@@ -406,7 +365,7 @@ export default function AssessmentInput() {
 
         try {
           const gradeValue = typeof value === 'number' ? value : parseFloat(value as string)
-          
+
           if (isNaN(gradeValue)) {
             continue
           }
@@ -418,7 +377,6 @@ export default function AssessmentInput() {
             notes: typeof value === 'string' && isNaN(parseFloat(value)) ? value : undefined,
           }
 
-          // O saveGrade já verifica se existe e atualiza automaticamente
           await saveGrade(gradeData)
           savedCount++
         } catch {
@@ -428,7 +386,7 @@ export default function AssessmentInput() {
 
       if (savedCount > 0) {
         toast.success(`${savedCount} nota(s) salva(s) com sucesso!`)
-        await loadData() // Recarregar dados
+        await loadData()
       } else {
         toast.warning('Nenhuma nota foi salva.')
       }
@@ -439,34 +397,23 @@ export default function AssessmentInput() {
     }
   }
 
-  // Filtered students for rendering
-  const filteredStudents = useMemo(() => {
-    if (!classId || !enrollments.length) return []
-
-    return enrollments
-      .map((enrollment) => {
-        const studentProfileId = enrollment.student_profile_id || enrollment.student_id
-        const student = safeStudents.find((s) => s.id === studentProfileId)
-        return student
-      })
-      .filter(Boolean)
-      .sort((a: any, b: any) => {
-        const nameA = `${a.first_name || a.person?.first_name || ''} ${a.last_name || a.person?.last_name || ''}`
-        const nameB = `${b.first_name || b.person?.first_name || ''} ${b.last_name || b.person?.last_name || ''}`
-        return nameA.localeCompare(nameB)
-      })
-  }, [enrollments, safeStudents, classId])
+  // Alunos da turma já vêm ordenados do classService.getClassStudents
+  const displayStudents = useMemo(() => {
+    if (!filters.classId || !classStudents.length) return []
+    return classStudents
+  }, [classStudents, filters.classId])
 
   const isConfigComplete =
-    schoolId &&
-    academicYearId &&
-    academicPeriodId &&
-    courseId &&
-    classId &&
-    subjectId
+    filters.schoolId &&
+    filters.academicYearId &&
+    filters.academicPeriodId &&
+    filters.courseId &&
+    filters.classId &&
+    filters.subjectId
 
-  const isNumeric = true // TODO: buscar do tipo de avaliação
-  const maxGrade = 10 // TODO: buscar da regra de avaliação
+  const maxGrade = 10
+  const isLoadingData = loading
+  const hasStudents = displayStudents.length > 0
 
   return (
     <div className="space-y-6 animate-fade-in pb-10">
@@ -492,295 +439,231 @@ export default function AssessmentInput() {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <Form {...form}>
-            <form className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {/* 1. School */}
-                <FormField
-                  control={form.control}
-                  name="schoolId"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Escola</FormLabel>
-                      <Select
-                        onValueChange={field.onChange}
-                        value={field.value}
-                        disabled={schoolsLoading}
-                      >
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Selecione..." />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {safeSchools.map((s) => (
-                            <SelectItem key={s.id} value={s.id.toString()}>
-                              {s.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {/* 1. School */}
+            <div className="space-y-2">
+              <Label>Escola</Label>
+              <select
+                className={selectClassName}
+                value={filters.schoolId}
+                onChange={(e) => handleFilterChange('schoolId', e.target.value)}
+                disabled={schoolsLoading}
+              >
+                <option value="">Selecione...</option>
+                {safeSchools.map((s) => (
+                  <option key={s.id} value={s.id.toString()}>
+                    {s.name}
+                  </option>
+                ))}
+              </select>
+            </div>
 
-                {/* 2. Academic Year */}
-                <FormField
-                  control={form.control}
-                  name="academicYearId"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Ano Letivo</FormLabel>
-                      <Select
-                        onValueChange={field.onChange}
-                        value={field.value}
-                        disabled={!schoolId || yearsLoading}
-                      >
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Selecione..." />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {safeAcademicYears.map((y) => (
-                            <SelectItem key={y.id} value={y.id.toString()}>
-                              {y.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+            {/* 2. Academic Year */}
+            <div className="space-y-2">
+              <Label>Ano Letivo</Label>
+              <select
+                className={selectClassName}
+                value={filters.academicYearId}
+                onChange={(e) => handleFilterChange('academicYearId', e.target.value)}
+                disabled={!filters.schoolId || yearsLoading}
+              >
+                <option value="">Selecione...</option>
+                {safeAcademicYears.map((y) => (
+                  <option key={y.id} value={y.id.toString()}>
+                    {y.name}
+                  </option>
+                ))}
+              </select>
+            </div>
 
-                {/* 3. Academic Period */}
-                <FormField
-                  control={form.control}
-                  name="academicPeriodId"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Período</FormLabel>
-                      <Select
-                        onValueChange={field.onChange}
-                        value={field.value}
-                        disabled={!academicYearId || periodsLoading}
-                      >
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Selecione..." />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {filteredPeriods.map((p) => (
-                            <SelectItem key={p.id} value={p.id.toString()}>
-                              {p.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+            {/* 3. Academic Period */}
+            <div className="space-y-2">
+              <Label>Período</Label>
+              <select
+                className={selectClassName}
+                value={filters.academicPeriodId}
+                onChange={(e) => handleFilterChange('academicPeriodId', e.target.value)}
+                disabled={!filters.academicYearId || periodsLoading}
+              >
+                <option value="">Selecione...</option>
+                {filteredPeriods.map((p) => (
+                  <option key={p.id} value={p.id.toString()}>
+                    {p.name}
+                  </option>
+                ))}
+              </select>
+            </div>
 
-                {/* 4. Course */}
-                <FormField
-                  control={form.control}
-                  name="courseId"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Curso</FormLabel>
-                      <Select
-                        onValueChange={field.onChange}
-                        value={field.value}
-                        disabled={!academicYearId || coursesLoading}
-                      >
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Selecione..." />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {safeCourses.map((c) => (
-                            <SelectItem key={c.id} value={c.id.toString()}>
-                              {c.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+            {/* 4. Course */}
+            <div className="space-y-2">
+              <Label>Curso</Label>
+              <select
+                className={selectClassName}
+                value={filters.courseId}
+                onChange={(e) => handleFilterChange('courseId', e.target.value)}
+                disabled={!filters.academicYearId || coursesLoading}
+              >
+                <option value="">Selecione...</option>
+                {safeCourses.map((c) => (
+                  <option key={c.id} value={c.id.toString()}>
+                    {c.name}
+                  </option>
+                ))}
+              </select>
+            </div>
 
-                {/* 5. Class */}
-                <FormField
-                  control={form.control}
-                  name="classId"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Turma</FormLabel>
-                      <Select
-                        onValueChange={field.onChange}
-                        value={field.value}
-                        disabled={!courseId || classesLoading}
-                      >
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Selecione..." />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {classesLoading ? (
-                            <div className="flex justify-center p-2">
-                              <Loader2 className="h-4 w-4 animate-spin" />
-                            </div>
-                          ) : (
-                            filteredClasses.map((c) => (
-                              <SelectItem key={c.id} value={c.id.toString()}>
-                                {c.name}
-                              </SelectItem>
-                            ))
-                          )}
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+            {/* 5. Class */}
+            <div className="space-y-2">
+              <Label>Turma</Label>
+              <select
+                className={selectClassName}
+                value={filters.classId}
+                onChange={(e) => handleFilterChange('classId', e.target.value)}
+                disabled={!filters.courseId || classesLoading}
+              >
+                <option value="">{classesLoading ? 'Carregando...' : 'Selecione...'}</option>
+                {filteredClasses.map((c) => (
+                  <option key={c.id} value={c.id.toString()}>
+                    {c.name}
+                  </option>
+                ))}
+              </select>
+            </div>
 
-                {/* 6. Subject */}
-                <FormField
-                  control={form.control}
-                  name="subjectId"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Disciplina</FormLabel>
-                      <Select
-                        onValueChange={field.onChange}
-                        value={field.value}
-                        disabled={!courseId || coursesLoading}
-                      >
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Selecione..." />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {safeSubjects.map((s) => (
-                            <SelectItem key={s.id} value={s.id.toString()}>
-                              {s.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-            </form>
-          </Form>
+            {/* 6. Subject */}
+            <div className="space-y-2">
+              <Label>Disciplina</Label>
+              <select
+                className={selectClassName}
+                value={filters.subjectId}
+                onChange={(e) => handleFilterChange('subjectId', e.target.value)}
+                disabled={!filters.courseId || coursesLoading}
+              >
+                <option value="">Selecione...</option>
+                {safeSubjects.map((s) => (
+                  <option key={s.id} value={s.id.toString()}>
+                    {s.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          {/* Load Data Button */}
+          <div className="mt-6 flex justify-end">
+            <Button
+              onClick={loadData}
+              disabled={!isConfigComplete || loading}
+              className="bg-gradient-to-r from-purple-500 via-purple-600 to-purple-500 bg-size-200 bg-pos-0 hover:bg-pos-100 text-white shadow-lg hover:shadow-xl transition-all duration-500"
+            >
+              <Loader2 className={cn("mr-2 h-4 w-4 animate-spin", !loading && "hidden")} />
+              <Filter className={cn("mr-2 h-4 w-4", loading && "hidden")} />
+              <span>Carregar Dados</span>
+            </Button>
+          </div>
         </CardContent>
       </Card>
 
-      {/* Grid Display */}
-      {isConfigComplete ? (
-        <Card className="animate-fade-in-up relative overflow-hidden bg-gradient-to-br from-white via-purple-50/20 to-white border-purple-200/50 hover:shadow-lg transition-all duration-300">
-          <CardHeader className="flex flex-row items-center justify-between relative z-10">
-            <div className="space-y-1">
-              <CardTitle className="flex items-center gap-2">
-                <div className="p-1.5 rounded-md bg-gradient-to-br from-purple-100 to-purple-200">
-                  <Save className="h-4 w-4 text-purple-600" />
-                </div>
-                Diário de Classe
-              </CardTitle>
-              <CardDescription>
-                {filteredStudents.length} aluno(s) listado(s)
-              </CardDescription>
-            </div>
-            <div className="flex gap-2">
-              <RequirePermission permission="create:assessment">
-                <Button 
-                  onClick={handleSave} 
-                  disabled={loading || studentsLoading || gradesLoading} 
-                  size="sm"
-                  className="bg-gradient-to-r from-purple-500 via-purple-600 to-purple-500 bg-size-200 bg-pos-0 hover:bg-pos-100 text-white shadow-lg hover:shadow-xl transition-all duration-500 transform hover:scale-105 font-semibold disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
-                >
-                  {loading ? (
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  ) : (
-                    <div className="p-0.5 rounded-md bg-white/20 mr-2">
-                      <Save className="h-4 w-4" />
-                    </div>
-                  )}
-                  Salvar Notas
-                </Button>
-              </RequirePermission>
-            </div>
-          </CardHeader>
-          <CardContent>
-            {loading || studentsLoading ? (
-              <div className="space-y-2">
-                {Array.from({ length: 5 }).map((_, index) => (
-                  <div key={`skeleton-${index}`} className="flex gap-4">
-                    <Skeleton className="h-16 w-full" />
-                  </div>
-                ))}
-              </div>
-            ) : filteredStudents.length === 0 ? (
-              <div className="text-center py-12 text-muted-foreground border-2 border-dashed rounded-lg">
-                <AlertCircle className="h-12 w-12 mx-auto mb-4 opacity-20" />
-                <p className="font-medium">Nenhum aluno encontrado nesta turma.</p>
-                <p className="text-sm mt-2">Verifique se há alunos matriculados na turma selecionada.</p>
-              </div>
-            ) : (
-              <div className="space-y-2">
-                {filteredStudents.map((student: any) => (
-                  <StudentRow
-                    key={`student-${student.id}`}
-                    student={student}
-                    value={studentGrades[student.id]}
-                    max={maxGrade}
-                    isNumeric={isNumeric}
-                    onChange={handleGradeChange}
-                  />
-                ))}
+      {/* Grid Display - Config incomplete message */}
+      <div className={cn(
+        "flex flex-col items-center justify-center py-12 text-muted-foreground bg-muted/10 rounded-lg border-2 border-dashed",
+        (isConfigComplete && dataLoaded) && "hidden"
+      )}>
+        <Filter className="h-12 w-12 mb-4 opacity-20" />
+        <p className="text-lg font-medium">
+          {isConfigComplete
+            ? 'Clique em "Carregar Dados" para visualizar o diário.'
+            : 'Selecione todos os filtros acima para carregar o diário.'}
+        </p>
+        <p className="text-sm mt-2">
+          {isConfigComplete
+            ? 'Os filtros estão configurados. Agora carregue os dados.'
+            : 'Configure escola, ano letivo, período, curso, turma e disciplina.'}
+        </p>
+      </div>
 
-                <div className="flex justify-end pt-6 sticky bottom-4">
-                  <RequirePermission permission="create:assessment">
-                    <Button 
-                      size="lg" 
-                      onClick={handleSave} 
-                      disabled={loading}
-                      className="shadow-lg bg-gradient-to-r from-purple-500 via-purple-600 to-purple-500 bg-size-200 bg-pos-0 hover:bg-pos-100 text-white"
-                    >
-                      {loading ? (
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      ) : (
-                        <Save className="mr-2 h-4 w-4" />
-                      )}
-                      Salvar Alterações
-                    </Button>
-                  </RequirePermission>
-                </div>
+      {/* Grid Display - Class diary card */}
+      <Card className={cn(
+        "animate-fade-in-up relative overflow-hidden bg-gradient-to-br from-white via-purple-50/20 to-white border-purple-200/50 hover:shadow-lg transition-all duration-300",
+        !dataLoaded && "hidden"
+      )}>
+        <CardHeader className="flex flex-row items-center justify-between relative z-10">
+          <div className="space-y-1">
+            <CardTitle className="flex items-center gap-2">
+              <div className="p-1.5 rounded-md bg-gradient-to-br from-purple-100 to-purple-200">
+                <Save className="h-4 w-4 text-purple-600" />
               </div>
-            )}
-          </CardContent>
-        </Card>
-      ) : (
-        <div className="flex flex-col items-center justify-center py-12 text-muted-foreground bg-muted/10 rounded-lg border-2 border-dashed">
-          <Filter className="h-12 w-12 mb-4 opacity-20" />
-          <p className="text-lg font-medium">
-            Selecione todos os filtros acima para carregar o diário.
-          </p>
-          <p className="text-sm mt-2">
-            Configure escola, ano letivo, período, curso, turma e disciplina.
-          </p>
-        </div>
-      )}
+              Diário de Classe
+            </CardTitle>
+            <CardDescription>
+              {displayStudents.length} aluno(s) listado(s)
+            </CardDescription>
+          </div>
+          <div className="flex gap-2">
+            <Button
+              onClick={handleSave}
+              disabled={loading || studentsLoading || gradesLoading}
+              size="sm"
+              className="bg-gradient-to-r from-purple-500 via-purple-600 to-purple-500 bg-size-200 bg-pos-0 hover:bg-pos-100 text-white shadow-lg hover:shadow-xl transition-all duration-500 transform hover:scale-105 font-semibold disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
+            >
+              <Loader2 className={cn("mr-2 h-4 w-4 animate-spin", !loading && "hidden")} />
+              <div className={cn("p-0.5 rounded-md bg-white/20 mr-2", loading && "hidden")}>
+                <Save className="h-4 w-4" />
+              </div>
+              <span>Salvar Notas</span>
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {/* Loading skeleton */}
+          <div className={cn("space-y-2", !isLoadingData && "hidden")}>
+            {Array.from({ length: 5 }).map((_, index) => (
+              <div key={`skeleton-${index}`} className="flex gap-4">
+                <Skeleton className="h-16 w-full" />
+              </div>
+            ))}
+          </div>
+
+          {/* Empty state */}
+          <div className={cn(
+            "text-center py-12 text-muted-foreground border-2 border-dashed rounded-lg",
+            (isLoadingData || hasStudents) && "hidden"
+          )}>
+            <AlertCircle className="h-12 w-12 mx-auto mb-4 opacity-20" />
+            <p className="font-medium">Nenhum aluno encontrado nesta turma.</p>
+            <p className="text-sm mt-2">Verifique se há alunos matriculados na turma selecionada.</p>
+          </div>
+
+          {/* Students list */}
+          <div className={cn(
+            "space-y-2",
+            (isLoadingData || !hasStudents) && "hidden"
+          )}>
+            {displayStudents.map((student: any) => (
+              <StudentRow
+                key={`student-${student.id}`}
+                student={student}
+                value={studentGrades[student.id]}
+                max={maxGrade}
+                onChange={handleGradeChange}
+              />
+            ))}
+
+            <div className="flex justify-end pt-6 sticky bottom-4">
+              <Button
+                size="lg"
+                onClick={handleSave}
+                disabled={loading}
+                className="shadow-lg bg-gradient-to-r from-purple-500 via-purple-600 to-purple-500 bg-size-200 bg-pos-0 hover:bg-pos-100 text-white"
+              >
+                <Loader2 className={cn("mr-2 h-4 w-4 animate-spin", !loading && "hidden")} />
+                <Save className={cn("mr-2 h-4 w-4", loading && "hidden")} />
+                <span>Salvar Alterações</span>
+              </Button>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   )
 }

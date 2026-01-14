@@ -113,15 +113,13 @@ export class BaseService<T = Record<string, unknown>> {
 
   /**
    * Criar novo registro
+   * Nota: created_by usa 1 (Sistema) pois o UUID do Supabase Auth não é compatível com INTEGER
    */
   async create(data: Partial<T>): Promise<T> {
     try {
-      // Obter ID do usuário atual (se disponível)
-      const { data: { user } } = await supabase.auth.getUser();
-      
       const insertData = {
         ...data,
-        created_by: user?.id || 1, // Fallback para Sistema (ID 1)
+        created_by: 1, // Sistema (ID 1) - UUID do Auth não é compatível com INTEGER
       };
 
       const { data: result, error } = await supabase
@@ -140,15 +138,13 @@ export class BaseService<T = Record<string, unknown>> {
 
   /**
    * Atualizar registro existente
+   * Nota: updated_by usa 1 (Sistema) pois o UUID do Supabase Auth não é compatível com INTEGER
    */
   async update(id: number | string, data: Partial<T>): Promise<T> {
     try {
-      // Obter ID do usuário atual (se disponível)
-      const { data: { user } } = await supabase.auth.getUser();
-      
       const updateData = {
         ...data,
-        updated_by: user?.id || 1, // Fallback para Sistema (ID 1)
+        updated_by: 1, // Sistema (ID 1) - UUID do Auth não é compatível com INTEGER
         updated_at: new Date().toISOString(),
       };
 
@@ -169,16 +165,15 @@ export class BaseService<T = Record<string, unknown>> {
 
   /**
    * Deletar registro (soft delete)
+   * Nota: updated_by usa 1 (Sistema) pois o UUID do Supabase Auth não é compatível com INTEGER
    */
   async delete(id: number | string): Promise<void> {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      
       const { error } = await supabase
         .from(this.tableName)
         .update({
           deleted_at: new Date().toISOString(),
-          updated_by: user?.id || 1,
+          updated_by: 1, // Sistema (ID 1) - UUID do Auth não é compatível com INTEGER
         })
         .eq('id', id);
 

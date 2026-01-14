@@ -300,13 +300,10 @@ export const fetchSchoolsQEduData = async (
     })
 
     if (!response.ok) {
-      if (response.status === 404) {
-        usingMockData = false
-        return []
-      }
-      throw new Error(
-        `Falha na comunicação com API QEdu: ${response.status} ${response.statusText}`,
-      )
+      // On any non-OK response, fallback to mock data
+      console.warn(`QEdu API returned ${response.status}, using mock data.`)
+      usingMockData = true
+      return getMockSchoolsData(municipalityId)
     }
 
     const json = await response.json()
@@ -314,10 +311,10 @@ export const fetchSchoolsQEduData = async (
       ? json
       : json.data || json.schools || []
 
-    if (!Array.isArray(schoolsList)) {
-      console.warn('Formato de dados inválido recebido da API QEdu', json)
-      usingMockData = false
-      return []
+    if (!Array.isArray(schoolsList) || schoolsList.length === 0) {
+      console.warn('Dados vazios ou inválidos da API QEdu, usando mock data.')
+      usingMockData = true
+      return getMockSchoolsData(municipalityId)
     }
 
     usingMockData = false

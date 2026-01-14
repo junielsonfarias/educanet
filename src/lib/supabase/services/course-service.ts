@@ -808,6 +808,93 @@ class CourseService extends BaseService {
   }
 
   /**
+   * Excluir curso/etapa de ensino com limpeza de vínculos
+   * Remove referências em: classes, student_enrollments, course_subjects, school_academic_year_courses
+   */
+  async deleteCourseWithCleanup(courseId: number): Promise<void> {
+    try {
+      const now = new Date().toISOString();
+
+      // 1. Limpar course_id em classes (SET NULL)
+      const { error: classesError } = await supabase
+        .from('classes')
+        .update({ course_id: null, updated_by: 1 })
+        .eq('course_id', courseId);
+
+      if (classesError) {
+        console.warn('Erro ao limpar classes:', classesError.message);
+      }
+
+      // 2. Limpar course_id em student_enrollments (SET NULL)
+      const { error: enrollmentsError } = await supabase
+        .from('student_enrollments')
+        .update({ course_id: null })
+        .eq('course_id', courseId);
+
+      if (enrollmentsError) {
+        console.warn('Erro ao limpar student_enrollments:', enrollmentsError.message);
+      }
+
+      // 3. Soft delete de course_subjects
+      const { error: courseSubjectsError } = await supabase
+        .from('course_subjects')
+        .update({ deleted_at: now })
+        .eq('course_id', courseId)
+        .is('deleted_at', null);
+
+      if (courseSubjectsError) {
+        console.warn('Erro ao limpar course_subjects:', courseSubjectsError.message);
+      }
+
+      // 4. Remover de school_academic_year_courses (hard delete por causa do CASCADE)
+      const { error: schoolCoursesError } = await supabase
+        .from('school_academic_year_courses')
+        .delete()
+        .eq('course_id', courseId);
+
+      if (schoolCoursesError) {
+        console.warn('Erro ao limpar school_academic_year_courses:', schoolCoursesError.message);
+      }
+
+      // 5. Limpar course_id em assessment_types (SET NULL)
+      const { error: assessmentError } = await supabase
+        .from('assessment_types')
+        .update({ course_id: null })
+        .eq('course_id', courseId);
+
+      if (assessmentError) {
+        console.warn('Erro ao limpar assessment_types:', assessmentError.message);
+      }
+
+      // 6. Limpar course_id em evaluation_rules (SET NULL)
+      const { error: evalRulesError } = await supabase
+        .from('evaluation_rules')
+        .update({ course_id: null })
+        .eq('course_id', courseId);
+
+      if (evalRulesError) {
+        console.warn('Erro ao limpar evaluation_rules:', evalRulesError.message);
+      }
+
+      // 7. Soft delete do curso
+      const { error: deleteError } = await supabase
+        .from('courses')
+        .update({
+          deleted_at: now,
+          updated_by: 1
+        })
+        .eq('id', courseId);
+
+      if (deleteError) throw handleSupabaseError(deleteError);
+
+      console.log(`Curso ${courseId} excluído com sucesso. Vínculos limpos.`);
+    } catch (error) {
+      console.error('Error in CourseService.deleteCourseWithCleanup:', error);
+      throw error;
+    }
+  }
+
+  /**
    * Buscar estatísticas
    */
   async getStats(): Promise<{

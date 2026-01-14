@@ -450,6 +450,24 @@ export function AppSidebar() {
                   <SidebarMenuItem>
                     <SidebarMenuButton
                       asChild
+                      isActive={isActive('/configuracoes/academico')}
+                      tooltip="Configurações Acadêmicas"
+                    >
+                      <Link to="/configuracoes/academico" className="flex items-center gap-3 group/item">
+                        {isActive('/configuracoes/academico') ? (
+                          <div className="p-1.5 rounded-md bg-gradient-to-br from-purple-500/20 to-purple-600/20">
+                            <BookOpen className="h-5 w-5 text-purple-600" />
+                          </div>
+                        ) : (
+                          <BookOpen className="h-5 w-5 text-muted-foreground group-hover/item:text-purple-600 transition-colors" />
+                        )}
+                        <span>Config. Acadêmicas</span>
+                      </Link>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                  <SidebarMenuItem>
+                    <SidebarMenuButton
+                      asChild
                       isActive={isActive('/configuracoes/educacenso')}
                       tooltip="Exportação Educacenso"
                     >

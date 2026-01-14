@@ -11,6 +11,7 @@ import type { Class, ClassWithDetails, School, Course, AcademicYear, Student, Te
 
 export interface ClassStats {
   totalStudents: number;
+  studentsPCD: number;
   capacity: number;
   availableSpots: number;
   occupancyRate: number;
@@ -44,7 +45,8 @@ class ClassService extends BaseService<Class> {
           *,
           school:schools(*),
           course:courses(*),
-          academic_year:academic_years(*)
+          academic_period:academic_periods(*, academic_year:academic_years(*)),
+          education_grade:education_grades(*)
         `)
         .eq('id', id)
         .is('deleted_at', null)
@@ -60,8 +62,12 @@ class ClassService extends BaseService<Class> {
       // Buscar estatísticas
       const stats = await this.getClassStats(id);
 
+      // Extrair academic_year do academic_period para compatibilidade
+      const academic_year = data?.academic_period?.academic_year || null;
+
       return {
         ...data,
+        academic_year,
         stats
       } as ClassWithFullInfo;
     } catch (error) {
@@ -79,19 +85,31 @@ class ClassService extends BaseService<Class> {
     courseId?: number;
   }): Promise<ClassWithDetails[]> {
     try {
+      // Se precisar filtrar por ano letivo, primeiro buscar os períodos do ano
+      let periodIds: number[] = [];
+      if (options?.academicYearId) {
+        const { data: periods } = await supabase
+          .from('academic_periods')
+          .select('id')
+          .eq('academic_year_id', options.academicYearId);
+        periodIds = (periods || []).map(p => p.id);
+      }
+
       let query = supabase
         .from('classes')
         .select(`
           *,
           school:schools(*),
           course:courses(*),
-          academic_year:academic_years(*)
+          academic_period:academic_periods(*, academic_year:academic_years(*)),
+          education_grade:education_grades(*)
         `)
         .eq('school_id', schoolId)
         .is('deleted_at', null);
 
-      if (options?.academicYearId) {
-        query = query.eq('academic_year_id', options.academicYearId);
+      // Filtrar por períodos do ano letivo
+      if (options?.academicYearId && periodIds.length > 0) {
+        query = query.in('academic_period_id', periodIds);
       }
 
       if (options?.shift) {
@@ -120,15 +138,27 @@ class ClassService extends BaseService<Class> {
     shift?: string;
   }): Promise<ClassWithDetails[]> {
     try {
+      // Buscar períodos do ano letivo
+      const { data: periods } = await supabase
+        .from('academic_periods')
+        .select('id')
+        .eq('academic_year_id', academicYearId);
+      const periodIds = (periods || []).map(p => p.id);
+
+      if (periodIds.length === 0) {
+        return [];
+      }
+
       let query = supabase
         .from('classes')
         .select(`
           *,
           school:schools(*),
           course:courses(*),
-          academic_year:academic_years(*)
+          academic_period:academic_periods(*, academic_year:academic_years(*)),
+          education_grade:education_grades(*)
         `)
-        .eq('academic_year_id', academicYearId)
+        .in('academic_period_id', periodIds)
         .is('deleted_at', null);
 
       if (options?.schoolId) {
@@ -139,7 +169,7 @@ class ClassService extends BaseService<Class> {
         query = query.eq('shift', options.shift);
       }
 
-      const { data, error } = await query.order('school.trade_name').order('name');
+      const { data, error } = await query.order('name');
 
       if (error) throw handleSupabaseError(error);
       return (data || []) as ClassWithDetails[];
@@ -150,35 +180,90 @@ class ClassService extends BaseService<Class> {
   }
 
   /**
-   * Buscar alunos de uma turma
+   * Buscar alunos de uma turma com informacoes completas
    */
   async getClassStudents(classId: number, options?: {
     status?: string;
+    includeTransferred?: boolean;
   }): Promise<any[]> {
     try {
       let query = supabase
         .from('class_enrollments')
         .select(`
-          *,
+          id,
+          enrollment_date,
+          status,
           student_enrollment:student_enrollments(
-            *,
+            id,
+            enrollment_date,
+            enrollment_status,
             student_profile:student_profiles(
-              *,
-              person:people(*)
+              id,
+              student_registration_number,
+              person:people(
+                id,
+                first_name,
+                last_name,
+                date_of_birth
+              )
             )
           )
         `)
         .eq('class_id', classId)
         .is('deleted_at', null);
 
+      // Por padrao inclui todos os status existentes no banco
       if (options?.status) {
         query = query.eq('status', options.status);
+      } else {
+        // Filtrar apenas status Ativo e Transferido (que existem no ENUM atual)
+        query = query.eq('status', 'Ativo');
       }
 
-      const { data, error } = await query.order('student_enrollment.student_profile.person.full_name');
+      const { data, error } = await query;
 
       if (error) throw handleSupabaseError(error);
-      return (data || []).map((item: Record<string, unknown>) => item.student_enrollment?.student_profile).filter(Boolean);
+
+      // Mapear os dados com informacoes completas
+      const students = (data || [])
+        .map((item: Record<string, unknown>) => {
+          const enrollment = item.student_enrollment as Record<string, unknown> | undefined;
+          const studentProfile = enrollment?.student_profile as Record<string, unknown> | undefined;
+
+          if (!studentProfile) return null;
+
+          // Construir pessoa com full_name
+          const person = studentProfile.person as Record<string, unknown> | undefined;
+          const personWithFullName = person ? {
+            ...person,
+            full_name: `${person.first_name || ''} ${person.last_name || ''}`.trim(),
+            birth_date: person.date_of_birth
+          } : undefined;
+
+          return {
+            ...studentProfile,
+            person: personWithFullName,
+            class_enrollment_id: item.id,
+            class_enrollment_status: item.status,
+            class_enrollment_date: item.enrollment_date,
+            student_enrollment_id: enrollment?.id,
+            student_enrollment_status: enrollment?.enrollment_status
+          };
+        })
+        .filter(Boolean);
+
+      // Ordenar alfabeticamente por nome
+      const sortedStudents = students.sort((a: any, b: any) => {
+        const nameA = a?.person?.full_name || '';
+        const nameB = b?.person?.full_name || '';
+        return nameA.localeCompare(nameB);
+      });
+
+      // Atribuir numeros de ordem
+      return sortedStudents.map((student, index) => ({
+        ...student,
+        order_number: index + 1
+      }));
     } catch (error) {
       console.error('Error in ClassService.getClassStudents:', error);
       throw error;
@@ -219,11 +304,12 @@ class ClassService extends BaseService<Class> {
       const { data, error } = await supabase
         .from('class_teacher_subjects')
         .select(`
+          id,
           subject:subjects(*),
           teacher:teachers(
-            person:people(full_name)
-          ),
-          workload_hours
+            id,
+            person:people(first_name, last_name)
+          )
         `)
         .eq('class_id', classId)
         .is('deleted_at', null);
@@ -233,13 +319,13 @@ class ClassService extends BaseService<Class> {
       // Agrupar por disciplina (pode ter múltiplos professores)
       const subjectsMap = new Map();
       (data || []).forEach((item: Record<string, unknown>) => {
-        if (item.subject) {
-          const subjectId = item.subject.id;
+        const subject = item.subject as Record<string, unknown> | undefined;
+        if (subject) {
+          const subjectId = subject.id;
           if (!subjectsMap.has(subjectId)) {
             subjectsMap.set(subjectId, {
-              ...item.subject,
-              teachers: [],
-              workload_hours: item.workload_hours
+              ...subject,
+              teachers: []
             });
           }
           if (item.teacher) {
@@ -266,13 +352,16 @@ class ClassService extends BaseService<Class> {
         throw new Error('Turma não encontrada');
       }
 
-      // Contar alunos
+      // Contar alunos ativos
       const { count: totalStudents } = await supabase
         .from('class_enrollments')
         .select('id', { count: 'exact', head: true })
         .eq('class_id', classId)
         .eq('status', 'Ativo')
         .is('deleted_at', null);
+
+      // PCD desabilitado temporariamente (campo is_pcd pode nao existir)
+      const studentsPCD = 0;
 
       // Contar professores únicos
       const { data: teachersData } = await supabase
@@ -301,6 +390,7 @@ class ClassService extends BaseService<Class> {
 
       return {
         totalStudents: enrolled,
+        studentsPCD,
         capacity,
         availableSpots,
         occupancyRate,
@@ -338,12 +428,95 @@ class ClassService extends BaseService<Class> {
   }
 
   /**
+   * Buscar alunos disponíveis para matrícula em uma turma
+   * Retorna alunos com matrícula ativa na escola/ano letivo que ainda não estão na turma
+   */
+  async getAvailableStudentsForClass(classId: number): Promise<any[]> {
+    try {
+      // Primeiro, buscar informações da turma para saber escola e ano letivo
+      const classInfo = await this.getClassFullInfo(classId);
+      if (!classInfo) {
+        throw new Error('Turma não encontrada');
+      }
+
+      const schoolId = classInfo.school?.id;
+      const academicYearId = classInfo.academic_year?.id;
+
+      if (!schoolId || !academicYearId) {
+        throw new Error('Escola ou ano letivo não definido para esta turma');
+      }
+
+      // Buscar IDs dos alunos já matriculados na turma
+      const { data: enrolledStudents } = await supabase
+        .from('class_enrollments')
+        .select('student_enrollment_id')
+        .eq('class_id', classId)
+        .eq('status', 'Ativo')
+        .is('deleted_at', null);
+
+      const enrolledIds = (enrolledStudents || []).map(e => e.student_enrollment_id);
+
+      // Buscar alunos com matrícula ativa na mesma escola e ano letivo
+      let query = supabase
+        .from('student_enrollments')
+        .select(`
+          id,
+          enrollment_number,
+          enrollment_date,
+          enrollment_status,
+          student_profile:student_profiles(
+            id,
+            student_registration_number,
+            person:people(
+              id,
+              first_name,
+              last_name,
+              date_of_birth
+            )
+          )
+        `)
+        .eq('school_id', schoolId)
+        .eq('academic_year_id', academicYearId)
+        .eq('enrollment_status', 'Ativo')
+        .is('deleted_at', null);
+
+      // Excluir alunos já matriculados
+      if (enrolledIds.length > 0) {
+        query = query.not('id', 'in', `(${enrolledIds.join(',')})`);
+      }
+
+      const { data, error } = await query.order('enrollment_number');
+
+      if (error) throw handleSupabaseError(error);
+
+      // Mapear para formato mais amigável
+      return (data || []).map((item: Record<string, unknown>) => {
+        const profile = item.student_profile as Record<string, unknown> | undefined;
+        const person = profile?.person as Record<string, unknown> | undefined;
+        return {
+          student_enrollment_id: item.id,
+          enrollment_number: item.enrollment_number,
+          enrollment_date: item.enrollment_date,
+          student_profile_id: profile?.id,
+          student_registration_number: profile?.student_registration_number,
+          person: person ? {
+            ...person,
+            full_name: `${person.first_name || ''} ${person.last_name || ''}`.trim()
+          } : undefined
+        };
+      });
+    } catch (error) {
+      console.error('Error in ClassService.getAvailableStudentsForClass:', error);
+      throw error;
+    }
+  }
+
+  /**
    * Matricular aluno em uma turma
    */
   async enrollStudent(
     studentEnrollmentId: number,
-    classId: number,
-    notes?: string
+    classId: number
   ): Promise<void> {
     try {
       // Verificar disponibilidade
@@ -354,15 +527,25 @@ class ClassService extends BaseService<Class> {
 
       const { data: { user } } = await supabase.auth.getUser();
 
+      // Obter person_id do usuário
+      let createdBy = 1;
+      if (user?.id) {
+        const { data: authUser } = await supabase
+          .from('auth_users')
+          .select('person_id')
+          .eq('id', user.id)
+          .single();
+        createdBy = authUser?.person_id || 1;
+      }
+
       const { error } = await supabase
         .from('class_enrollments')
         .insert({
           student_enrollment_id: studentEnrollmentId,
           class_id: classId,
-          enrollment_date: new Date().toISOString(),
+          enrollment_date: new Date().toISOString().split('T')[0],
           status: 'Ativo',
-          notes,
-          created_by: user?.id || 1
+          created_by: createdBy
         });
 
       if (error) throw handleSupabaseError(error);
@@ -454,6 +637,16 @@ class ClassService extends BaseService<Class> {
     academicYearId?: number;
   }): Promise<any[]> {
     try {
+      // Se filtrar por ano letivo, buscar períodos primeiro
+      let periodIds: number[] = [];
+      if (options?.academicYearId) {
+        const { data: periods } = await supabase
+          .from('academic_periods')
+          .select('id')
+          .eq('academic_year_id', options.academicYearId);
+        periodIds = (periods || []).map(p => p.id);
+      }
+
       let query = supabase
         .from('class_teacher_subjects')
         .select(`
@@ -462,21 +655,27 @@ class ClassService extends BaseService<Class> {
             *,
             school:schools(*),
             course:courses(*),
-            academic_year:academic_years(*)
+            academic_period:academic_periods(*, academic_year:academic_years(*)),
+            education_grade:education_grades(*)
           ),
           subject:subjects(*)
         `)
         .eq('teacher_id', teacherId)
         .is('deleted_at', null);
 
-      if (options?.academicYearId) {
-        query = query.eq('class.academic_year_id', options.academicYearId);
-      }
-
       const { data, error } = await query;
 
       if (error) throw handleSupabaseError(error);
-      return data || [];
+
+      // Filtrar por ano letivo se necessário
+      let result = data || [];
+      if (options?.academicYearId && periodIds.length > 0) {
+        result = result.filter(item =>
+          item.class && periodIds.includes(item.class.academic_period_id)
+        );
+      }
+
+      return result;
     } catch (error) {
       console.error('Error in ClassService.getTeacherClasses:', error);
       throw error;
@@ -493,13 +692,24 @@ class ClassService extends BaseService<Class> {
     shift?: string;
   }): Promise<ClassWithDetails[]> {
     try {
+      // Se filtrar por ano letivo, buscar períodos primeiro
+      let periodIds: number[] = [];
+      if (options.academicYearId) {
+        const { data: periods } = await supabase
+          .from('academic_periods')
+          .select('id')
+          .eq('academic_year_id', options.academicYearId);
+        periodIds = (periods || []).map(p => p.id);
+      }
+
       let query = supabase
         .from('classes')
         .select(`
           *,
           school:schools(*),
           course:courses(*),
-          academic_year:academic_years(*)
+          academic_period:academic_periods(*, academic_year:academic_years(*)),
+          education_grade:education_grades(*)
         `)
         .is('deleted_at', null);
 
@@ -507,8 +717,8 @@ class ClassService extends BaseService<Class> {
         query = query.eq('school_id', options.schoolId);
       }
 
-      if (options.academicYearId) {
-        query = query.eq('academic_year_id', options.academicYearId);
+      if (options.academicYearId && periodIds.length > 0) {
+        query = query.in('academic_period_id', periodIds);
       }
 
       if (options.courseId) {
@@ -526,7 +736,7 @@ class ClassService extends BaseService<Class> {
       // Filtrar turmas com vagas
       const classesWithStats = await Promise.all(
         (data || []).map(async (classData: Record<string, unknown>) => {
-          const stats = await this.getClassStats(classData.id);
+          const stats = await this.getClassStats(classData.id as number);
           return {
             ...classData,
             stats,
@@ -556,6 +766,16 @@ class ClassService extends BaseService<Class> {
     byCourse: Record<string, number>;
   }> {
     try {
+      // Se filtrar por ano letivo, buscar períodos primeiro
+      let periodIds: number[] = [];
+      if (options?.academicYearId) {
+        const { data: periods } = await supabase
+          .from('academic_periods')
+          .select('id')
+          .eq('academic_year_id', options.academicYearId);
+        periodIds = (periods || []).map(p => p.id);
+      }
+
       let query = supabase
         .from('classes')
         .select(`
@@ -568,8 +788,8 @@ class ClassService extends BaseService<Class> {
         query = query.eq('school_id', options.schoolId);
       }
 
-      if (options?.academicYearId) {
-        query = query.eq('academic_year_id', options.academicYearId);
+      if (options?.academicYearId && periodIds.length > 0) {
+        query = query.in('academic_period_id', periodIds);
       }
 
       const { data: classes, error } = await query;
@@ -623,10 +843,11 @@ class ClassService extends BaseService<Class> {
   // ==================== MÉTODOS COM EDUCATION_GRADE_ID ====================
 
   /**
-   * Criar turma com série específica
+   * Criar turma com série específica e campos do Censo Escolar
    */
   async createClass(data: {
     name: string;
+    code?: string;
     school_id: number;
     course_id: number;
     academic_period_id: number;
@@ -634,6 +855,15 @@ class ClassService extends BaseService<Class> {
     homeroom_teacher_id?: number;
     capacity?: number;
     shift?: string;
+    // Campos do Censo Escolar
+    is_multi_grade?: boolean;
+    education_modality?: string | null;
+    tipo_regime?: string | null;
+    operating_hours?: string | null;
+    min_students?: number | null;
+    max_dependency_subjects?: number | null;
+    operating_days?: string[] | null;
+    regent_teacher_id?: number | null;
   }): Promise<Record<string, unknown>> {
     try {
       const { data: { user } } = await supabase.auth.getUser();
@@ -653,6 +883,7 @@ class ClassService extends BaseService<Class> {
         .from('classes')
         .insert({
           name: data.name,
+          code: data.code || null,
           school_id: data.school_id,
           course_id: data.course_id,
           academic_period_id: data.academic_period_id,
@@ -660,6 +891,15 @@ class ClassService extends BaseService<Class> {
           homeroom_teacher_id: data.homeroom_teacher_id,
           capacity: data.capacity || 35,
           shift: data.shift || 'Manhã',
+          // Campos do Censo Escolar
+          is_multi_grade: data.is_multi_grade || false,
+          education_modality: data.education_modality || null,
+          tipo_regime: data.tipo_regime || null,
+          operating_hours: data.operating_hours || null,
+          min_students: data.min_students || null,
+          max_dependency_subjects: data.max_dependency_subjects || null,
+          operating_days: data.operating_days || null,
+          regent_teacher_id: data.regent_teacher_id || null,
           created_by: createdBy
         })
         .select()
@@ -701,13 +941,23 @@ class ClassService extends BaseService<Class> {
     academicYearId?: number;
   }): Promise<ClassWithDetails[]> {
     try {
+      // Se filtrar por ano letivo, buscar períodos primeiro
+      let periodIds: number[] = [];
+      if (options?.academicYearId) {
+        const { data: periods } = await supabase
+          .from('academic_periods')
+          .select('id')
+          .eq('academic_year_id', options.academicYearId);
+        periodIds = (periods || []).map(p => p.id);
+      }
+
       let query = supabase
         .from('classes')
         .select(`
           *,
           school:schools(*),
           course:courses(*),
-          academic_year:academic_years(*),
+          academic_period:academic_periods(*, academic_year:academic_years(*)),
           education_grade:education_grades(*)
         `)
         .eq('education_grade_id', educationGradeId)
@@ -717,8 +967,8 @@ class ClassService extends BaseService<Class> {
         query = query.eq('school_id', options.schoolId);
       }
 
-      if (options?.academicYearId) {
-        query = query.eq('academic_year_id', options.academicYearId);
+      if (options?.academicYearId && periodIds.length > 0) {
+        query = query.in('academic_period_id', periodIds);
       }
 
       const { data, error } = await query.order('name');
@@ -742,7 +992,7 @@ class ClassService extends BaseService<Class> {
           *,
           school:schools(*),
           course:courses(*),
-          academic_year:academic_years(*),
+          academic_period:academic_periods(*, academic_year:academic_years(*)),
           education_grade:education_grades(*)
         `)
         .eq('id', classId)
@@ -757,22 +1007,37 @@ class ClassService extends BaseService<Class> {
       // Buscar regra de avaliação aplicável
       let evaluationRule = null;
       if (data?.education_grade_id || data?.course_id) {
-        const { data: rule } = await supabase
-          .from('evaluation_rules')
-          .select('*')
-          .or(`education_grade_id.eq.${data.education_grade_id},course_id.eq.${data.course_id}`)
-          .is('deleted_at', null)
-          .limit(1)
-          .maybeSingle();
+        // Construir filtro OR apenas com valores não-null
+        const orFilters: string[] = [];
+        if (data.education_grade_id) {
+          orFilters.push(`education_grade_id.eq.${data.education_grade_id}`);
+        }
+        if (data.course_id) {
+          orFilters.push(`course_id.eq.${data.course_id}`);
+        }
 
-        evaluationRule = rule;
+        if (orFilters.length > 0) {
+          const { data: rule } = await supabase
+            .from('evaluation_rules')
+            .select('*')
+            .or(orFilters.join(','))
+            .is('deleted_at', null)
+            .limit(1)
+            .maybeSingle();
+
+          evaluationRule = rule;
+        }
       }
 
       // Buscar estatísticas
       const stats = await this.getClassStats(classId);
 
+      // Extrair academic_year do academic_period para compatibilidade
+      const academic_year = data?.academic_period?.academic_year || null;
+
       return {
         ...data,
+        academic_year,
         evaluation_rule: evaluationRule,
         stats
       };

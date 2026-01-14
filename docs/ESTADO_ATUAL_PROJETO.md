@@ -1,8 +1,8 @@
 # ESTADO ATUAL DO PROJETO - EDUCANET (EduGestao Municipal)
 
 **Data de Criacao:** 13 de Janeiro de 2026
-**Ultima Atualizacao:** 13 de Janeiro de 2026
-**Versao do Documento:** 3.5
+**Ultima Atualizacao:** 14 de Janeiro de 2026
+**Versao do Documento:** 4.7
 **Status Geral:** 100% COMPLETO E FUNCIONAL
 **Tempo Total de Desenvolvimento:** ~28 horas
 
@@ -19,12 +19,12 @@ O **EduGestao Municipal** (EduCanet) e um sistema completo de gestao educacional
 | Metrica | Valor |
 |---------|-------|
 | Linhas de Codigo | ~29.000 |
-| Arquivos Criados | 77+ |
-| Tabelas no Banco | 54 |
-| Migrations SQL | 42 |
-| Services Backend | 19 |
+| Arquivos Criados | 80+ |
+| Tabelas no Banco | 56 |
+| Migrations SQL | 49 |
+| Services Backend | 20 |
 | Stores Frontend | 14 |
-| Metodos de Service | 277+ |
+| Metodos de Service | 296+ |
 | Acoes de Store | 234+ |
 | Politicas RLS | 110+ |
 | Permissoes | 85+ |
@@ -197,6 +197,8 @@ educanet/
 - `subjects` - Disciplinas
 - `classes` - Turmas
 - `lessons` - Aulas
+- `school_academic_year_courses` - Cursos oferecidos por escola/ano letivo
+- `school_academic_year_course_grades` - Series oferecidas por curso/escola/ano (NOVA)
 
 **Grupo 4: Matriculas e Enturmacao**
 - `student_enrollments` - Matriculas
@@ -277,8 +279,9 @@ educanet/
 | PreEnrollmentService | 28 | Pre-matricula online |
 | ReenrollmentService | 25 | Rematricula automatica |
 | EvaluationRulesService | 12 | Regras de avaliacao |
+| SchoolCourseService | 19 | Cursos e series por escola/ano letivo |
 
-**Total: 277+ metodos implementados**
+**Total: 296+ metodos implementados**
 
 ---
 
@@ -502,9 +505,10 @@ Portal Publico
 └── Hero Carousel
 
 Configuracoes
+├── Geral
+├── Config. Academicas (NOVO - Admin)
 ├── Usuarios
 ├── Permissoes
-├── Sistema
 ├── Educacenso Export
 └── Relatorio Inconsistencias
 ```
@@ -759,6 +763,503 @@ O **EduGestao Municipal** e um sistema **100% completo e funcional**, desenvolvi
 
 Esta secao registra todas as alteracoes significativas realizadas no projeto.
 
+### 14/01/2026 - Versao 4.2
+**Adicao de Campo Sigla da Turma e Aba de Regras de Avaliacao:**
+
+**Novas Funcionalidades:**
+
+1. **Campo Sigla da Turma:**
+   - Campo de sigla (code) para identificacao rapida da turma (ex: 5A, 6B, T101)
+   - Sigla convertida automaticamente para maiusculas ao digitar
+   - Exibicao da sigla em badges nos cards de turmas
+   - Exibicao da sigla no header e detalhes da turma
+
+2. **Aba de Regras de Avaliacao (Nova):**
+   - Nova aba "Regras" no dialog de detalhes da turma
+   - Exibicao da regra de avaliacao aplicavel (por serie ou curso)
+   - Criterios de aprovacao: nota minima, frequencia minima, avaliacoes por periodo
+   - Configuracoes de calculo: tipo de calculo, periodo academico, recuperacao
+   - Lista de tipos de avaliacao aplicaveis para a turma/serie
+   - Carregamento lazy - dados so sao buscados ao acessar a aba
+
+**Arquivos Criados:**
+- `supabase/migrations/047_add_class_code_column.sql` (NOVO)
+  - Coluna `code` VARCHAR(20) para sigla da turma
+  - Coluna `shift` VARCHAR(20) para turno (se nao existia)
+  - Coluna `capacity` INTEGER para capacidade (se nao existia)
+  - Indices para busca por codigo e turno
+
+**Arquivos Modificados:**
+- `src/pages/schools/components/ClassFormDialog.tsx`:
+  - Novo estado `code` para sigla
+  - Interface `editingClass` atualizada com campo `code`
+  - Layout em grid para nome (2/3) e sigla (1/3)
+  - Input com conversao automatica para maiusculas e maxLength=10
+  - Envio do campo code para classService.createClass
+
+- `src/pages/schools/components/ClassDetailsDialog.tsx`:
+  - Interface `ClassInfo` atualizada com campo `code`
+  - Header exibe Badge com sigla ao lado do nome
+  - Card "Dados da Turma" mostra sigla com icone Hash
+  - Nova aba "Regras" com regra de avaliacao e tipos de avaliacao
+  - Estados adicionados: assessmentTypes, evaluationRule
+  - Nova funcao loadEvaluationData() para carregar dados
+  - Integracao com assessmentTypeService e evaluationRulesService
+
+- `src/pages/schools/SchoolDetails.tsx`:
+  - Interface `ClassWithStats` atualizada com campo `code`
+  - Cards de turma exibem Badge com sigla quando preenchida
+
+- `src/lib/supabase/services/class-service.ts`:
+  - Parametro `code` adicionado ao metodo `createClass`
+  - Insert inclui `code: data.code || null`
+
+**Impacto:**
+- Identificacao visual rapida das turmas por sigla
+- Facilita organizacao interna da escola
+- Siglas aparecem em destaque com estilo monospace
+- Visualizacao clara das regras de avaliacao aplicaveis a cada turma
+- Professores e coordenadores podem ver os criterios de aprovacao diretamente na turma
+
+---
+
+### 14/01/2026 - Versao 4.3
+**Unificacao do Formulario de Turmas e Filtro Hierarquico por Usuario:**
+
+**Novas Funcionalidades:**
+
+1. **Formulario Unificado de Turmas (ClassFormDialogUnified):**
+   - Combina funcionalidades dos dois formularios anteriores (ClassFormDialog e ClassroomDialog)
+   - Integracao com regras de avaliacao (filtra periodos pelo tipo da regra)
+   - Campos do Censo Escolar: Modalidade, Tipo de Regime, Turma Multisserie, Dias de Funcionamento
+   - Professor Regente vinculado a turma
+   - Maximo de Disciplinas em Dependencia
+   - Horario de Funcionamento e Minimo de Alunos
+   - Suporta criacao tanto dentro da escola quanto pelo menu admin
+
+2. **Filtro Hierarquico por Tipo de Usuario:**
+   - Admin e Supervisor: Veem todas as turmas de todas as escolas
+   - Coordenador de Polo: Ve apenas turmas das escolas do seu polo
+   - Coordenador/Diretor: Ve apenas turmas da sua escola
+   - Professor: Ve apenas turmas da sua escola
+   - Filtro aplicado automaticamente no menu admin de turmas
+
+3. **Novos Campos na Tabela Classes:**
+   - `is_multi_grade` (BOOLEAN): Indica turma multisserie
+   - `education_modality` (VARCHAR): Modalidade conforme Censo Escolar
+   - `tipo_regime` (VARCHAR): Tipo de regime (Seriado/Nao Seriado)
+   - `operating_hours` (VARCHAR): Horario de funcionamento
+   - `min_students` (INTEGER): Minimo de alunos
+   - `max_dependency_subjects` (INTEGER): Maximo de disciplinas em dependencia
+   - `operating_days` (TEXT[]): Dias de funcionamento da semana
+   - `regent_teacher_id` (INTEGER): FK para professor regente
+
+**Arquivos Criados:**
+- `src/pages/schools/components/ClassFormDialogUnified.tsx` (NOVO)
+  - Formulario completo com react-hook-form e zod
+  - Integracao com regras de avaliacao
+  - Campos do Censo Escolar
+  - Suporte a modo admin (selecao de escola/ano)
+
+- `supabase/migrations/048_add_census_fields_classes.sql` (NOVO)
+  - Adiciona campos do Censo Escolar a tabela classes
+  - FK para professor regente
+  - Indices para performance
+
+**Arquivos Modificados:**
+- `src/pages/schools/SchoolDetails.tsx`:
+  - Usa ClassFormDialogUnified em vez do antigo ClassFormDialog
+  - Alterado para formato de tabela na visualizacao de turmas
+  - Botoes de CRUD com permissoes
+
+- `src/pages/academic/ClassesList.tsx`:
+  - Usa ClassFormDialogUnified em vez de ClassroomDialog
+  - Implementado filtro hierarquico por tipo de usuario
+  - Escolas e turmas filtradas automaticamente pelo role
+
+- `src/lib/supabase/services/class-service.ts`:
+  - Metodo createClass atualizado para suportar novos campos do Censo
+
+**Impacto:**
+- Formulario unico para criar turmas em qualquer contexto
+- Conformidade com campos do Censo Escolar
+- Usuarios veem apenas turmas que podem gerenciar
+- Melhor organizacao e controle de permissoes
+
+---
+
+### 14/01/2026 - Versao 4.6
+**Sistema de Lancamento de Notas Completo:**
+
+**Novas Funcionalidades:**
+
+1. **Aba de Notas Reformulada:**
+   - Interface com filtros: Disciplina, Tipo de Avaliacao, Periodo
+   - Carregamento dinamico de dados conforme filtros selecionados
+   - Notas existentes sao carregadas automaticamente nos campos
+   - Suporte a lancamento em lote (todos os alunos de uma vez)
+
+2. **Modo Normal de Lancamento:**
+   - Campo de Nota editavel por aluno
+   - Campo de Faltas por periodo
+   - Campo de Observacoes
+   - Estatisticas em tempo real (total, lancadas, pendentes, aprovados, reprovados)
+
+3. **Modo Recuperacao:**
+   - Ativado automaticamente quando tipo de avaliacao e "Recuperacao"
+   - Exibe nota original (somente leitura) ao lado do campo de recuperacao
+   - Calculo automatico da Nota Final = MAX(Original, Recuperacao)
+   - Indicadores visuais (aprovado/abaixo da media)
+   - Todos os alunos podem fazer recuperacao (mesmo ja aprovados)
+
+4. **Criacao Automatica de Avaliacoes:**
+   - Se nao existir evaluation_instance para os filtros, cria automaticamente ao salvar
+   - Integra com assessment_types para pegar peso e nota maxima
+
+**Estados e Funções Adicionados:**
+- `academicPeriods` - Lista de periodos academicos
+- `selectedSubjectId`, `selectedAssessmentTypeId`, `selectedPeriodId` - Filtros
+- `gradesData` - Dados do formulario de notas
+- `isRecoveryMode` - Controle do modo recuperacao
+- `loadGradesTabData()` - Carrega periodos e tipos de avaliacao
+- `loadGradesForFilters()` - Carrega notas baseado nos filtros
+- `handleGradeChange()` - Atualiza nota no estado
+- `handleSaveGrades()` - Salva notas em lote
+- `calculateFinalGrade()` - Calcula nota final (recuperacao)
+- `getGradesStats()` - Estatisticas das notas
+
+**Arquivos Modificados:**
+- `src/pages/schools/components/ClassDetailsDialog.tsx`:
+  - Novos imports: `academicPeriodService`, `evaluationInstanceService`, `supabase`
+  - +15 novos estados para gerenciamento de notas
+  - +7 novas funcoes para logica de notas
+  - UI completa da aba Notas (~350 linhas de JSX)
+
+**Impacto:**
+- Professores podem lancar notas diretamente na turma
+- Notas de recuperacao calculam nota final automaticamente
+- Sistema cria avaliacoes automaticamente quando necessario
+- Feedback visual de sucesso/erro em todas as operacoes
+
+---
+
+### 14/01/2026 - Versao 4.5
+**Correcao de Erro do Toast e Melhorias na Matricula:**
+
+**Problemas Corrigidos:**
+1. **Erro removeChild com Sonner Toast:**
+   - Erro "Failed to execute 'removeChild' on 'Node'" ao matricular alunos
+   - Causado por incompatibilidade do Sonner com React 19
+   - Removido uso de toast.success/toast.error
+   - Implementado feedback visual local no modal de matricula
+
+2. **Novo Botao Cadastrar Aluno:**
+   - Adicionado botao "Cadastrar Novo Aluno" no modal de matricula
+   - Disponivel no footer do modal para acesso rapido
+   - Exibido tambem quando nao ha alunos disponiveis
+   - Abre pagina de cadastro de aluno em nova aba
+
+**Arquivos Modificados:**
+- `src/pages/schools/components/ClassDetailsDialog.tsx`:
+  - Removido import do toast (Sonner)
+  - Adicionado estado `enrollFeedback` para feedback local
+  - Atualizado `handleOpenEnrollModal` para usar feedback local
+  - Atualizado `handleEnrollStudent` para usar feedback local
+  - Adicionado componente de feedback visual (sucesso/erro) no modal
+  - Adicionado botao "Cadastrar Novo Aluno" no footer do modal
+  - Adicionado botao "Cadastrar Novo Aluno" quando lista vazia
+
+**Impacto:**
+- Modal de matricula funciona sem erros de DOM
+- Usuarios podem cadastrar novos alunos diretamente do fluxo de matricula
+- Feedback visual claro de sucesso/erro ao matricular
+
+---
+
+### 14/01/2026 - Versao 4.4
+**Sistema PCD e Melhorias na Aba de Alunos:**
+
+**Novas Funcionalidades:**
+
+1. **Suporte a Alunos PCD (Pessoa com Deficiencia):**
+   - Campos is_pcd, cid_code, cid_description em student_profiles
+   - Campos has_medical_report, medical_report_date, medical_report_notes para laudo medico
+   - Badge visual [PCD] ao lado do nome do aluno
+   - Icone de laudo quando aluno possui laudo medico
+   - Contagem de alunos PCD nas estatisticas da turma
+   - Contagem de alunos PCD nas estatisticas da escola
+
+2. **Nova Estrutura da Aba de Alunos no ClassDetailsDialog:**
+   - Coluna de numeracao de ordem (Nº)
+   - Coluna Nome do Aluno com badge PCD quando aplicavel
+   - Coluna PCD com icone e indicador de laudo
+   - Coluna Situacao com badges coloridos: Cursando, Transferido, Abandono, Aprovado, Reprovado
+   - Cabecalho de tabela com estilo visual melhorado
+   - Estatisticas rapidas no topo da aba (Total e PCD)
+
+3. **Campos de Consolidacao de Matricula:**
+   - Campo is_consolidated em class_enrollments para indicar se matricula foi consolidada
+   - Campo enrollment_order para numero de ordem do aluno na turma
+   - Campo final_result para resultado final (Aprovado/Reprovado)
+   - Campo enrollment_consolidation_date em academic_years
+   - Novos status no ENUM: Abandono, Aprovado, Reprovado
+
+4. **Formulario de Aluno com Dados PCD:**
+   - Secao dedicada "Dados PCD" no formulario de cadastro
+   - Campo CID (codigo) e Descricao da Deficiencia
+   - Campo "Possui Laudo Medico?" com opcoes Sim/Nao
+   - Campos condicionais: Data do Laudo e Observacoes do Laudo
+   - Visual destacado com fundo cyan para secao PCD
+
+**Arquivos Criados:**
+- `supabase/migrations/049_add_pcd_and_enrollment_fields.sql` (NOVO)
+  - Campos PCD em student_profiles
+  - Campos enrollment em class_enrollments
+  - Novos valores no ENUM class_enrollment_status
+  - Campo enrollment_consolidation_date em academic_years
+  - Indices para performance
+
+**Arquivos Modificados:**
+- `src/lib/supabase/services/class-service.ts`:
+  - Interface ClassStats com campo studentsPCD
+  - Metodo getClassStudents retorna dados completos de enrollment e PCD
+  - Logica de ordenacao: consolidados (alfabetico) depois nao-consolidados (por data)
+  - Metodo getClassStats conta alunos PCD
+
+- `src/lib/supabase/services/school-service.ts`:
+  - Interface SchoolStats com campo totalStudentsPCD
+  - Metodo getSchoolStats conta alunos PCD da escola
+
+- `src/pages/schools/components/ClassDetailsDialog.tsx`:
+  - Interface StudentInfo com campos PCD e enrollment
+  - Aba de alunos com nova estrutura em tabela
+  - Badges de situacao coloridos
+  - Card de estatisticas com contagem PCD
+  - Imports de Accessibility, MoreHorizontal, format, ptBR
+
+- `src/pages/schools/SchoolDetails.tsx`:
+  - Estatisticas da escola incluem contagem de alunos PCD
+  - Import do icone Accessibility
+
+- `src/pages/people/components/StudentFormDialog.tsx`:
+  - Schema Zod atualizado com campos PCD e laudo
+  - Secao visual dedicada para dados PCD
+  - Campos condicionais baseados em hasSpecialNeeds e hasMedicalReport
+  - handleSubmit inclui campos is_pcd, cid_code, etc.
+
+**Impacto:**
+- Gestao completa de alunos PCD conforme legislacao
+- Visibilidade clara da quantidade de alunos PCD por turma e escola
+- Rastreabilidade de laudos medicos
+- Situacao do aluno visivel diretamente na lista
+- Preparacao para logica de consolidacao de matricula
+
+---
+
+### 14/01/2026 - Versao 4.1
+**Melhorias na Gestao de Turmas - Filtros e Visualizacao Detalhada:**
+
+**Novas Funcionalidades:**
+- Filtro por ano letivo na aba de Turmas
+- Filtro por turno (Manha, Tarde, Noite, Integral)
+- Campo de busca por nome da turma, curso ou serie
+- Criacao de nova turma diretamente na pagina da escola
+- Visualizacao detalhada da turma ao clicar no card
+- Dialog de detalhes com abas: Informacoes, Alunos, Disciplinas, Notas
+
+**Arquivos Criados:**
+- `src/pages/schools/components/ClassDetailsDialog.tsx` (NOVO)
+  - Dialog completo para visualizacao e gestao da turma
+  - Aba Informacoes: Estatisticas, ocupacao, dados da turma
+  - Aba Alunos: Lista com busca, badge de status
+  - Aba Disciplinas: Lista expansivel com professores alocados
+  - Aba Notas: Resumo de notas por disciplina com media
+
+- `src/pages/schools/components/ClassFormDialog.tsx` (NOVO)
+  - Formulario para criar nova turma
+  - Selecao de curso configurado para o ano letivo
+  - Selecao de serie/ano (baseado no curso selecionado)
+  - Selecao de periodo academico, turno e capacidade
+
+**Arquivos Modificados:**
+- `src/pages/schools/SchoolDetails.tsx`:
+  - Novos estados para filtros de turmas (academicYears, selectedYearId, classSearch, selectedShift)
+  - Nova funcao loadClassesForYear() para carregar turmas com estatisticas
+  - Nova funcao filterClasses() para filtrar turmas dinamicamente
+  - Card de filtros com selects e campo de busca
+  - Cards de turmas clicaveis com barra de ocupacao
+  - Integracao com ClassDetailsDialog e ClassFormDialog
+
+**Interface Melhorada:**
+- Cards de turma mostram:
+  - Nome e turno
+  - Curso e nivel educacional
+  - Serie (quando definida)
+  - Barra de progresso de ocupacao (alunos/capacidade)
+- Filtros inline no topo da aba
+- Botao "Limpar filtros" quando ha filtros ativos
+- Loading skeleton enquanto carrega turmas
+- Mensagens contextuais quando nao ha turmas
+
+**Impacto:**
+- Navegacao mais eficiente entre turmas de diferentes anos
+- Visualizacao completa de todos os dados da turma em um unico lugar
+- Facilidade para criar novas turmas sem sair da pagina da escola
+
+### 14/01/2026 - Versao 4.0
+**Sistema de Series/Anos por Curso Escolar:**
+
+**Nova Funcionalidade Implementada:**
+- Configuracao de quais series/anos cada escola oferece para cada curso
+- Exemplo: Uma escola oferece Anos Iniciais mas apenas 1o ao 3o ano (nao 4o e 5o)
+- Capacidade maxima de alunos por serie/escola
+- Interface visual para selecao de series ao adicionar cursos
+
+**Arquivos Criados:**
+- `supabase/migrations/046_create_school_course_grades.sql` (NOVO)
+  - Tabela `school_academic_year_course_grades` com FKs
+  - Constraint unica para evitar duplicatas (school_course_id, education_grade_id)
+  - Indices para performance
+  - Trigger para updated_at automatico
+  - Politicas RLS (admin CRUD, authenticated SELECT)
+  - View `vw_school_course_grades` para consultas facilitadas
+
+**Arquivos Modificados:**
+- `src/lib/supabase/services/school-course-service.ts`:
+  - Novas interfaces: `EducationGrade`, `SchoolCourseGrade`
+  - 8 novos metodos: `getGradesByEducationLevel`, `getCourseGrades`, `addGradesToCourse`,
+    `removeGradeFromCourse`, `updateGradeCapacity`, `addCourseWithGrades`, `getCoursesWithGrades`
+  - Total de metodos: 19 (antes 11)
+
+- `src/pages/schools/components/SchoolYearCoursesConfig.tsx` (REESCRITO):
+  - Substituidos componentes Radix UI (Dialog, Select, Checkbox) por HTML nativo
+  - Resolucao de erros React 19 com portais (removeChild error)
+  - Nova interface `CourseSelection` para gerenciar selecao de series
+  - Modal de adicao com checkboxes para series disponiveis
+  - Modal de edicao de series de cursos ja configurados
+  - Listagem expansivel mostrando series de cada curso
+
+- `src/pages/schools/SchoolDetails.tsx`:
+  - Removida renderizacao condicional de icones (insertBefore error)
+  - Removido import nao utilizado de Loader2
+  - Corrigido padrao `{loading ? <Loader2> : <Edit>}` que causava erro DOM
+
+**Problemas Resolvidos:**
+1. `removeChild` error: Radix UI Dialog/Select conflitando com React 19
+   - Solucao: Substituir por elementos HTML nativos com modais simples
+2. `insertBefore` error: Renderizacao condicional de icones
+   - Solucao: Remover ternarios `{loading ? <IconA> : <IconB>}` dentro de botoes
+3. `insertBefore` error ao selecionar curso no dialog de turmas (14/01/2026)
+   - Causa: Mudanca dinamica da lista de series (grades) ao trocar curso causava conflito de reconciliacao DOM
+   - Solucao: Adicionar key unica ao FormField de grades baseada no courseId selecionado
+   - Arquivos corrigidos: `ClassFormDialogUnified.tsx` e `ClassFormDialog.tsx`
+   - Adicao de filtro `.filter((grade) => grade && grade.id)` para evitar valores nulos
+4. `TeacherService` com relacionamento invalido teachers->schools (14/01/2026)
+   - Causa: Queries no TeacherService tentavam fazer join `school:schools(*)` mas tabela teachers nao tem school_id
+   - Solucao: Corrigir TeacherService para buscar professores por escola via class_teacher_subjects->classes
+   - Arquivos corrigidos: `teacher-service.ts`, `ClassFormDialogUnified.tsx`
+   - Removido uso de `employment_status` que tambem nao existe na tabela teachers
+5. Pagina de Etapas de Ensino melhorada (14/01/2026)
+   - Alterado de visualizacao em grid/cards para tabela
+   - Adicionadas acoes de editar e excluir etapas de ensino
+   - Dialog de confirmacao de exclusao com avisos sobre impacto
+   - Menu dropdown com opcoes: Visualizar/Series, Editar, Excluir
+   - Arquivo modificado: `src/pages/academic/CoursesList.tsx`
+6. Exclusao de Etapas de Ensino com limpeza de vinculos (14/01/2026)
+   - Novo metodo `deleteCourseWithCleanup` no CourseService
+   - Limpa `course_id` em: classes, student_enrollments (SET NULL)
+   - Soft delete em: course_subjects
+   - Hard delete em: school_academic_year_courses (CASCADE)
+   - Limpa referencias em: assessment_types, evaluation_rules
+   - Arquivos modificados: `course-service.ts`, `useCourseStore.supabase.tsx`
+7. Correcao de UUID vs INTEGER no BaseService (14/01/2026)
+   - Os campos `created_by` e `updated_by` agora usam valor fixo 1 (Sistema)
+   - UUID do Supabase Auth nao e compativel com colunas INTEGER
+   - Arquivo modificado: `base-service.ts`
+
+**Impacto:**
+- Escolas podem definir exatamente quais series oferecem de cada curso
+- Total de tabelas: 56 (antes 55)
+- Total de metodos service: 296+ (antes 288+)
+
+### 14/01/2026 - Versao 3.9
+**Sistema de Configuracao de Cursos por Escola/Ano Letivo:**
+
+**Nova Funcionalidade Implementada:**
+- Configuracao de quais cursos/etapas de ensino cada escola oferece por ano letivo
+- Historico de evolucao da escola ao longo dos anos
+- Prerequisito para criacao de turmas (validacao de curso habilitado)
+
+**Arquivos Criados:**
+- `supabase/migrations/045_create_school_academic_year_courses.sql` (NOVO)
+  - Tabela `school_academic_year_courses` com relacionamentos FK
+  - Indices para performance em consultas
+  - Trigger para updated_at automatico
+  - Politicas RLS (admin CRUD, authenticated SELECT)
+  - Funcao `fn_check_school_course_enabled()` para validacao
+  - View `vw_school_courses_by_year` para consultas facilitadas
+
+- `src/lib/supabase/services/school-course-service.ts` (NOVO)
+  - 11 metodos: getBySchoolAndYear, getBySchool, getSchoolHistory, addCourse,
+    addMultipleCourses, removeCourse, toggleCourseActive, isCourseEnabled,
+    copyFromYear, getAvailableCourses
+
+- `src/pages/schools/components/SchoolYearCoursesConfig.tsx` (NOVO)
+  - Componente para configuracao visual de cursos por ano
+  - Selecao de ano letivo com dropdown
+  - Listagem de cursos configurados com opcoes de ativacao/remocao
+  - Accordion para adicionar novos cursos disponiveis
+  - Funcao de copiar configuracao de ano anterior
+  - Tab de historico da escola com visualizacao por ano
+
+**Arquivos Modificados:**
+- `src/lib/supabase/services/index.ts` - Export do novo schoolCourseService
+- `src/pages/schools/SchoolDetails.tsx` - Redesenhado com 3 abas:
+  - Informacoes Gerais (dados cadastrais, estatisticas, infraestrutura)
+  - Ano Letivo e Cursos (nova configuracao)
+  - Turmas (listagem de turmas da escola)
+
+**Impacto:**
+- Escolas podem definir quais cursos oferecem a cada ano
+- Base para validacao na criacao de turmas
+- Visualizacao historica da evolucao da escola
+- Total de tabelas: 55 (antes 54)
+- Total de services: 20 (antes 19)
+- Total de metodos: 288+ (antes 277+)
+
+### 14/01/2026 - Versao 3.8
+**Correcao de Erros no SchoolService (Detalhes de Escola):**
+
+**Problemas Identificados:**
+- Erro 400 em `getTeachers`: Supabase nao suporta `.order('person.full_name')` para campos relacionados
+- Erro 400 em `getStudents`: Mesmo problema com `.order('student_profile.person.full_name')`
+- Erro 400 em `getInfrastructure`: Coluna `infrastructures.name` nao existe (usar `type`)
+- Erro 400 em `getClasses`: Tabela `classes` usa `academic_period_id`, nao `academic_year_id`
+- Erro 400 nas contagens: Campo `status` nao existe em `student_enrollments` (usar `enrollment_status`)
+- Status invalido: Valor `'Matriculado'` nao existe no enum (usar `'Ativo'`)
+
+**Correcoes Aplicadas:**
+1. `getInfrastructure`: Alterado `.order('name')` para `.order('type')`
+2. `getClasses`: Alterado relacionamento de `academic_years` para `academic_periods`
+3. `getTeachers`: Removido `.order()` e implementado ordenacao via JavaScript com `localeCompare()`
+4. `getStaff`: Mesmo tratamento - ordenacao client-side
+5. `getStudents`: Removido `.order()` e ordenacao client-side
+6. `getSchoolStats`: Alterado `status` para `enrollment_status` e `'Matriculado'` para `'Ativo'`
+7. `getGeneralStats`: Mesmas correcoes de status
+8. `checkAvailability`: Mesmas correcoes de status
+9. Atualizado tipo `ClassWithDetails` em database-types.ts (academic_period em vez de academic_year)
+10. Atualizado assinaturas de funcoes no `useSchoolStore.supabase.tsx`
+
+**Arquivos modificados:**
+- `src/lib/supabase/services/school-service.ts` (9 funcoes corrigidas)
+- `src/lib/database-types.ts` (tipo ClassWithDetails atualizado)
+- `src/stores/useSchoolStore.supabase.tsx` (assinaturas de tipo atualizadas)
+
+**Impacto:**
+- Pagina de detalhes de escola agora funciona corretamente
+- Listagem de professores, alunos, turmas e infraestrutura exibindo dados
+- Estatisticas da escola calculadas corretamente
+
 ### 13/01/2026 - Versao 2.3
 **Limpeza de Arquivos Legacy e Correcoes de Integracao:**
 - Removidos arquivos legacy nao utilizados:
@@ -821,6 +1322,48 @@ Esta secao registra todas as alteracoes significativas realizadas no projeto.
   - Visualizacao de motivo de erro quando aplicavel
 - Componentes usam RequirePermission para controle de acesso
 - Total de arquivos criados: 3 paginas/componentes novos
+
+### 13/01/2026 - Versao 3.7
+**Correcao de Compatibilidade useStudentStore e StudentDetails:**
+
+**Problema Identificado:**
+- Erro "getStudent is not a function" na pagina StudentDetails.tsx
+- O store Supabase nao tinha a funcao `getStudent` que o componente esperava
+- Propriedades do modelo mock (`name`, `registration`, `projectIds`) nao existiam no modelo Supabase
+
+**Correcoes Aplicadas:**
+- Adicionada funcao `getStudent(id)` ao useStudentStore.supabase.tsx para busca sincrona
+- Adicionadas funcoes de compatibilidade: `addEnrollment`, `updateEnrollment`, `addProjectEnrollment`, `removeProjectEnrollment`
+- Criada funcao helper `enrichStudentData()` para adicionar propriedades de compatibilidade
+- Atualizado tipo `StudentFullInfo` com propriedades opcionais: `name`, `registration`, `projectIds`
+- Atualizado StudentDetails.tsx para usar `fetchStudentById` com useEffect
+- Adicionado estado de loading enquanto carrega dados do aluno
+
+**Arquivos modificados:**
+- `src/stores/useStudentStore.supabase.tsx` (funcoes adicionadas + helper enrichStudentData)
+- `src/lib/database-types.ts` (propriedades de compatibilidade em StudentFullInfo)
+- `src/pages/people/StudentDetails.tsx` (useEffect para carregar dados + loading state)
+
+### 13/01/2026 - Versao 3.6
+**Correcao de FK student_enrollments -> courses:**
+
+**Problema Identificado:**
+- Erro "Could not find a relationship between 'student_enrollments' and 'courses'" no Supabase PostgREST
+- A tabela student_enrollments tinha coluna course_id mas sem Foreign Key definida
+- O PostgREST precisa de FKs para permitir joins na API
+
+**Correcao Aplicada:**
+- Criada migration `044_fix_student_enrollments_fk_courses.sql`
+- Adiciona coluna course_id se nao existir
+- Cria constraint FK para courses(id)
+- Adiciona indice para performance
+
+**Arquivos criados:**
+- `supabase/migrations/044_fix_student_enrollments_fk_courses.sql` (NOVO)
+
+**Como aplicar:**
+1. Executar a migration no Supabase (Dashboard SQL Editor ou CLI)
+2. Recarregar o schema do PostgREST (isso acontece automaticamente apos alguns segundos)
 
 ### 13/01/2026 - Versao 3.5
 **Melhoria Visual do Tema Claro - Area Administrativa:**
@@ -1327,6 +1870,34 @@ Esta secao registra todas as alteracoes significativas realizadas no projeto.
 - src/stores/useCourseStore.supabase.tsx (fetchCourses)
 - src/pages/academic/CoursesList.tsx (exibição de séries)
 
+### 14/01/2026 - Versao 4.2
+**Configuracao Academica Centralizada:**
+- ClassFormDialog agora filtra periodos academicos de acordo com a regra de avaliacao do curso
+- Adicionado card de regra de avaliacao no formulario de criacao de turma
+- O sistema exibe nota minima, frequencia minima, tipo de periodo e periodos por ano
+- Periodos sao filtrados pelo tipo definido na regra (ex: Bimestre, Semestre)
+
+**Nova Pagina de Configuracoes Academicas (Admin):**
+- Criada pagina /configuracoes/academico para centralizacao de configuracoes
+- Dashboard com estatisticas de cursos, regras e tipos de avaliacao
+- Alerta de cursos sem regra de avaliacao configurada
+- Links diretos para gerenciamento de regras e tipos de avaliacao
+- Visao geral de configuracoes por nivel de ensino
+- Acesso restrito a usuarios Admin
+
+**Arquivos criados/modificados:**
+- src/pages/settings/AcademicConfig.tsx (NOVO)
+- src/pages/schools/components/ClassFormDialog.tsx (aprimorado)
+- src/components/AppSidebar.tsx (novo item no menu)
+- src/App.tsx (nova rota /configuracoes/academico)
+
+**Impacto:**
+- Administradores podem configurar regras centralizadas que se aplicam automaticamente a todas as escolas
+- Ao criar turmas, o sistema automaticamente carrega as regras e filtra periodos compativeis
+- Facilita a padronizacao de configuracoes academicas em toda a rede municipal
+
+---
+
 ### 13/01/2026 - Versao 1.1
 **Correcoes de TypeScript:**
 - Corrigidos todos os `any` nos arquivos base (types.ts, helpers.ts, base-service.ts)
@@ -1349,9 +1920,26 @@ Esta secao registra todas as alteracoes significativas realizadas no projeto.
 - Analise completa do projeto realizada
 - Todas as secoes documentadas
 
+### 14/01/2026 - Versao 4.7
+**Correcoes de Compatibilidade React 19:**
+- Substituido componente `Loader2` por spinner CSS puro em todos os arquivos
+- O componente Lucide `Loader2` com `animate-spin` causa erros de DOM no React 19
+- Solucao: `<div className="border-2 border-current border-t-transparent rounded-full animate-spin" />`
+- Arquivos corrigidos:
+  - `ClassDetailsDialog.tsx` - Aba de Notas (lancamento de notas)
+  - `ClassFormDialogUnified.tsx` - Formulario de turmas
+  - `ClassFormDialog.tsx` - Formulario alternativo de turmas
+- Substituido `toast` (Sonner) por `alert` nos formularios (Sonner incompativel com React 19)
+- Refatorados ternarios aninhados para blocos condicionais `&&` separados
+
+**Funcionalidades Corrigidas:**
+- Aba de Notas na turma: filtros e lancamento funcionando
+- Edicao de turma: modal de edicao abrindo corretamente
+- Todos os spinners de loading renderizando sem erros
+
 ---
 
 **Documento gerado em:** 13/01/2026
-**Ultima Atualizacao:** 13/01/2026
+**Ultima Atualizacao:** 14/01/2026
 **Autor:** Analise automatizada do projeto
 **Versao do Sistema:** 0.0.65
