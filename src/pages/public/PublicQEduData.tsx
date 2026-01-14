@@ -27,8 +27,10 @@ export default function PublicQEduData() {
   const { settings } = useSettingsStore()
   const { toast } = useToast()
 
-  // State
-  const [selectedMunicipalityId, setSelectedMunicipalityId] = useState('')
+  // State - Inicializar com São Sebastião da Boa Vista (1507706)
+  const [selectedMunicipalityId, setSelectedMunicipalityId] = useState(
+    availableMunicipalities[0]?.id || '1507706'
+  )
   const [schoolsData, setSchoolsData] = useState<SchoolQEduData[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -47,11 +49,16 @@ export default function PublicQEduData() {
     return stored ? JSON.parse(stored) : []
   })
 
-  // Initialize Municipality from Settings or Default
+  // Initialize Municipality - usar São Sebastião da Boa Vista (único disponível)
   useEffect(() => {
-    if (settings.qeduMunicipalityId) {
-      setSelectedMunicipalityId(settings.qeduMunicipalityId)
+    // Verificar se o ID configurado existe na lista de municípios disponíveis
+    const configuredId = settings.qeduMunicipalityId as string
+    const municipalityExists = availableMunicipalities.some(m => m.id === configuredId)
+
+    if (configuredId && municipalityExists) {
+      setSelectedMunicipalityId(configuredId)
     } else if (availableMunicipalities.length > 0) {
+      // Fallback para o primeiro município disponível (São Sebastião da Boa Vista)
       setSelectedMunicipalityId(availableMunicipalities[0].id)
     }
   }, [settings.qeduMunicipalityId])
