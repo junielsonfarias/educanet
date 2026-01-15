@@ -19,10 +19,41 @@ export interface ClassStats {
   totalSubjects: number;
 }
 
+export interface ClassAcademicPeriodInfo {
+  id: number;
+  name: string;
+  type: string;
+  start_date?: string;
+  end_date?: string;
+  academic_year_id?: number;
+  academic_year?: AcademicYear;
+}
+
 export interface ClassWithFullInfo extends Class {
+  // Campos adicionais que existem na tabela mas não estão no tipo base
+  code?: string;
+  shift?: string;
+  capacity?: number;
+  is_multi_grade?: boolean;
+  education_modality?: string;
+  tipo_regime?: string;
+  operating_hours?: string;
+  min_students?: number;
+  max_dependency_subjects?: number;
+  operating_days?: string[];
+  regent_teacher_id?: number;
+  education_grade_id?: number;
+  // Relacionamentos
   school?: School;
   course?: Course;
   academic_year?: AcademicYear;
+  academic_period?: ClassAcademicPeriodInfo;
+  education_grade?: {
+    id: number;
+    grade_name: string;
+    grade_order: number;
+    education_level?: string;
+  };
   stats?: ClassStats;
   students?: Student[];
   teachers?: Teacher[];
@@ -72,6 +103,124 @@ class ClassService extends BaseService<Class> {
       } as ClassWithFullInfo;
     } catch (error) {
       console.error('Error in ClassService.getClassFullInfo:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Buscar todas as turmas com informações completas (otimizado)
+   * Evita N+1 queries fazendo todos os joins de uma vez
+   */
+  async getAllWithFullInfo(): Promise<ClassWithFullInfo[]> {
+    try {
+      // Query básica das turmas
+      const { data, error } = await supabase
+        .from('classes')
+        .select(`
+          *,
+          school:schools(*),
+          course:courses(*),
+          education_grade:education_grades(*)
+        `)
+        .is('deleted_at', null)
+        .order('name');
+
+      if (error) throw handleSupabaseError(error);
+
+      // Buscar contagem de alunos por turma em uma única query
+      const classIds = (data || []).map((cls: any) => cls.id);
+      const studentCounts = new Map<number, number>();
+
+      if (classIds.length > 0) {
+        const { data: enrollments } = await supabase
+          .from('class_enrollments')
+          .select('class_id')
+          .in('class_id', classIds)
+          .eq('status', 'Ativo')
+          .is('deleted_at', null);
+
+        // Contar alunos por turma
+        for (const enrollment of enrollments || []) {
+          const count = studentCounts.get(enrollment.class_id) || 0;
+          studentCounts.set(enrollment.class_id, count + 1);
+        }
+      }
+
+      // Buscar períodos acadêmicos com anos letivos SEMPRE (evita problemas de join)
+      const periodIds = [...new Set((data || []).map((cls: any) => cls.academic_period_id).filter(Boolean))];
+      const academicPeriodMap = new Map<number, { id: number; name: string; type: string; academic_year_id: number; academic_year: { id: number; name: string } | null }>();
+
+      if (periodIds.length > 0) {
+        // Buscar TODOS os anos letivos (tabela tem 'year' como número, não 'name')
+        const { data: allYears, error: yearsError } = await supabase
+          .from('academic_years')
+          .select('id, year');
+
+        const yearMap = new Map<number, { id: number; name: string }>();
+        if (!yearsError && allYears) {
+          for (const yr of allYears) {
+            // Converter o ano (number) para nome (string)
+            yearMap.set(yr.id, { id: yr.id, name: String(yr.year) });
+          }
+        }
+
+        // Buscar períodos
+        const { data: periods, error: periodsError } = await supabase
+          .from('academic_periods')
+          .select('id, name, type, academic_year_id')
+          .in('id', periodIds);
+
+        if (!periodsError && periods) {
+          // Montar o mapa de períodos com anos
+          for (const period of periods) {
+            const year = period.academic_year_id ? yearMap.get(period.academic_year_id) : null;
+            academicPeriodMap.set(period.id, {
+              id: period.id,
+              name: period.name,
+              type: period.type,
+              academic_year_id: period.academic_year_id,
+              academic_year: year || null
+            });
+
+          }
+        }
+      }
+
+      // Mapear resultados com academic_year e stats
+      const classes = (data || []).map((cls: any) => {
+        const totalStudents = studentCounts.get(cls.id) || 0;
+        const capacity = cls.capacity || cls.max_students || 35;
+
+        // Buscar período e ano letivo do mapa
+        const periodData = cls.academic_period_id ? academicPeriodMap.get(cls.academic_period_id) : null;
+        const academic_year = periodData?.academic_year || null;
+        const academic_period = periodData ? {
+          id: periodData.id,
+          name: periodData.name,
+          type: periodData.type,
+          academic_year_id: periodData.academic_year_id,
+          academic_year: periodData.academic_year
+        } : null;
+
+        return {
+          ...cls,
+          academic_year,
+          academic_period,
+          stats: {
+            totalStudents,
+            capacity,
+            availableSpots: capacity - totalStudents,
+            occupancyRate: capacity > 0 ? Math.round((totalStudents / capacity) * 100) : 0,
+            studentsPCD: 0,
+            totalTeachers: 0,
+            totalSubjects: 0,
+          }
+        };
+      });
+
+      return classes as ClassWithFullInfo[];
+    } catch (error) {
+      console.error('Error in ClassService.getAllWithFullInfo:', error);
       throw error;
     }
   }

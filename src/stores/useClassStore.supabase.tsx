@@ -114,15 +114,8 @@ export const useClassStore = create<ClassState>((set, get) => ({
           academicYearId: currentFilters.academicYearId
         })
       } else {
-        // Buscar todas as turmas
-        const allClasses = await classService.getAll()
-        // Enriquecer com informações completas
-        classes = await Promise.all(
-          allClasses.map(async (cls) => {
-            const fullInfo = await classService.getClassFullInfo(cls.id)
-            return fullInfo || cls as ClassWithFullInfo
-          })
-        )
+        // Buscar todas as turmas com informações completas (otimizado)
+        classes = await classService.getAllWithFullInfo()
       }
 
       // Aplicar filtro de busca

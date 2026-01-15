@@ -145,11 +145,18 @@ class AttendanceService extends BaseService<Attendance> {
           )
         `)
         .eq('lesson_id', lessonId)
-        .is('deleted_at', null)
-        .order('student_profile.person.full_name');
+        .is('deleted_at', null);
 
       if (error) throw handleSupabaseError(error);
-      return data || [];
+
+      // Ordenar por nome em JavaScript (Supabase não suporta order por relações aninhadas)
+      const sortedData = (data || []).sort((a, b) => {
+        const nameA = a.student_profile?.person?.full_name || '';
+        const nameB = b.student_profile?.person?.full_name || '';
+        return nameA.localeCompare(nameB);
+      });
+
+      return sortedData;
     } catch (error) {
       console.error('Error in AttendanceService.getLessonAttendance:', error);
       throw error;
@@ -199,10 +206,18 @@ class AttendanceService extends BaseService<Attendance> {
         query = query.lte('lesson.lesson_date', options.endDate);
       }
 
-      const { data, error } = await query.order('lesson.lesson_date', { ascending: false });
+      const { data, error } = await query;
 
       if (error) throw handleSupabaseError(error);
-      return data || [];
+
+      // Ordenar por data em JavaScript (Supabase não suporta order por relações aninhadas)
+      const sortedData = (data || []).sort((a, b) => {
+        const dateA = a.lesson?.lesson_date || '';
+        const dateB = b.lesson?.lesson_date || '';
+        return dateB.localeCompare(dateA); // Ordem decrescente
+      });
+
+      return sortedData;
     } catch (error) {
       console.error('Error in AttendanceService.getStudentAttendance:', error);
       throw error;

@@ -57,6 +57,7 @@ import { evaluationInstanceService } from '@/lib/supabase/services/evaluation-in
 import type { AssessmentType } from '@/lib/supabase/services/assessment-type-service'
 import type { EvaluationRule } from '@/lib/supabase/services/evaluation-rules-service'
 import { supabase } from '@/lib/supabase/client'
+import { StudentDetailsModal } from '@/components/academic/StudentDetailsModal'
 
 interface ClassDetailsDialogProps {
   classId: number
@@ -1855,89 +1856,14 @@ export function ClassDetailsDialog({ classId, onClose, onUpdated, onEdit }: Clas
         </div>
       </div>
 
-      {/* Modal de visualização do aluno */}
+      {/* Modal de visualização do aluno com abas (Info, Boletim, Frequência) */}
       {showStudentModal && selectedStudent && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center">
-          <div className="fixed inset-0 bg-black/50" onClick={() => setShowStudentModal(false)} />
-          <div className="relative z-[60] w-full max-w-md bg-background rounded-lg shadow-lg border mx-4">
-            {/* Header */}
-            <div className="flex items-center justify-between p-4 border-b">
-              <h3 className="font-semibold text-lg">Informações do Aluno</h3>
-              <Button variant="ghost" size="icon" onClick={() => setShowStudentModal(false)}>
-                <X className="h-4 w-4" />
-              </Button>
-            </div>
-
-            {/* Content */}
-            <div className="p-4 space-y-4">
-              {/* Avatar e nome */}
-              <div className="flex items-center gap-4">
-                <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center">
-                  <span className="text-2xl font-medium text-primary">
-                    {selectedStudent.person?.full_name?.charAt(0) || '?'}
-                  </span>
-                </div>
-                <div>
-                  <h4 className="font-semibold text-lg">{selectedStudent.person?.full_name || 'Nome não informado'}</h4>
-                  <p className="text-sm text-muted-foreground">
-                    Nº {selectedStudent.order_number || '-'} • {selectedStudent.student_registration_number || selectedStudent.registration_number || 'Sem matrícula'}
-                  </p>
-                </div>
-              </div>
-
-              {/* Informações */}
-              <div className="grid grid-cols-2 gap-3 text-sm">
-                <div>
-                  <Label className="text-muted-foreground">Data de Nascimento</Label>
-                  <p className="font-medium">
-                    {selectedStudent.person?.birth_date
-                      ? format(new Date(selectedStudent.person.birth_date), 'dd/MM/yyyy', { locale: ptBR })
-                      : 'Não informado'}
-                  </p>
-                </div>
-                <div>
-                  <Label className="text-muted-foreground">Situação</Label>
-                  <p className="font-medium">{selectedStudent.class_enrollment_status || 'Ativo'}</p>
-                </div>
-                <div>
-                  <Label className="text-muted-foreground">Data de Matrícula</Label>
-                  <p className="font-medium">
-                    {selectedStudent.class_enrollment_date
-                      ? format(new Date(selectedStudent.class_enrollment_date), 'dd/MM/yyyy', { locale: ptBR })
-                      : 'Não informado'}
-                  </p>
-                </div>
-                <div>
-                  <Label className="text-muted-foreground">PCD</Label>
-                  <p className="font-medium">{selectedStudent.is_pcd ? 'Sim' : 'Não'}</p>
-                </div>
-              </div>
-
-              {selectedStudent.is_pcd && selectedStudent.cid_code && (
-                <div className="p-3 bg-cyan-50 rounded-lg border border-cyan-200">
-                  <div className="flex items-center gap-2 text-cyan-700">
-                    <Accessibility className="h-4 w-4" />
-                    <span className="font-medium">Informações PCD</span>
-                  </div>
-                  <p className="text-sm mt-1 text-cyan-600">
-                    CID: {selectedStudent.cid_code}
-                    {selectedStudent.cid_description && ` - ${selectedStudent.cid_description}`}
-                  </p>
-                  {selectedStudent.has_medical_report && (
-                    <p className="text-sm mt-1 text-cyan-600">✓ Possui laudo médico</p>
-                  )}
-                </div>
-              )}
-            </div>
-
-            {/* Footer */}
-            <div className="flex justify-end gap-2 p-4 border-t">
-              <Button variant="outline" onClick={() => setShowStudentModal(false)}>
-                Fechar
-              </Button>
-            </div>
-          </div>
-        </div>
+        <StudentDetailsModal
+          student={selectedStudent}
+          classId={classId}
+          academicYearId={classInfo?.academic_year?.id}
+          onClose={() => setShowStudentModal(false)}
+        />
       )}
 
       {/* Modal de matrícula de aluno */}

@@ -1,7 +1,7 @@
-import { useForm } from 'react-hook-form'
+import { useForm, useFieldArray } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import {
   Dialog,
   DialogContent,
@@ -37,6 +37,11 @@ interface EducationGrade {
   education_level?: string;
 }
 
+// Schema para pesos de período
+const periodWeightSchema = z.object({
+  weight: z.coerce.number().min(1).max(10).default(1),
+})
+
 const formSchema = z.object({
   name: z.string().min(1, 'Nome é obrigatório'),
   description: z.string().optional(),
@@ -51,6 +56,10 @@ const formSchema = z.object({
   calculation_type: z.enum(['Media_Simples', 'Media_Ponderada', 'Soma_Notas', 'Descritiva']).default('Media_Simples'),
   allow_recovery: z.boolean().default(true),
   recovery_replaces_lowest: z.boolean().default(true),
+  // Campos de pesos para média ponderada
+  period_weights: z.array(periodWeightSchema).optional(),
+  use_custom_divisor: z.boolean().default(false),
+  custom_divisor: z.coerce.number().min(1).max(100).optional(),
 })
 
 type FormData = z.infer<typeof formSchema>
@@ -99,7 +108,16 @@ export function EvaluationRuleFormDialog({
       calculation_type: 'Media_Simples',
       allow_recovery: true,
       recovery_replaces_lowest: true,
+      period_weights: [{ weight: 2 }, { weight: 3 }, { weight: 2 }, { weight: 3 }],
+      use_custom_divisor: false,
+      custom_divisor: 10,
     },
+  })
+
+  // Field array para os pesos
+  const { fields: weightFields, replace: replaceWeights } = useFieldArray({
+    control: form.control,
+    name: 'period_weights',
   })
 
   useEffect(() => {
@@ -129,6 +147,12 @@ export function EvaluationRuleFormDialog({
     if (!open) return
 
     if (rule) {
+      // Extrair pesos da regra existente
+      const existingWeights = rule.period_weights?.weights || []
+      const weights = existingWeights.length > 0
+        ? existingWeights.map(w => ({ weight: w }))
+        : Array(rule.periods_per_year).fill({ weight: 1 })
+
       form.reset({
         name: rule.name,
         description: rule.description || '',
@@ -143,6 +167,9 @@ export function EvaluationRuleFormDialog({
         calculation_type: rule.calculation_type as FormData['calculation_type'],
         allow_recovery: rule.allow_recovery,
         recovery_replaces_lowest: rule.recovery_replaces_lowest,
+        period_weights: weights,
+        use_custom_divisor: rule.period_weights?.divisor !== existingWeights.reduce((a, b) => a + b, 0),
+        custom_divisor: rule.period_weights?.divisor || existingWeights.reduce((a, b) => a + b, 0) || 10,
       })
     } else {
       form.reset({
@@ -159,13 +186,85 @@ export function EvaluationRuleFormDialog({
         calculation_type: 'Media_Simples',
         allow_recovery: true,
         recovery_replaces_lowest: true,
+        period_weights: [{ weight: 2 }, { weight: 3 }, { weight: 2 }, { weight: 3 }],
+        use_custom_divisor: false,
+        custom_divisor: 10,
       })
     }
   }, [rule, form, open])
 
+  // Ajustar número de pesos quando muda o número de períodos
+  const periodsPerYear = form.watch('periods_per_year')
+  const calculationType = form.watch('calculation_type')
+
+  useEffect(() => {
+    if (calculationType === 'Media_Ponderada') {
+      const currentWeights = form.getValues('period_weights') || []
+      if (currentWeights.length !== periodsPerYear) {
+        // Criar array de pesos com valores padrão alternados (2, 3, 2, 3...)
+        const newWeights = Array(periodsPerYear).fill(null).map((_, i) =>
+          ({ weight: i % 2 === 0 ? 2 : 3 })
+        )
+        replaceWeights(newWeights)
+      }
+    }
+  }, [periodsPerYear, calculationType, form, replaceWeights])
+
+  // Gerar preview da fórmula
+  const periodWeights = form.watch('period_weights') || []
+  const useCustomDivisor = form.watch('use_custom_divisor')
+  const customDivisor = form.watch('custom_divisor')
+  const academicPeriodType = form.watch('academic_period_type')
+
+  const formulaPreview = useMemo(() => {
+    if (calculationType !== 'Media_Ponderada') return null
+
+    const weights = periodWeights.map(p => p.weight)
+    const totalWeight = weights.reduce((a, b) => a + b, 0)
+    const divisor = useCustomDivisor ? (customDivisor || totalWeight) : totalWeight
+
+    const periodLabel = academicPeriodType === 'Bimestre' ? 'Av.' :
+      academicPeriodType === 'Trimestre' ? 'Tri.' : 'Sem.'
+
+    const parts = weights.map((w, i) => `(${i + 1}ª ${periodLabel} × ${w})`).join(' + ')
+    return `(${parts}) / ${divisor}`
+  }, [periodWeights, useCustomDivisor, customDivisor, calculationType, academicPeriodType])
+
   const onSubmit = async (values: FormData) => {
     setIsSubmitting(true)
     try {
+      // Preparar dados de pesos se for média ponderada
+      let periodWeightsData = undefined
+      let formulaDescription = undefined
+
+      if (values.calculation_type === 'Media_Ponderada' && values.period_weights) {
+        const weights = values.period_weights.map(p => p.weight)
+        const totalWeight = weights.reduce((a, b) => a + b, 0)
+        const divisor = values.use_custom_divisor ? (values.custom_divisor || totalWeight) : totalWeight
+
+        periodWeightsData = {
+          weights,
+          divisor,
+        }
+
+        // Gerar descrição da fórmula
+        const periodLabel = values.academic_period_type === 'Bimestre' ? 'Av.' :
+          values.academic_period_type === 'Trimestre' ? 'Tri.' : 'Sem.'
+        const parts = weights.map((w, i) => `(${i + 1}ª ${periodLabel} × ${w})`).join(' + ')
+        formulaDescription = `Média Ponderada: (${parts}) / ${divisor}`
+      } else if (values.calculation_type === 'Media_Simples') {
+        // Pesos iguais para média simples
+        const weights = Array(values.periods_per_year).fill(1)
+        periodWeightsData = {
+          weights,
+          divisor: values.periods_per_year,
+        }
+        const periodLabel = values.academic_period_type === 'Bimestre' ? 'Av.' :
+          values.academic_period_type === 'Trimestre' ? 'Tri.' : 'Sem.'
+        const parts = weights.map((_, i) => `${i + 1}ª ${periodLabel}`).join(' + ')
+        formulaDescription = `Média Simples: (${parts}) / ${values.periods_per_year}`
+      }
+
       const data = {
         name: values.name,
         description: values.description || undefined,
@@ -180,6 +279,8 @@ export function EvaluationRuleFormDialog({
         calculation_type: values.calculation_type,
         allow_recovery: values.allow_recovery,
         recovery_replaces_lowest: values.recovery_replaces_lowest,
+        period_weights: periodWeightsData,
+        formula_description: formulaDescription,
       }
 
       let result
@@ -208,7 +309,6 @@ export function EvaluationRuleFormDialog({
     }
   }
 
-  const selectedCalculationType = form.watch('calculation_type')
   const allowRecovery = form.watch('allow_recovery')
 
   return (
@@ -458,9 +558,9 @@ export function EvaluationRuleFormDialog({
                       </select>
                     </FormControl>
                     <FormDescription>
-                      {selectedCalculationType === 'Descritiva'
+                      {calculationType === 'Descritiva'
                         ? 'Avaliação qualitativa - ideal para Educação Infantil'
-                        : selectedCalculationType === 'Media_Ponderada'
+                        : calculationType === 'Media_Ponderada'
                         ? 'Cada avaliação terá peso diferente no cálculo'
                         : 'Soma das notas dividida pelo número de avaliações'}
                     </FormDescription>
@@ -469,7 +569,7 @@ export function EvaluationRuleFormDialog({
                 )}
               />
 
-              {selectedCalculationType !== 'Descritiva' && (
+              {calculationType !== 'Descritiva' && (
                 <FormField
                   control={form.control}
                   name="max_single_evaluation_weight"
@@ -492,10 +592,92 @@ export function EvaluationRuleFormDialog({
                   )}
                 />
               )}
+
+              {/* Configuração de Pesos (Média Ponderada) */}
+              {calculationType === 'Media_Ponderada' && (
+                <div className="bg-slate-50 rounded-lg p-4 space-y-4">
+                  <h5 className="font-medium text-sm text-slate-700">Configuração de Pesos por Período</h5>
+                  <p className="text-xs text-slate-500">
+                    Defina o peso de cada período para o cálculo da média ponderada.
+                    A nota de cada período já considera a maior entre avaliação e recuperação.
+                  </p>
+
+                  <div className="grid grid-cols-4 gap-3">
+                    {weightFields.map((field, index) => (
+                      <FormField
+                        key={field.id}
+                        control={form.control}
+                        name={`period_weights.${index}.weight`}
+                        render={({ field: weightField }) => (
+                          <FormItem>
+                            <FormLabel className="text-xs">{index + 1}º {academicPeriodType === 'Semestre' ? 'Sem.' : academicPeriodType === 'Trimestre' ? 'Tri.' : 'Bim.'}</FormLabel>
+                            <FormControl>
+                              <Input
+                                type="number"
+                                min="1"
+                                max="10"
+                                className="h-9"
+                                {...weightField}
+                              />
+                            </FormControl>
+                          </FormItem>
+                        )}
+                      />
+                    ))}
+                  </div>
+
+                  <div className="flex items-center gap-4">
+                    <FormField
+                      control={form.control}
+                      name="use_custom_divisor"
+                      render={({ field }) => (
+                        <FormItem className="flex items-center gap-2">
+                          <FormControl>
+                            <Switch
+                              checked={field.value}
+                              onCheckedChange={field.onChange}
+                            />
+                          </FormControl>
+                          <FormLabel className="text-sm font-normal">Usar divisor customizado</FormLabel>
+                        </FormItem>
+                      )}
+                    />
+
+                    {useCustomDivisor && (
+                      <FormField
+                        control={form.control}
+                        name="custom_divisor"
+                        render={({ field }) => (
+                          <FormItem className="flex items-center gap-2">
+                            <FormLabel className="text-sm">Divisor:</FormLabel>
+                            <FormControl>
+                              <Input
+                                type="number"
+                                min="1"
+                                max="100"
+                                className="h-9 w-20"
+                                {...field}
+                              />
+                            </FormControl>
+                          </FormItem>
+                        )}
+                      />
+                    )}
+                  </div>
+
+                  {/* Preview da Fórmula */}
+                  {formulaPreview && (
+                    <div className="bg-white rounded-md p-3 border border-slate-200">
+                      <p className="text-xs text-slate-500 mb-1">Fórmula:</p>
+                      <p className="text-sm font-mono text-slate-700">{formulaPreview}</p>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
 
             {/* Recuperação */}
-            {selectedCalculationType !== 'Descritiva' && (
+            {calculationType !== 'Descritiva' && (
               <div className="border rounded-lg p-4 space-y-4">
                 <h4 className="font-medium text-sm">Recuperação</h4>
 

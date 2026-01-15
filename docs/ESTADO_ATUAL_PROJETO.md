@@ -1,8 +1,8 @@
 # ESTADO ATUAL DO PROJETO - EDUCANET (EduGestao Municipal)
 
 **Data de Criacao:** 13 de Janeiro de 2026
-**Ultima Atualizacao:** 14 de Janeiro de 2026
-**Versao do Documento:** 4.7
+**Ultima Atualizacao:** 15 de Janeiro de 2026
+**Versao do Documento:** 4.17
 **Status Geral:** 100% COMPLETO E FUNCIONAL
 **Tempo Total de Desenvolvimento:** ~28 horas
 
@@ -1937,9 +1937,356 @@ Esta secao registra todas as alteracoes significativas realizadas no projeto.
 - Edicao de turma: modal de edicao abrindo corretamente
 - Todos os spinners de loading renderizando sem erros
 
+### 15/01/2026 - Versao 4.8
+**Correcoes de Ordenacao Supabase (Relacoes Aninhadas):**
+- O Supabase PostgREST nao suporta `.order()` por campos de relacoes aninhadas
+- Todas as queries que tentavam ordenar por campos como `student_profile.person.full_name` causavam erro 400
+- Solucao: Remover `.order()` das queries e ordenar os dados em JavaScript apos o fetch
+
+**Arquivos Corrigidos:**
+- `grade-service.ts`:
+  - `getStudentGrades`: Ordenacao por `evaluation_instance.evaluation_date`
+  - `getEvaluationGrades`: Ordenacao por `student_profile.person.full_name`
+- `attendance-service.ts`:
+  - `getLessonAttendance`: Ordenacao por `student_profile.person.full_name`
+  - `getStudentAttendance`: Ordenacao por `lesson.lesson_date`
+- `student-service.ts`:
+  - `getBySchool`: Ordenacao por `student_profile.person.full_name`
+  - `getByClass`: Ordenacao por `student_enrollment.student_profile.person.full_name`
+  - `searchByName`: Ordenacao por `person.full_name`
+
+**Impacto:**
+- Modal de detalhes do aluno (StudentDetailsModal) agora carrega notas e frequencia corretamente
+- Aba Boletim: Notas por disciplina e periodo funcionando
+- Aba Frequencia: Frequencia por disciplina funcionando
+- Ordenacao mantida (implementada via JavaScript com `localeCompare`)
+
+**Correcoes de Esquema de Relacionamento (evaluation_instances -> subjects):**
+- A tabela `evaluation_instances` NAO tem relacao direta com `subjects`
+- A relacao correta e: `evaluation_instances` -> `class_teacher_subjects` -> `subjects`
+- Todas as queries que tentavam `subject:subjects(*)` diretamente causavam erro 400
+
+**Funcoes Corrigidas em grade-service.ts:**
+- `getGradeFullInfo`: Corrigido path do subject
+- `getStudentGrades`: Corrigido path do subject
+- `getStudentReport`: Corrigido path do subject e campo `name` para `title`
+- `calculateAverage`: Corrigido filtro por subject_id via class_teacher_subject
+- `calculateOverallAverage`: Corrigido filtro por subject_id via class_teacher_subject
+- `getClassGradesBySubject`: Corrigido filtro por subject_id via class_teacher_subject
+- `getGradeStats`: Corrigido filtro por subject_id via class_teacher_subject
+
+**Correcoes em StudentDetailsModal.tsx:**
+- Corrigido acesso a `subject_id` via `class_teacher_subject`
+- Corrigido campos: `name` -> `title`, `max_value` -> `max_grade`, `assessment_type` -> `evaluation_type`
+
+### 15/01/2026 - Versao 4.9
+**Redesenho Completo do Boletim (StudentDetailsModal):**
+- Implementada nova visualizacao do Boletim com tabela por disciplina e periodo
+- Layout: Disciplina | 1a Av. | 2a Av. | 3a Av. | 4a Av. | Media Final | Freq.(%) | Situacao
+- Sub-abas para "Boletim" (notas finais) e "Recuperacao" (detalhamento)
+
+**Aba Boletim de Recuperacao:**
+- Nova aba que mostra: Disciplina | Av. | Rec. | Av. | Rec. | ... por periodo
+- Destaque visual (bg-green-50) na nota utilizada na media (maior entre avaliacao e recuperacao)
+- Legenda explicativa das cores e situacoes
+
+**Logica de Notas Implementada:**
+- Nota regular: Media das avaliacoes normais (Prova, Trabalho, Participacao, Outro)
+- Nota recuperacao: Maior nota das avaliacoes do tipo "Recuperacao"
+- Nota final do periodo: Maior valor entre nota regular e recuperacao
+- Media final: Media das notas finais de todos os periodos
+
+**Frequencia Integrada:**
+- Coluna de frequencia (%) na tabela principal do boletim
+- Calculo por disciplina considerando Presente, Ausente e Justificado
+- Cor verde (>=75%), amarelo (60-74%), vermelho (<60%)
+
+**Situacao Automatica:**
+- Aprovado: Media >= 7.0 e Frequencia >= 75%
+- Recuperacao: Media entre 5.0 e 6.9
+- Reprovado: Media < 5.0 ou Frequencia < 75%
+
+**Melhorias de Interface:**
+- Aumentada largura do modal de max-w-5xl para max-w-6xl
+- Corrigidos React Fragments com keys adequadas
+- Tabelas com overflow-x-auto para responsividade
+- Cores semanticas para notas e frequencia
+
+**Arquivos Modificados:**
+- src/components/academic/StudentDetailsModal.tsx (redesenho completo)
+- src/lib/supabase/services/grade-service.ts (correcao de queries)
+
+**Impacto:**
+- Visualizacao clara do desempenho do aluno por disciplina e periodo
+- Transparencia no calculo de notas com recuperacao
+- Interface responsiva para diferentes quantidades de periodos
+
+### 15/01/2026 - Versao 4.10
+**Correcao de Query de Lessons (Frequencia):**
+- A tabela `lessons` nao possui colunas `class_id` e `subject_id` diretamente
+- A relacao correta e atraves de `class_teacher_subject_id`
+- Erro 400 Bad Request ao buscar aulas por disciplina foi corrigido
+
+**Alteracoes em StudentDetailsModal.tsx:**
+- Funcao `loadAttendanceBySubject`: Agora usa `class_teacher_subject_id` para buscar aulas
+- Funcao `loadAttendance`: Mesma correcao aplicada
+- Mapeamento de `ctsWithSubjects` para manter relacao entre disciplina e class_teacher_subject
+- Query corrigida: `.eq('class_teacher_subject_id', cts.classTeacherSubjectId)`
+
+**Melhorias de Interface:**
+- Modal centralizado com `p-4` no container externo e `overflow-hidden`
+- Removido `mx-4` que causava deslocamento horizontal
+- Aba "Recuperacao" agora sempre visivel (mostra mensagem quando nao ha dados)
+- Mensagem informativa quando nao ha notas de recuperacao registradas
+
+**Arquivos Modificados:**
+- src/components/academic/StudentDetailsModal.tsx
+
+**Impacto:**
+- Frequencia por disciplina carrega corretamente sem erros 400
+- Modal centralizado em todas as resolucoes de tela
+- Aba de Recuperacao acessivel mesmo sem dados (melhor UX)
+
+### 15/01/2026 - Versao 4.11
+**Melhorias na Tabela de Recuperacao:**
+- Adicionada coluna "Boletim" ao final de cada periodo mostrando a maior nota
+- Cabecalho: Disciplina | 1a Av. | 1a Rec. | Boletim | 2a Av. | 2a Rec. | Boletim | ...
+- Coluna Boletim com destaque visual em azul (bg-blue-50)
+- Marcacao visual aprimorada: maior nota destacada com ring verde (ring-2 ring-green-400)
+
+**Integracao com Regras de Avaliacao:**
+- Busca automatica da regra de avaliacao da turma via `evaluationRulesService.getRuleForClass`
+- Exibicao das informacoes da regra no final do boletim
+- Card informativo com: Nome da regra, Nota minima, Frequencia minima, Tipo de periodo, Calculo
+- Explicacao da politica de recuperacao (maior nota ou soma)
+
+**Dinamizacao dos Valores de Aprovacao:**
+- Funcao `getGradeColor`: usa min_approval_grade da regra
+- Funcao `getAttendanceColor`: usa min_attendance_percent da regra
+- Funcao `getSituacaoFromGrade`: usa valores da regra para determinar situacao
+- Legenda atualizada dinamicamente com valores da regra de avaliacao
+
+**Arquivos Modificados:**
+- src/components/academic/StudentDetailsModal.tsx
+
+**Impacto:**
+- Transparencia total no calculo de notas e criterios de aprovacao
+- Visualizacao clara de qual nota e usada no boletim
+- Sistema adapta-se automaticamente as regras de avaliacao cadastradas por curso/serie
+
+### 15/01/2026 - Versao 4.12
+**Sistema de Formulas de Calculo Personalizadas:**
+- Nova migration 051: Adiciona campos `period_weights` (JSONB) e `formula_description` na tabela `evaluation_rules`
+- Permite configurar pesos diferentes para cada periodo (ex: 1º=2, 2º=3, 3º=2, 4º=3)
+- Formula exemplo: ((1ª Av. x 2) + (2ª Av. x 3) + (3ª Av. x 2) + (4ª Av. x 3)) / 10
+
+**Atualizacoes no Service (evaluation-rules-service.ts):**
+- Novo tipo `PeriodWeights`: `{ weights: number[], divisor: number, formula?: string }`
+- Funcao `calculateWeightedAverage`: Calcula media ponderada usando pesos configurados
+- Funcao `generateFormulaDescription`: Gera descricao textual da formula
+- Funcao `getDefaultWeights`: Retorna pesos padrao por tipo de calculo
+
+**Atualizacoes no StudentDetailsModal:**
+- Calculo de media agora usa pesos configurados quando disponivel
+- Exibicao da formula de calculo no card de regra de avaliacao
+- Mostra pesos por periodo e divisor quando media ponderada
+
+**Nova Interface de Configuracao de Pesos:**
+- Campos dinamicos para peso de cada periodo
+- Opcao de divisor customizado (soma dos pesos ou valor fixo)
+- Preview da formula em tempo real
+- Grid responsivo para 4 periodos
+
+**Arquivos Modificados:**
+- supabase/migrations/051_add_period_weights_to_evaluation_rules.sql (novo)
+- src/lib/supabase/services/evaluation-rules-service.ts
+- src/components/academic/StudentDetailsModal.tsx
+- src/pages/academic/components/EvaluationRuleFormDialog.tsx
+
+**Impacto:**
+- Flexibilidade total na configuracao de formulas de calculo por curso/serie
+- Cada etapa de ensino pode ter formula diferente
+- Notas de avaliacao ja consideram maior nota entre avaliacao e recuperacao
+- Formula visivel no boletim do aluno para transparencia
+
+### 15/01/2026 - Versao 4.13
+**Correcoes de Query de Attendances e Passagem de Parametros:**
+
+**Problemas Identificados:**
+1. Erro 400 na query de attendances: coluna `attendance_status` nao existe (correto: `status`)
+2. Erro 400 na query de attendances: coluna `student_profile_id` nao existe (correto: `student_enrollment_id`)
+3. Boletim nao mostrava estrutura: `academicYearId` undefined no StudentDetailsModal
+4. ClassDetails.tsx usava `classData?.academic_year_id` mas propriedade correta e `classData?.academic_year?.id`
+
+**Correcoes Aplicadas:**
+1. `StudentDetailsModal.tsx` - funcao `loadAttendanceBySubject`:
+   - Alterado `attendance_status` para `status`
+   - Alterado `student_profile_id` para `student_enrollment_id`
+   - Adicionada busca de `student_enrollment_id` quando nao disponivel nas props
+   - Retorno de dados vazios quando enrollment nao encontrado (evita erro)
+
+2. `ClassDetails.tsx` - chamada do StudentDetailsModal:
+   - Corrigido: `academicYearId={classData?.academic_year_id}` -> `academicYearId={classData?.academic_year?.id}`
+   - O tipo `ClassWithFullInfo` tem `academic_year` como objeto, nao como ID
+
+**Arquivos Modificados:**
+- src/components/academic/StudentDetailsModal.tsx
+- src/pages/academic/ClassDetails.tsx
+
+**Impacto:**
+- Frequencia por disciplina carrega corretamente usando colunas corretas da tabela
+- Boletim agora mostra estrutura de periodos e disciplinas corretamente
+- Resolucao definitiva do erro 400 ao buscar frequencia do aluno
+
+### 15/01/2026 - Versao 4.14
+**Exibicao de Regras de Avaliacao e Disciplinas em Etapas de Ensino:**
+
+**Problemas Identificados:**
+1. Pagina de detalhes de Etapas de Ensino nao mostrava as regras de avaliacao cadastradas
+2. Disciplinas vinculadas ao curso/serie nao apareciam na listagem
+3. Array `evaluationRules` estava vazio (hardcoded)
+4. Array `subjects` nas series estava sempre vazio
+
+**Correcoes Aplicadas:**
+1. `CourseDetails.tsx` - Carregamento de dados:
+   - Adicionado useEffect para carregar regras via `evaluationRulesService.getByCourse()`
+   - Busca tambem regras especificas de cada serie via `evaluationRulesService.getByGrade()`
+   - Carrega disciplinas do banco via query em `course_subjects` com join em `subjects`
+   - Organiza disciplinas por serie usando Map<gradeId, SubjectItem[]>
+
+2. `CourseDetails.tsx` - Novo card de Regras de Avaliacao:
+   - Card visual mostrando todas as regras vinculadas ao curso/series
+   - Exibe tipo de calculo, nota minima, frequencia minima, periodos
+   - Mostra formula de calculo quando disponivel
+   - Estado de loading e mensagem quando vazio
+
+3. `CourseDetails.tsx` - Funcoes auxiliares:
+   - `getRuleForGrade()`: Busca regra especifica da serie ou do curso
+   - `getRuleName()`: Atualizada para usar ID da serie ao inves de evaluationRuleId
+
+4. `GradeFormDialog.tsx` - Correcoes de tipo:
+   - Import alterado de `@/lib/mock-data` para `@/lib/supabase/services/evaluation-rules-service`
+   - Campo evaluationRuleId agora e opcional (z.string().optional())
+   - Conversao de rule.id para String no SelectItem
+   - Mensagem quando nao ha regras cadastradas
+
+**Arquivos Modificados:**
+- src/pages/academic/CourseDetails.tsx
+- src/pages/academic/components/GradeFormDialog.tsx
+
+**Impacto:**
+- Pagina de Etapas de Ensino agora mostra todas as regras de avaliacao cadastradas
+- Disciplinas vinculadas aparecem corretamente em cada serie
+- Integracao completa com dados do banco de dados
+- Melhor experiencia visual com cards informativos
+
+### 15/01/2026 - Versao 4.15
+**Melhorias na Listagem de Turmas e Alunos:**
+
+**Problema Identificado:**
+- O metodo `getAll()` da `BaseService` faz apenas `select('*')` sem joins
+- Isso causava N+1 queries para enriquecer cada turma com `getClassFullInfo()`
+- O processo era lento e em alguns casos falhava, deixando `academic_year` como null
+
+**Solucao Implementada:**
+1. Novo metodo `getAllWithFullInfo()` no `ClassService`:
+   - Query otimizada com todos os joins necessarios em uma unica requisicao
+   - Inclui: `school`, `course`, `academic_period` com `academic_year`, `education_grade`
+   - Extrai `academic_year` do `academic_period` para compatibilidade
+
+2. Atualizacao do `useClassStore.supabase.tsx`:
+   - Substituido `getAll()` + multiplos `getClassFullInfo()` por `getAllWithFullInfo()`
+   - Eliminadas N+1 queries, agora usa apenas 1 query
+
+3. Exibicao da Idade do Aluno na listagem de alunos da turma:
+   - Nova coluna "Idade" adicionada na tabela de alunos
+   - Funcao `calculateAge()` para calcular idade a partir da data de nascimento
+   - Exibe "X anos" ou "-" quando data nao informada
+
+**Arquivos Modificados:**
+- src/lib/supabase/services/class-service.ts (novo metodo getAllWithFullInfo)
+- src/stores/useClassStore.supabase.tsx (usa novo metodo)
+- src/pages/academic/ClassesList.tsx (mapeamento de ano letivo)
+- src/pages/academic/ClassDetails.tsx (coluna idade e funcao de calculo)
+
+**Impacto:**
+- Listagem de turmas carrega muito mais rapido (1 query vs N+1)
+- Ano letivo agora aparece corretamente na listagem
+- Listagem de alunos da turma mostra a idade de cada aluno
+
+### 15/01/2026 - Versao 4.16
+**Correcoes de Stats e Paginacao na Listagem de Turmas:**
+
+**Problemas Identificados:**
+1. Contagem de alunos mostrava "0" pois `getAllWithFullInfo` nao carregava stats
+2. Ano letivo ainda nao aparecia pois joins nao retornavam dados corretamente
+3. Listagem de turmas ficava muito longa sem paginacao
+
+**Solucoes Implementadas:**
+1. `getAllWithFullInfo` agora busca contagem de alunos via `class_enrollments`:
+   - Query separada para contar matriculas ativas por turma
+   - Monta objeto `stats` com totalStudents, capacity, occupancyRate, etc.
+   - Evita N+1 queries usando `in()` para buscar todas de uma vez
+
+2. Mapeamento de ano letivo com fallbacks multiplos:
+   - Tenta: `cls.academic_year` -> `academic_period?.academic_year`
+   - Fallback: busca no `academicYears` do store pelo `academic_year_id`
+   - Ultimo fallback: usa o unico ano letivo se houver apenas um cadastrado
+
+3. Paginacao na listagem de turmas:
+   - Exibe 15 turmas por pagina
+   - Controles: Primeira, Anterior, numeros de pagina, Proxima, Ultima
+   - Reset automatico para pagina 1 quando filtros mudam
+   - Exibe "Mostrando X a Y de Z turmas"
+
+**Arquivos Modificados:**
+- src/lib/supabase/services/class-service.ts (stats no getAllWithFullInfo)
+- src/pages/academic/ClassesList.tsx (paginacao e fallbacks de ano letivo)
+
+**Impacto:**
+- Contagem de alunos agora aparece corretamente
+- Ano letivo aparece usando fallbacks quando join falha
+- Interface mais organizada com paginacao
+- Melhor performance com menos dados carregados por vez
+
+### Correcao realizada em 15/01/2026 (Sessao 2)
+
+**Problema 1:** Ano letivo nao aparecia na listagem de turmas (academico/turmas).
+
+**Solucao:**
+1. Melhorado `getAllWithFullInfo()` no class-service para:
+   - Adicionar debug de dados retornados do Supabase
+   - Implementar fallback separado quando academic_period.academic_year nao carrega no join
+   - Buscar periodos com anos letivos separadamente se necessario
+
+2. Adicionada tipagem correta para `ClassWithFullInfo`:
+   - Nova interface `ClassAcademicPeriodInfo` para academic_period com academic_year
+   - Adicionada propriedade `education_grade` na interface
+
+**Problema 2:** Formulario de edicao de turma em academico/turmas nao carregava etapa de ensino.
+
+**Solucao:**
+1. Atualizado `ClassesList.tsx` para passar `school_id` e campos adicionais no editingClass
+2. Modificado `ClassFormDialogUnified.tsx`:
+   - Aceita `school_id` no editingClass
+   - Carrega anos letivos diretamente do banco quando em modo admin
+   - Busca o ano letivo correto do periodo academico da turma sendo editada
+   - Nao limpa selecoes dependentes quando editando
+
+**Arquivos Modificados:**
+- src/lib/supabase/services/class-service.ts (interfaces e fallback no getAllWithFullInfo)
+- src/pages/academic/ClassesList.tsx (school_id e campos no editingClass)
+- src/pages/schools/components/ClassFormDialogUnified.tsx (carregamento de anos no modo admin)
+- src/lib/supabase/services/index.ts (export de tipos)
+
+**Impacto:**
+- Ano letivo deve aparecer corretamente na listagem
+- Formulario de edicao carrega dados corretos da turma
+- Etapa de ensino e serie sao carregadas ao editar turma no menu academico
+
 ---
 
 **Documento gerado em:** 13/01/2026
-**Ultima Atualizacao:** 14/01/2026
+**Ultima Atualizacao:** 15/01/2026
 **Autor:** Analise automatizada do projeto
-**Versao do Sistema:** 0.0.65
+**Versao do Sistema:** 0.0.70

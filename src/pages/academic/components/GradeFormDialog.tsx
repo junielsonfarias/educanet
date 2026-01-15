@@ -28,12 +28,12 @@ import {
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { FormDescription } from '@/components/ui/form'
-import { EvaluationRule } from '@/lib/mock-data'
+import type { EvaluationRule } from '@/lib/supabase/services/evaluation-rules-service'
 
 const gradeSchema = z.object({
   name: z.string().min(2, 'Nome da série/ano deve ter pelo menos 2 caracteres'),
   numero: z.coerce.number().min(1).max(9, 'Número deve ser entre 1 e 9'),
-  evaluationRuleId: z.string().min(1, 'Regra de avaliação é obrigatória'),
+  evaluationRuleId: z.string().optional(),
 })
 
 interface GradeFormDialogProps {
@@ -155,7 +155,7 @@ export function GradeFormDialog({
               name="evaluationRuleId"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Regra de Avaliação *</FormLabel>
+                  <FormLabel>Regra de Avaliação</FormLabel>
                   <Select
                     onValueChange={field.onChange}
                     defaultValue={field.value}
@@ -166,11 +166,17 @@ export function GradeFormDialog({
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      {evaluationRules.map((rule) => (
-                        <SelectItem key={rule.id} value={rule.id}>
-                          {rule.name}
-                        </SelectItem>
-                      ))}
+                      {evaluationRules.length === 0 ? (
+                        <div className="px-2 py-4 text-center text-sm text-muted-foreground">
+                          Nenhuma regra cadastrada
+                        </div>
+                      ) : (
+                        evaluationRules.map((rule) => (
+                          <SelectItem key={rule.id} value={String(rule.id)}>
+                            {rule.name}
+                          </SelectItem>
+                        ))
+                      )}
                     </SelectContent>
                   </Select>
                   <FormDescription>

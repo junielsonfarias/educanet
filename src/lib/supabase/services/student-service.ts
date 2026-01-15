@@ -87,13 +87,20 @@ class StudentService extends BaseService<Student> {
         query = query.eq('academic_year_id', options.academicYearId);
       }
 
-      const { data, error } = await query.order('student_profile.person.full_name');
+      const { data, error } = await query;
 
       if (error) throw handleSupabaseError(error);
 
+      // Ordenar por nome em JavaScript (Supabase não suporta order por relações aninhadas)
+      const sortedData = (data || []).sort((a, b) => {
+        const nameA = a.student_profile?.person?.full_name || '';
+        const nameB = b.student_profile?.person?.full_name || '';
+        return nameA.localeCompare(nameB);
+      });
+
       // Extrair student_profiles únicos (evitar duplicatas)
       const students = new Map<number, StudentFullInfo>();
-      (data || []).forEach((enrollment: Record<string, unknown>) => {
+      sortedData.forEach((enrollment: Record<string, unknown>) => {
         if (enrollment.student_profile && !students.has(enrollment.student_profile.id)) {
           students.set(enrollment.student_profile.id, {
             ...enrollment.student_profile,
@@ -131,12 +138,18 @@ class StudentService extends BaseService<Student> {
         `)
         .eq('class_id', classId)
         .eq('status', 'Ativo')
-        .is('deleted_at', null)
-        .order('student_enrollment.student_profile.person.full_name');
+        .is('deleted_at', null);
 
       if (error) throw handleSupabaseError(error);
 
-      return (data || []).map((item: Record<string, unknown>) => item.student_enrollment?.student_profile).filter(Boolean);
+      // Ordenar por nome em JavaScript (Supabase não suporta order por relações aninhadas)
+      const sortedData = (data || []).sort((a, b) => {
+        const nameA = a.student_enrollment?.student_profile?.person?.full_name || '';
+        const nameB = b.student_enrollment?.student_profile?.person?.full_name || '';
+        return nameA.localeCompare(nameB);
+      });
+
+      return sortedData.map((item: Record<string, unknown>) => item.student_enrollment?.student_profile).filter(Boolean);
     } catch (error) {
       console.error('Error in StudentService.getByClass:', error);
       throw error;
@@ -300,10 +313,18 @@ class StudentService extends BaseService<Student> {
         query = query.limit(options.limit);
       }
 
-      const { data, error } = await query.order('person.full_name');
+      const { data, error } = await query;
 
       if (error) throw handleSupabaseError(error);
-      return (data || []) as StudentFullInfo[];
+
+      // Ordenar por nome em JavaScript (Supabase não suporta order por relações)
+      const sortedData = (data || []).sort((a, b) => {
+        const nameA = a.person?.full_name || '';
+        const nameB = b.person?.full_name || '';
+        return nameA.localeCompare(nameB);
+      });
+
+      return sortedData as StudentFullInfo[];
     } catch (error) {
       console.error('Error in StudentService.searchByName:', error);
       throw error;

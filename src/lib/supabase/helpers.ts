@@ -98,7 +98,7 @@ export function handleSupabaseError(
  */
 export function formatSuccessMessage(operation: string, itemName?: string): string {
   const item = itemName ? ` ${itemName}` : ''
-  
+
   switch (operation) {
     case 'create':
       return `${item} criado com sucesso!`
@@ -111,5 +111,61 @@ export function formatSuccessMessage(operation: string, itemName?: string): stri
     default:
       return 'Operação realizada com sucesso!'
   }
+}
+
+/**
+ * Obtém o person_id do usuário autenticado para uso em created_by/updated_by
+ * @returns person_id do usuário ou 1 (sistema) como fallback
+ */
+export async function getCurrentPersonId(): Promise<number> {
+  try {
+    const { data: { user } } = await supabase.auth.getUser()
+
+    if (!user?.id) {
+      return 1 // Sistema
+    }
+
+    const { data: authUser } = await supabase
+      .from('auth_users')
+      .select('person_id')
+      .eq('id', user.id)
+      .single()
+
+    return authUser?.person_id || 1
+  } catch {
+    return 1 // Sistema como fallback em caso de erro
+  }
+}
+
+/**
+ * Cache para person_id do usuário atual (evita queries repetidas)
+ */
+let cachedPersonId: number | null = null
+let cacheTimestamp: number = 0
+const CACHE_DURATION = 5 * 60 * 1000 // 5 minutos
+
+/**
+ * Versão com cache do getCurrentPersonId
+ * Evita múltiplas queries para o mesmo usuário
+ */
+export async function getCachedPersonId(): Promise<number> {
+  const now = Date.now()
+
+  if (cachedPersonId !== null && (now - cacheTimestamp) < CACHE_DURATION) {
+    return cachedPersonId
+  }
+
+  cachedPersonId = await getCurrentPersonId()
+  cacheTimestamp = now
+
+  return cachedPersonId
+}
+
+/**
+ * Limpa o cache de person_id (útil após logout)
+ */
+export function clearPersonIdCache(): void {
+  cachedPersonId = null
+  cacheTimestamp = 0
 }
 

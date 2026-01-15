@@ -89,6 +89,7 @@ interface ClassFormDialogUnifiedProps {
     code?: string
     shift: string
     capacity: number
+    school_id?: number
     course_id?: number
     education_grade_id?: number
     academic_period_id?: number
@@ -195,6 +196,9 @@ export function ClassFormDialogUnified({
   useEffect(() => {
     if (open) {
       if (editingClass) {
+        // Para modo admin, usar school_id da turma sendo editada
+        const editSchoolId = editingClass.school_id?.toString() || propSchoolId?.toString() || ''
+
         form.reset({
           name: editingClass.name || '',
           code: editingClass.code || '',
@@ -211,7 +215,7 @@ export function ClassFormDialogUnified({
           maxDependencySubjects: editingClass.max_dependency_subjects || 0,
           operatingDays: editingClass.operating_days || ['seg', 'ter', 'qua', 'qui', 'sex'],
           regentTeacherId: editingClass.regent_teacher_id?.toString() || '',
-          schoolId: propSchoolId?.toString() || '',
+          schoolId: editSchoolId,
           yearId: propAcademicYearId?.toString() || '',
         })
       } else {
@@ -240,24 +244,58 @@ export function ClassFormDialogUnified({
 
   // Carregar anos letivos quando escola mudar (modo admin)
   useEffect(() => {
-    if (isAdminMode && watchedSchoolId) {
-      const school = schools?.find(s => s.id === watchedSchoolId)
-      if (school?.academicYears) {
-        setAcademicYears(school.academicYears.map(y => ({ id: parseInt(y.id), name: y.name })))
-      } else {
+    const loadAcademicYearsForSchool = async (schoolId: number) => {
+      try {
+        const { supabase } = await import('@/lib/supabase/client')
+
+        // Buscar anos letivos que têm períodos vinculados a turmas desta escola
+        // Ou buscar todos os anos letivos ativos
+        const { data: years, error } = await supabase
+          .from('academic_years')
+          .select('id, name')
+          .is('deleted_at', null)
+          .order('name', { ascending: false })
+
+        if (error) throw error
+        setAcademicYears(years || [])
+
+        // Se estamos editando, buscar o ano letivo do período acadêmico
+        if (editingClass?.academic_period_id && years?.length > 0) {
+          const { data: period } = await supabase
+            .from('academic_periods')
+            .select('academic_year_id')
+            .eq('id', editingClass.academic_period_id)
+            .single()
+
+          if (period?.academic_year_id) {
+            form.setValue('yearId', period.academic_year_id.toString())
+          }
+        }
+      } catch (error) {
+        console.error('Erro ao carregar anos letivos:', error)
         setAcademicYears([])
       }
-      // Limpar seleções dependentes
-      form.setValue('yearId', '')
-      form.setValue('courseId', '')
-      form.setValue('gradeId', '')
-      form.setValue('periodId', '')
-      setCourses([])
-      setGrades([])
-      setAllPeriods([])
-      setFilteredPeriods([])
     }
-  }, [watchedSchoolId, isAdminMode, schools, form])
+
+    if (isAdminMode && watchedSchoolId) {
+      const schoolIdNum = parseInt(watchedSchoolId)
+      if (!isNaN(schoolIdNum)) {
+        loadAcademicYearsForSchool(schoolIdNum)
+      }
+
+      // Limpar seleções dependentes apenas se não estiver editando
+      if (!editingClass) {
+        form.setValue('yearId', '')
+        form.setValue('courseId', '')
+        form.setValue('gradeId', '')
+        form.setValue('periodId', '')
+        setCourses([])
+        setGrades([])
+        setAllPeriods([])
+        setFilteredPeriods([])
+      }
+    }
+  }, [watchedSchoolId, isAdminMode, editingClass, form])
 
   // Carregar cursos e períodos quando escola/ano estiverem definidos
   useEffect(() => {

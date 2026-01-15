@@ -10,6 +10,9 @@ import {
   Edit,
   Hash,
   Loader2,
+  FileCheck,
+  Calculator,
+  Percent,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
@@ -32,6 +35,9 @@ import { GradeFormDialog } from './components/GradeFormDialog'
 import { SubjectFormDialog } from './components/SubjectFormDialog'
 import { CourseFormDialog } from './components/CourseFormDialog'
 import { useToast } from '@/hooks/use-toast'
+import { evaluationRulesService } from '@/lib/supabase/services'
+import { supabase } from '@/lib/supabase/client'
+import type { EvaluationRule } from '@/lib/supabase/services/evaluation-rules-service'
 import {
   safeArray,
   safeFind,
@@ -95,6 +101,11 @@ export default function CourseDetails() {
     removeSubjectFromSeries,
   } = useCourseStore()
 
+  const { toast } = useToast()
+  const [evaluationRules, setEvaluationRules] = useState<EvaluationRule[]>([])
+  const [courseSubjects, setCourseSubjects] = useState<Map<number, SubjectItem[]>>(new Map())
+  const [loadingData, setLoadingData] = useState(false)
+
   // Carregar cursos ao montar o componente
   useEffect(() => {
     if (courses.length === 0) {
@@ -102,10 +113,74 @@ export default function CourseDetails() {
     }
   }, [courses.length, fetchCourses])
 
+  // Converter id para número para busca
+  const courseId = id ? Number(id) : null
+
+  // Carregar regras de avaliação e disciplinas quando tiver o courseId
+  useEffect(() => {
+    const loadCourseData = async () => {
+      if (!courseId) return
+
+      setLoadingData(true)
+      try {
+        // Carregar regras de avaliação do curso
+        const rules = await evaluationRulesService.getByCourse(courseId)
+
+        // Também buscar regras de todas as séries do curso
+        const course = courses.find(c => Number(c.id) === courseId)
+        if (course?.series) {
+          for (const serie of course.series as any[]) {
+            const gradeRules = await evaluationRulesService.getByGrade(serie.id)
+            rules.push(...gradeRules.filter(r => !rules.some(existing => existing.id === r.id)))
+          }
+        }
+        setEvaluationRules(rules)
+
+        // Carregar disciplinas vinculadas ao curso por série
+        const { data: subjectsData } = await supabase
+          .from('course_subjects')
+          .select(`
+            id,
+            course_id,
+            subject_id,
+            education_grade_id,
+            workload_hours,
+            is_mandatory,
+            subject:subjects(id, name, code)
+          `)
+          .eq('course_id', courseId)
+          .is('deleted_at', null)
+
+        // Organizar disciplinas por série
+        const subjectsByGrade = new Map<number, SubjectItem[]>()
+        for (const cs of subjectsData || []) {
+          const gradeId = cs.education_grade_id || 0
+          if (!subjectsByGrade.has(gradeId)) {
+            subjectsByGrade.set(gradeId, [])
+          }
+          if (cs.subject) {
+            subjectsByGrade.get(gradeId)!.push({
+              id: cs.subject.id,
+              name: cs.subject.name,
+              workload: cs.workload_hours || 0,
+            })
+          }
+        }
+        setCourseSubjects(subjectsByGrade)
+      } catch (error) {
+        console.error('Erro ao carregar dados do curso:', error)
+      } finally {
+        setLoadingData(false)
+      }
+    }
+
+    if (courses.length > 0 && courseId) {
+      loadCourseData()
+    }
+  }, [courseId, courses])
+
   // Alias para compatibilidade com código antigo
   const etapasEnsino = courses || []
-  const evaluationRules: { id: string; name: string }[] = []
-  const { toast } = useToast()
 
   const [isGradeDialogOpen, setIsGradeDialogOpen] = useState(false)
   const [isSubjectDialogOpen, setIsSubjectDialogOpen] = useState(false)
@@ -119,21 +194,28 @@ export default function CourseDetails() {
     subjectId: number | string
   } | null>(null)
 
-  // Converter id para número para busca
-  const courseId = id ? Number(id) : null
-
   // Buscar etapa de ensino pelo ID
   const etapaEnsino = courseId
     ? etapasEnsino.find((e) => Number(e.id) === courseId)
     : null
 
   // Mapear series do formato do banco para o formato do componente
+  // Inclui as disciplinas carregadas do course_subjects
   const seriesAnos: SerieAno[] = etapaEnsino?.series?.map((s: Record<string, unknown>) => ({
     id: s.id as number,
     name: (s.grade_name || s.name) as string,
     numero: (s.grade_order || s.numero) as number,
-    subjects: [] // Disciplinas serão carregadas separadamente se necessário
+    subjects: courseSubjects.get(s.id as number) || courseSubjects.get(0) || []
   })) || []
+
+  // Buscar regra de avaliação para uma série específica
+  const getRuleForGrade = (gradeId: number | string): EvaluationRule | undefined => {
+    // Primeiro busca regra específica da série
+    const gradeRule = evaluationRules.find(r => r.education_grade_id === Number(gradeId))
+    if (gradeRule) return gradeRule
+    // Se não encontrar, busca regra do curso
+    return evaluationRules.find(r => r.course_id === courseId && !r.education_grade_id)
+  }
 
   // Exibir loading enquanto carrega
   if (loading && courses.length === 0) {
@@ -247,10 +329,10 @@ export default function CourseDetails() {
     }
   }
 
-  const getRuleName = (ruleId?: string) => {
-    return (
-      evaluationRules.find((r) => r.id === ruleId)?.name || 'Regra não definida'
-    )
+  const getRuleName = (gradeId?: number | string) => {
+    if (!gradeId) return 'Regra não definida'
+    const rule = getRuleForGrade(gradeId)
+    return rule?.name || 'Regra não definida'
   }
 
   return (
@@ -298,6 +380,78 @@ export default function CourseDetails() {
       </div>
 
       <div className="grid gap-6">
+        {/* Card de Regras de Avaliação */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <FileCheck className="h-5 w-5 text-blue-600" />
+              Regras de Avaliação
+            </CardTitle>
+            <CardDescription>
+              Regras de avaliação vinculadas a esta etapa de ensino.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {loadingData ? (
+              <div className="flex items-center justify-center py-6">
+                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                <span className="ml-2 text-sm text-muted-foreground">Carregando regras...</span>
+              </div>
+            ) : evaluationRules.length === 0 ? (
+              <div className="text-center py-6 text-muted-foreground">
+                <FileCheck className="h-10 w-10 mx-auto mb-3 opacity-50" />
+                <p>Nenhuma regra de avaliação cadastrada para esta etapa de ensino.</p>
+                <p className="text-xs mt-2">
+                  Acesse o menu <strong>Configurações &gt; Acadêmico &gt; Regras de Avaliação</strong> para cadastrar.
+                </p>
+              </div>
+            ) : (
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                {evaluationRules.map((rule) => (
+                  <div
+                    key={rule.id}
+                    className="p-4 border rounded-lg bg-gradient-to-br from-blue-50 to-slate-50 dark:from-blue-900/20 dark:to-slate-800/50"
+                  >
+                    <div className="flex items-start justify-between mb-2">
+                      <h4 className="font-semibold text-sm">{rule.name}</h4>
+                      {rule.education_grade?.grade_name && (
+                        <Badge variant="outline" className="text-xs">
+                          {rule.education_grade.grade_name}
+                        </Badge>
+                      )}
+                    </div>
+                    <div className="space-y-1 text-xs text-muted-foreground">
+                      <div className="flex items-center gap-1">
+                        <Calculator className="h-3 w-3" />
+                        <span>
+                          {rule.calculation_type === 'Media_Simples' ? 'Média Simples' :
+                           rule.calculation_type === 'Media_Ponderada' ? 'Média Ponderada' :
+                           rule.calculation_type === 'Descritiva' ? 'Descritiva' :
+                           rule.calculation_type}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <Percent className="h-3 w-3" />
+                        <span>Aprovação: ≥{rule.min_approval_grade?.toFixed(1)} | Freq: ≥{rule.min_attendance_percent}%</span>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <Clock className="h-3 w-3" />
+                        <span>{rule.academic_period_type} ({rule.periods_per_year}x/ano)</span>
+                      </div>
+                    </div>
+                    {rule.formula_description && (
+                      <div className="mt-2 pt-2 border-t text-xs text-muted-foreground">
+                        <span className="font-medium">Fórmula:</span> {rule.formula_description}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Card de Séries/Anos e Currículo */}
         <Card>
           <CardHeader>
             <CardTitle>Séries/Anos e Currículo</CardTitle>
@@ -339,7 +493,7 @@ export default function CourseDetails() {
                         <div className="ml-auto flex items-center gap-4">
                           <div className="text-sm text-muted-foreground flex items-center gap-1">
                             <FileBadge className="h-3 w-3" />
-                            {getRuleName(serieAno.evaluationRuleId)}
+                            {getRuleName(serieAno.id)}
                           </div>
                           <div
                             role="button"

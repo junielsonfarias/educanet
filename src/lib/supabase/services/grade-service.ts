@@ -11,7 +11,7 @@ import type { Grade } from '@/lib/database-types';
 
 export interface GradeData {
   evaluation_instance_id: number;
-  student_profile_id: number;
+  student_enrollment_id: number;
   grade_value: number;
   notes?: string;
 }
@@ -49,7 +49,10 @@ class GradeService extends BaseService<Grade> {
           *,
           evaluation_instance:evaluation_instances(
             *,
-            subject:subjects(*),
+            class_teacher_subject:class_teacher_subjects(
+              *,
+              subject:subjects(*)
+            ),
             academic_period:academic_periods(*)
           ),
           student_profile:student_profiles(
@@ -87,7 +90,7 @@ class GradeService extends BaseService<Grade> {
         .from('grades')
         .select('id')
         .eq('evaluation_instance_id', data.evaluation_instance_id)
-        .eq('student_profile_id', data.student_profile_id)
+        .eq('student_enrollment_id', data.student_enrollment_id)
         .is('deleted_at', null)
         .single();
 
@@ -128,33 +131,67 @@ class GradeService extends BaseService<Grade> {
 
   /**
    * Buscar notas de um aluno por período
+   * Nota: grades usa student_enrollment_id, não student_profile_id
    */
   async getStudentGrades(
     studentProfileId: number,
     academicPeriodId?: number
   ): Promise<any[]> {
     try {
-      let query = supabase
-        .from('grades')
-        .select(`
-          *,
-          evaluation_instance:evaluation_instances(
-            *,
-            subject:subjects(*),
-            academic_period:academic_periods(*)
-          )
-        `)
+      // Primeiro, buscar todos os student_enrollment_ids do aluno
+      const { data: enrollments, error: enrollmentError } = await supabase
+        .from('student_enrollments')
+        .select('id')
         .eq('student_profile_id', studentProfileId)
         .is('deleted_at', null);
 
-      if (academicPeriodId) {
-        query = query.eq('evaluation_instance.academic_period_id', academicPeriodId);
+      if (enrollmentError) throw handleSupabaseError(enrollmentError);
+
+      const enrollmentIds = (enrollments || []).map(e => e.id);
+
+      if (enrollmentIds.length === 0) {
+        return [];
       }
 
-      const { data, error } = await query.order('evaluation_instance.evaluation_date', { ascending: false });
+      // Buscar notas usando student_enrollment_id
+      const { data, error } = await supabase
+        .from('grades')
+        .select(`
+          *,
+          student_enrollment:student_enrollments(
+            id,
+            student_profile_id
+          ),
+          evaluation_instance:evaluation_instances(
+            *,
+            class_teacher_subject:class_teacher_subjects(
+              *,
+              subject:subjects(*)
+            ),
+            academic_period:academic_periods(*)
+          )
+        `)
+        .in('student_enrollment_id', enrollmentIds)
+        .is('deleted_at', null);
 
       if (error) throw handleSupabaseError(error);
-      return data || [];
+
+      // Filtrar por período se especificado
+      let filteredData = data || [];
+      if (academicPeriodId) {
+        filteredData = filteredData.filter(
+          (g: any) => g.evaluation_instance?.academic_period_id === academicPeriodId
+        );
+      }
+
+      // Ordenar por data de avaliação em JavaScript
+      const sortedData = filteredData.sort((a, b) => {
+        const dateA = a.evaluation_instance?.evaluation_date || '';
+        const dateB = b.evaluation_instance?.evaluation_date || '';
+        return dateB.localeCompare(dateA); // Ordem decrescente
+      });
+
+      return sortedData;
     } catch (error) {
       console.error('Error in GradeService.getStudentGrades:', error);
       throw error;
@@ -176,11 +213,18 @@ class GradeService extends BaseService<Grade> {
           )
         `)
         .eq('evaluation_instance_id', evaluationInstanceId)
-        .is('deleted_at', null)
-        .order('student_profile.person.full_name');
+        .is('deleted_at', null);
 
       if (error) throw handleSupabaseError(error);
-      return data || [];
+
+      // Ordenar por nome do aluno em JavaScript (Supabase não suporta order por relações aninhadas)
+      const sortedData = (data || []).sort((a, b) => {
+        const nameA = a.student_profile?.person?.full_name || '';
+        const nameB = b.student_profile?.person?.full_name || '';
+        return nameA.localeCompare(nameB);
+      });
+
+      return sortedData;
     } catch (error) {
       console.error('Error in GradeService.getEvaluationGrades:', error);
       throw error;
@@ -196,29 +240,46 @@ class GradeService extends BaseService<Grade> {
     academicPeriodId: number
   ): Promise<number> {
     try {
+      // Primeiro, buscar todos os student_enrollment_ids do aluno
+      const { data: enrollments, error: enrollmentError } = await supabase
+        .from('student_enrollments')
+        .select('id')
+        .eq('student_profile_id', studentProfileId)
+        .is('deleted_at', null);
+
+      if (enrollmentError) throw handleSupabaseError(enrollmentError);
+
+      const enrollmentIds = (enrollments || []).map(e => e.id);
+      if (enrollmentIds.length === 0) return 0;
+
       const { data, error } = await supabase
         .from('grades')
         .select(`
           grade_value,
           evaluation_instance:evaluation_instances(
-            subject_id,
-            academic_period_id
+            academic_period_id,
+            class_teacher_subject:class_teacher_subjects(subject_id)
           )
         `)
-        .eq('student_profile_id', studentProfileId)
-        .eq('evaluation_instance.subject_id', subjectId)
-        .eq('evaluation_instance.academic_period_id', academicPeriodId)
+        .in('student_enrollment_id', enrollmentIds)
         .is('deleted_at', null);
 
       if (error) throw handleSupabaseError(error);
 
-      if (!data || data.length === 0) {
+      // Filtrar por disciplina e período em JavaScript
+      const filteredData = (data || []).filter((grade: any) => {
+        const gradeSubjectId = grade.evaluation_instance?.class_teacher_subject?.subject_id;
+        const gradePeriodId = grade.evaluation_instance?.academic_period_id;
+        return gradeSubjectId === subjectId && gradePeriodId === academicPeriodId;
+      });
+
+      if (filteredData.length === 0) {
         return 0;
       }
 
-      const sum = data.reduce((acc, grade) => acc + grade.grade_value, 0);
-      const average = sum / data.length;
-      
+      const sum = filteredData.reduce((acc: number, grade: any) => acc + grade.grade_value, 0);
+      const average = sum / filteredData.length;
+
       return Math.round(average * 100) / 100; // 2 casas decimais
     } catch (error) {
       console.error('Error in GradeService.calculateAverage:', error);
@@ -234,30 +295,46 @@ class GradeService extends BaseService<Grade> {
     academicPeriodId: number
   ): Promise<number> {
     try {
+      // Primeiro, buscar todos os student_enrollment_ids do aluno
+      const { data: enrollments, error: enrollmentError } = await supabase
+        .from('student_enrollments')
+        .select('id')
+        .eq('student_profile_id', studentProfileId)
+        .is('deleted_at', null);
+
+      if (enrollmentError) throw handleSupabaseError(enrollmentError);
+
+      const enrollmentIds = (enrollments || []).map(e => e.id);
+      if (enrollmentIds.length === 0) return 0;
+
       const { data, error } = await supabase
         .from('grades')
         .select(`
           grade_value,
           evaluation_instance:evaluation_instances(
-            subject_id,
-            academic_period_id
+            academic_period_id,
+            class_teacher_subject:class_teacher_subjects(subject_id)
           )
         `)
-        .eq('student_profile_id', studentProfileId)
-        .eq('evaluation_instance.academic_period_id', academicPeriodId)
+        .in('student_enrollment_id', enrollmentIds)
         .is('deleted_at', null);
 
       if (error) throw handleSupabaseError(error);
 
-      if (!data || data.length === 0) {
+      // Filtrar por período em JavaScript
+      const filteredData = (data || []).filter((grade: any) => {
+        return grade.evaluation_instance?.academic_period_id === academicPeriodId;
+      });
+
+      if (filteredData.length === 0) {
         return 0;
       }
 
       // Agrupar por disciplina e calcular média de cada
       const subjectAverages = new Map<number, number[]>();
-      
-      data.forEach((grade: Record<string, unknown>) => {
-        const subjectId = grade.evaluation_instance?.subject_id;
+
+      filteredData.forEach((grade: any) => {
+        const subjectId = grade.evaluation_instance?.class_teacher_subject?.subject_id;
         if (subjectId) {
           if (!subjectAverages.has(subjectId)) {
             subjectAverages.set(subjectId, []);
@@ -273,9 +350,11 @@ class GradeService extends BaseService<Grade> {
         averages.push(avg);
       });
 
+      if (averages.length === 0) return 0;
+
       // Média geral = média das médias das disciplinas
       const overallAvg = averages.reduce((a, b) => a + b, 0) / averages.length;
-      
+
       return Math.round(overallAvg * 100) / 100;
     } catch (error) {
       console.error('Error in GradeService.calculateOverallAverage:', error);
@@ -303,27 +382,54 @@ class GradeService extends BaseService<Grade> {
 
       if (studentError) throw handleSupabaseError(studentError);
 
+      // Buscar student_enrollment_ids do aluno
+      const { data: enrollments, error: enrollmentError } = await supabase
+        .from('student_enrollments')
+        .select('id')
+        .eq('student_profile_id', studentProfileId)
+        .is('deleted_at', null);
+
+      if (enrollmentError) throw handleSupabaseError(enrollmentError);
+
+      const enrollmentIds = (enrollments || []).map(e => e.id);
+      if (enrollmentIds.length === 0) {
+        return {
+          student_profile_id: studentProfileId,
+          student_name: studentData.person.full_name,
+          grades: [],
+          overall_average: 0,
+          status: 'Pendente'
+        };
+      }
+
       // Buscar todas as notas do período
-      const { data: gradesData, error: gradesError } = await supabase
+      const { data: allGrades, error: gradesError } = await supabase
         .from('grades')
         .select(`
           *,
           evaluation_instance:evaluation_instances(
             *,
-            subject:subjects(*)
+            class_teacher_subject:class_teacher_subjects(
+              *,
+              subject:subjects(*)
+            )
           )
         `)
-        .eq('student_profile_id', studentProfileId)
-        .eq('evaluation_instance.academic_period_id', academicPeriodId)
+        .in('student_enrollment_id', enrollmentIds)
         .is('deleted_at', null);
 
       if (gradesError) throw handleSupabaseError(gradesError);
 
+      // Filtrar por período em JavaScript
+      const gradesData = (allGrades || []).filter(
+        (g: any) => g.evaluation_instance?.academic_period_id === academicPeriodId
+      );
+
       // Agrupar por disciplina
       const subjectsMap = new Map<number, any>();
-      
+
       (gradesData || []).forEach((grade: Record<string, unknown>) => {
-        const subject = grade.evaluation_instance?.subject;
+        const subject = grade.evaluation_instance?.class_teacher_subject?.subject;
         if (!subject) return;
 
         if (!subjectsMap.has(subject.id)) {
@@ -337,7 +443,7 @@ class GradeService extends BaseService<Grade> {
 
         const subjectData = subjectsMap.get(subject.id);
         subjectData.evaluations.push({
-          evaluation_name: grade.evaluation_instance.name,
+          evaluation_name: grade.evaluation_instance.title,
           grade_value: grade.grade_value,
           evaluation_date: grade.evaluation_instance.evaluation_date
         });
@@ -391,13 +497,16 @@ class GradeService extends BaseService<Grade> {
   ): Promise<any[]> {
     try {
       // Buscar alunos da turma
+      // 1. Buscar todos os alunos da turma
       const { data: enrollments, error: enrollmentError } = await supabase
         .from('class_enrollments')
         .select(`
+          student_enrollment_id,
           student_enrollment:student_enrollments(
+            id,
             student_profile:student_profiles(
               id,
-              person:people(full_name)
+              person:people(first_name, last_name)
             )
           )
         `)
@@ -406,34 +515,80 @@ class GradeService extends BaseService<Grade> {
         .is('deleted_at', null);
 
       if (enrollmentError) throw handleSupabaseError(enrollmentError);
+      if (!enrollments || enrollments.length === 0) return [];
 
-      // Para cada aluno, buscar notas da disciplina
-      const results = await Promise.all(
-        (enrollments || []).map(async (enrollment: Record<string, unknown>) => {
-          const studentProfileId = enrollment.student_enrollment?.student_profile?.id;
-          if (!studentProfileId) return null;
+      // Extrair IDs de student_enrollment para query em lote
+      const studentEnrollmentIds = enrollments
+        .map((e: Record<string, unknown>) => e.student_enrollment_id)
+        .filter(Boolean) as number[];
 
-          const { data: grades } = await supabase
-            .from('grades')
-            .select(`
-              *,
-              evaluation_instance:evaluation_instances(*)
-            `)
-            .eq('student_profile_id', studentProfileId)
-            .eq('evaluation_instance.subject_id', subjectId)
-            .eq('evaluation_instance.academic_period_id', academicPeriodId)
-            .is('deleted_at', null);
+      if (studentEnrollmentIds.length === 0) return [];
 
-          const average = await this.calculateAverage(studentProfileId, subjectId, academicPeriodId);
+      // 2. Buscar TODAS as notas de todos os alunos em UMA query (otimizado)
+      const { data: allGrades, error: gradesError } = await supabase
+        .from('grades')
+        .select(`
+          *,
+          evaluation_instance:evaluation_instances(
+            id,
+            name,
+            academic_period_id,
+            class_teacher_subject:class_teacher_subjects(subject_id)
+          )
+        `)
+        .in('student_enrollment_id', studentEnrollmentIds)
+        .is('deleted_at', null);
 
-          return {
-            student_profile_id: studentProfileId,
-            student_name: enrollment.student_enrollment.student_profile.person.full_name,
-            grades: grades || [],
-            average
-          };
-        })
-      );
+      if (gradesError) throw handleSupabaseError(gradesError);
+
+      // Criar mapa de notas por student_enrollment_id para acesso O(1)
+      const gradesByEnrollment = new Map<number, typeof allGrades>();
+      for (const grade of allGrades || []) {
+        const enrollmentId = grade.student_enrollment_id;
+        if (!gradesByEnrollment.has(enrollmentId)) {
+          gradesByEnrollment.set(enrollmentId, []);
+        }
+        gradesByEnrollment.get(enrollmentId)!.push(grade);
+      }
+
+      // 3. Montar resultados mapeando notas aos alunos
+      const results = enrollments.map((enrollment: Record<string, unknown>) => {
+        const studentEnrollmentId = enrollment.student_enrollment_id as number;
+        const studentEnrollment = enrollment.student_enrollment as Record<string, unknown> | null;
+        const studentProfile = studentEnrollment?.student_profile as Record<string, unknown> | null;
+        const person = studentProfile?.person as Record<string, unknown> | null;
+
+        if (!studentEnrollmentId || !studentProfile?.id) return null;
+
+        // Filtrar notas deste aluno por disciplina e período
+        const studentGrades = gradesByEnrollment.get(studentEnrollmentId) || [];
+        const filteredGrades = studentGrades.filter((g: Record<string, unknown>) => {
+          const evalInstance = g.evaluation_instance as Record<string, unknown> | null;
+          const classTeacherSubject = evalInstance?.class_teacher_subject as Record<string, unknown> | null;
+          const gradeSubjectId = classTeacherSubject?.subject_id;
+          const gradePeriodId = evalInstance?.academic_period_id;
+          return gradeSubjectId === subjectId && gradePeriodId === academicPeriodId;
+        });
+
+        // Calcular média local (evita query adicional)
+        const gradeValues = filteredGrades
+          .map((g: Record<string, unknown>) => g.grade_value as number)
+          .filter((v): v is number => typeof v === 'number' && !isNaN(v));
+        const average = gradeValues.length > 0
+          ? gradeValues.reduce((a, b) => a + b, 0) / gradeValues.length
+          : 0;
+
+        const firstName = person?.first_name || '';
+        const lastName = person?.last_name || '';
+        const fullName = `${firstName} ${lastName}`.trim();
+
+        return {
+          student_profile_id: studentProfile.id as number,
+          student_name: fullName,
+          grades: filteredGrades,
+          average: Math.round(average * 100) / 100
+        };
+      });
 
       return results.filter(Boolean);
     } catch (error) {
@@ -478,31 +633,41 @@ class GradeService extends BaseService<Grade> {
     recovery: number;
   }> {
     try {
-      let query = supabase
+      const { data, error } = await supabase
         .from('grades')
         .select(`
           grade_value,
           evaluation_instance:evaluation_instances(
-            subject_id,
             academic_period_id,
-            class_teacher_subject:class_teacher_subjects(class_id)
+            class_teacher_subject:class_teacher_subjects(class_id, subject_id)
           )
         `)
         .is('deleted_at', null);
 
+      if (error) throw handleSupabaseError(error);
+
+      // Filtrar em JavaScript (Supabase não suporta filtro por nested relations)
+      let filteredData = data || [];
+
       if (options.subjectId) {
-        query = query.eq('evaluation_instance.subject_id', options.subjectId);
+        filteredData = filteredData.filter((g: any) =>
+          g.evaluation_instance?.class_teacher_subject?.subject_id === options.subjectId
+        );
       }
 
       if (options.academicPeriodId) {
-        query = query.eq('evaluation_instance.academic_period_id', options.academicPeriodId);
+        filteredData = filteredData.filter((g: any) =>
+          g.evaluation_instance?.academic_period_id === options.academicPeriodId
+        );
       }
 
-      const { data, error } = await query;
+      if (options.classId) {
+        filteredData = filteredData.filter((g: any) =>
+          g.evaluation_instance?.class_teacher_subject?.class_id === options.classId
+        );
+      }
 
-      if (error) throw handleSupabaseError(error);
-
-      if (!data || data.length === 0) {
+      if (filteredData.length === 0) {
         return {
           total: 0,
           average: 0,
@@ -514,7 +679,7 @@ class GradeService extends BaseService<Grade> {
         };
       }
 
-      const grades = data.map(g => g.grade_value);
+      const grades = filteredData.map((g: any) => g.grade_value);
       const sum = grades.reduce((a, b) => a + b, 0);
       const avg = sum / grades.length;
 

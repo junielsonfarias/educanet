@@ -436,8 +436,8 @@ class ReenrollmentServiceClass extends BaseService<ReenrollmentBatch> {
         .select(`
           *,
           school:schools(id, name),
-          ano_letivo_origem:academic_years!ano_letivo_origem_id(id, year_name),
-          ano_letivo_destino:academic_years!ano_letivo_destino_id(id, year_name),
+          ano_letivo_origem:academic_years!ano_letivo_origem_id(id, year),
+          ano_letivo_destino:academic_years!ano_letivo_destino_id(id, year),
           criador:people!criado_por(first_name, last_name),
           executor:people!executado_por(first_name, last_name)
         `)
@@ -465,8 +465,8 @@ class ReenrollmentServiceClass extends BaseService<ReenrollmentBatch> {
         .from(this.tableName)
         .select(`
           *,
-          ano_letivo_origem:academic_years!ano_letivo_origem_id(id, year_name),
-          ano_letivo_destino:academic_years!ano_letivo_destino_id(id, year_name)
+          ano_letivo_origem:academic_years!ano_letivo_origem_id(id, year),
+          ano_letivo_destino:academic_years!ano_letivo_destino_id(id, year)
         `)
         .eq('school_id', escolaId)
         .is('deleted_at', null)
@@ -490,8 +490,8 @@ class ReenrollmentServiceClass extends BaseService<ReenrollmentBatch> {
         .select(`
           *,
           school:schools(id, name),
-          ano_letivo_origem:academic_years!ano_letivo_origem_id(id, year_name),
-          ano_letivo_destino:academic_years!ano_letivo_destino_id(id, year_name)
+          ano_letivo_origem:academic_years!ano_letivo_origem_id(id, year),
+          ano_letivo_destino:academic_years!ano_letivo_destino_id(id, year)
         `)
         .eq('status', 'Pendente')
         .is('deleted_at', null);
@@ -778,7 +778,7 @@ class ReenrollmentServiceClass extends BaseService<ReenrollmentBatch> {
         .from(this.tableName)
         .select(`
           *,
-          ano_letivo_origem:academic_years!ano_letivo_origem_id(year_name)
+          ano_letivo_origem:academic_years!ano_letivo_origem_id(year)
         `)
         .eq('school_id', escolaId)
         .eq('status', 'Concluido')
@@ -793,7 +793,7 @@ class ReenrollmentServiceClass extends BaseService<ReenrollmentBatch> {
       if (error) throw handleSupabaseError(error);
 
       const historico = (data || []).map((batch: Record<string, unknown>) => ({
-        ano_letivo: ((batch.ano_letivo_origem as Record<string, unknown>)?.year_name as string) || '',
+        ano_letivo: ((batch.ano_letivo_origem as Record<string, unknown>)?.year as string) || '',
         total_alunos: (batch.total_alunos as number) || 0,
         rematriculados: (batch.total_rematriculados as number) || 0,
         concluidos: (batch.total_concluidos as number) || 0,

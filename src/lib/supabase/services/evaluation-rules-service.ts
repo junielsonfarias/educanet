@@ -12,6 +12,13 @@ import { BaseService } from './base-service';
 import { supabase } from '../client';
 import { handleSupabaseError } from '../helpers';
 
+// Estrutura dos pesos por período para média ponderada
+export interface PeriodWeights {
+  weights: number[];  // Pesos para cada período na ordem
+  divisor: number;    // Divisor total (soma dos pesos ou valor fixo)
+  formula?: string;   // Fórmula textual opcional
+}
+
 export interface EvaluationRule {
   id: number;
   name: string;
@@ -27,6 +34,10 @@ export interface EvaluationRule {
   calculation_type: string;
   allow_recovery: boolean;
   recovery_replaces_lowest: boolean;
+  // Campos de fórmula de cálculo
+  period_weights?: PeriodWeights;
+  formula_description?: string;
+  // Auditoria
   created_at?: string;
   updated_at?: string;
   created_by?: number;
@@ -50,6 +61,9 @@ export interface EvaluationRuleFormData {
   calculation_type?: string;
   allow_recovery?: boolean;
   recovery_replaces_lowest?: boolean;
+  // Campos de fórmula de cálculo
+  period_weights?: PeriodWeights;
+  formula_description?: string;
 }
 
 class EvaluationRulesService extends BaseService {
@@ -393,6 +407,97 @@ class EvaluationRulesService extends BaseService {
       console.error('Error in EvaluationRulesService.checkApprovalStatus:', error);
       throw error;
     }
+  }
+
+  /**
+   * Calcular média ponderada usando os pesos configurados
+   */
+  calculateWeightedAverage(grades: (number | null)[], periodWeights: PeriodWeights): number | null {
+    const validGrades = grades.filter((g): g is number => g !== null);
+    if (validGrades.length === 0) return null;
+
+    const { weights, divisor } = periodWeights;
+
+    let weightedSum = 0;
+    let usedWeightsSum = 0;
+
+    for (let i = 0; i < grades.length && i < weights.length; i++) {
+      if (grades[i] !== null) {
+        weightedSum += (grades[i] as number) * weights[i];
+        usedWeightsSum += weights[i];
+      }
+    }
+
+    // Se não há divisor definido ou é 0, usar a soma dos pesos usados
+    const actualDivisor = divisor > 0 ? divisor : usedWeightsSum;
+
+    if (actualDivisor === 0) return null;
+
+    return Math.round((weightedSum / actualDivisor) * 100) / 100;
+  }
+
+  /**
+   * Gerar descrição textual da fórmula de cálculo
+   */
+  generateFormulaDescription(
+    rule: EvaluationRule,
+    periodNames?: string[]
+  ): string {
+    const { calculation_type, periods_per_year, period_weights } = rule;
+
+    // Nomes padrão dos períodos
+    const defaultPeriodNames = rule.academic_period_type === 'Bimestre'
+      ? ['1ª Av.', '2ª Av.', '3ª Av.', '4ª Av.']
+      : rule.academic_period_type === 'Trimestre'
+        ? ['1º Tri.', '2º Tri.', '3º Tri.']
+        : ['1º Sem.', '2º Sem.'];
+
+    const names = periodNames || defaultPeriodNames.slice(0, periods_per_year);
+
+    if (calculation_type === 'Media_Simples') {
+      const parts = names.join(' + ');
+      return `Média Simples: (${parts}) / ${periods_per_year}`;
+    }
+
+    if (calculation_type === 'Media_Ponderada' && period_weights) {
+      const { weights, divisor } = period_weights;
+      const parts = names.map((name, i) => {
+        const weight = weights[i] || 1;
+        return weight === 1 ? name : `(${name} × ${weight})`;
+      }).join(' + ');
+      return `Média Ponderada: (${parts}) / ${divisor}`;
+    }
+
+    if (calculation_type === 'Descritiva') {
+      return 'Avaliação Descritiva (sem nota numérica)';
+    }
+
+    if (calculation_type === 'Soma_Notas') {
+      const parts = names.join(' + ');
+      return `Soma de Notas: ${parts}`;
+    }
+
+    return 'Cálculo não definido';
+  }
+
+  /**
+   * Obter pesos padrão baseado no tipo de cálculo
+   */
+  getDefaultWeights(periodsPerYear: number, calculationType: string): PeriodWeights {
+    if (calculationType === 'Media_Ponderada') {
+      // Pesos padrão para média ponderada (alternados)
+      const weights = periodsPerYear === 4
+        ? [2, 3, 2, 3]
+        : periodsPerYear === 3
+          ? [2, 3, 3]
+          : [1, 1];
+      const divisor = weights.reduce((a, b) => a + b, 0);
+      return { weights, divisor };
+    }
+
+    // Média simples - pesos iguais
+    const weights = Array(periodsPerYear).fill(1);
+    return { weights, divisor: periodsPerYear };
   }
 }
 

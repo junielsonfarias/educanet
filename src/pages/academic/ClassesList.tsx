@@ -7,9 +7,10 @@ import {
   Search,
   Plus,
   MoreHorizontal,
-  Edit,
+  Pencil,
   Trash2,
   GraduationCap,
+  ChevronRight,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
@@ -22,6 +23,14 @@ import {
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table'
 import {
   Select,
   SelectContent,
@@ -84,6 +93,10 @@ export default function ClassesList() {
   const [editingClass, setEditingClass] = useState<ClassWithFullInfo | null>(null)
   const [deleteId, setDeleteId] = useState<number | null>(null)
 
+  // Pagination
+  const [currentPage, setCurrentPage] = useState(1)
+  const itemsPerPage = 15
+
   // Carregar dados ao montar
   useEffect(() => {
     const loadData = async () => {
@@ -100,21 +113,32 @@ export default function ClassesList() {
 
   // Adaptar classes para estrutura do componente
   const allClasses = useMemo(() => {
-    return classes.map((cls) => ({
-      ...cls,
-      id: cls.id.toString(),
-      name: cls.name || '',
-      schoolName: cls.school?.trade_name || cls.school?.name || '',
-      schoolId: cls.school_id?.toString() || '',
-      yearName: cls.academic_year?.name || '',
-      yearId: cls.academic_year_id?.toString() || '',
-      gradeName: cls.course?.name || '',
-      serieAnoName: cls.course?.name || '',
-      shift: cls.shift || '',
-      capacity: cls.capacity || 0,
-      isMultiGrade: false,
-      stats: cls.stats,
-    }))
+    return classes.map((cls) => {
+      // academic_year agora é garantido pelo service (getAllWithFullInfo)
+      const yearName = cls.academic_year?.name || ''
+      const yearId = cls.academic_year?.id?.toString() || ''
+
+      // Montar nome do curso com série
+      const courseName = cls.course?.name || ''
+      const gradeName = cls.education_grade?.grade_name || ''
+      const courseGradeName = gradeName ? `${courseName} - ${gradeName}` : courseName
+
+      return {
+        ...cls,
+        id: cls.id.toString(),
+        name: cls.name || '',
+        schoolName: cls.school?.trade_name || cls.school?.name || '',
+        schoolId: cls.school_id?.toString() || '',
+        yearName,
+        yearId,
+        gradeName: courseGradeName,
+        serieAnoName: gradeName,
+        shift: cls.shift || '',
+        capacity: cls.capacity || 0,
+        isMultiGrade: cls.is_multi_grade || false,
+        stats: cls.stats,
+      }
+    })
   }, [classes])
 
   // Unique lists for filters
@@ -141,32 +165,6 @@ export default function ClassesList() {
       ).sort(),
     [allClasses],
   )
-
-  // Filtering - uses classesFilteredByRole which is already filtered by user role
-  const filteredClasses = useMemo(() => {
-    return classesFilteredByRole.filter((cls) => {
-      if (!cls) return false
-      const matchesSearch = (cls.name || '')
-        .toLowerCase()
-        .includes(searchTerm.toLowerCase())
-      const matchesSchool =
-        schoolFilter === 'all' || cls.schoolId === schoolFilter
-      const matchesGrade =
-        gradeFilter === 'all' ||
-        cls.gradeName === gradeFilter ||
-        cls.serieAnoName === gradeFilter
-      const matchesShift = shiftFilter === 'all' || cls.shift === shiftFilter
-      const matchesYear = yearFilter === 'all' || cls.yearName === yearFilter
-
-      return (
-        matchesSearch &&
-        matchesSchool &&
-        matchesGrade &&
-        matchesShift &&
-        matchesYear
-      )
-    })
-  }, [classesFilteredByRole, searchTerm, schoolFilter, gradeFilter, shiftFilter, yearFilter])
 
   // Permissions based on user role
   const canManage = (schoolId?: string) => {
@@ -227,6 +225,44 @@ export default function ClassesList() {
 
     return []
   }, [allClasses, userData, filteredSchoolsByRole])
+
+  // Filtering - uses classesFilteredByRole which is already filtered by user role
+  const filteredClasses = useMemo(() => {
+    return classesFilteredByRole.filter((cls) => {
+      if (!cls) return false
+      const matchesSearch = (cls.name || '')
+        .toLowerCase()
+        .includes(searchTerm.toLowerCase())
+      const matchesSchool =
+        schoolFilter === 'all' || cls.schoolId === schoolFilter
+      const matchesGrade =
+        gradeFilter === 'all' ||
+        cls.gradeName === gradeFilter ||
+        cls.serieAnoName === gradeFilter
+      const matchesShift = shiftFilter === 'all' || cls.shift === shiftFilter
+      const matchesYear = yearFilter === 'all' || cls.yearName === yearFilter
+
+      return (
+        matchesSearch &&
+        matchesSchool &&
+        matchesGrade &&
+        matchesShift &&
+        matchesYear
+      )
+    })
+  }, [classesFilteredByRole, searchTerm, schoolFilter, gradeFilter, shiftFilter, yearFilter])
+
+  // Reset page when filters change
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [searchTerm, schoolFilter, gradeFilter, shiftFilter, yearFilter])
+
+  // Paginated classes
+  const totalPages = Math.ceil(filteredClasses.length / itemsPerPage)
+  const paginatedClasses = useMemo(() => {
+    const startIndex = (currentPage - 1) * itemsPerPage
+    return filteredClasses.slice(startIndex, startIndex + itemsPerPage)
+  }, [filteredClasses, currentPage, itemsPerPage])
 
   // Determine schools available for creation
   const availableSchools = filteredSchoolsByRole.filter((s: SchoolType) => canManage(s.id.toString()))
@@ -425,19 +461,38 @@ export default function ClassesList() {
       </Card>
 
       {loading ? (
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-          {Array.from({ length: 6 }).map((_, i) => (
-            <Card key={i}>
-              <CardHeader>
-                <Skeleton className="h-6 w-32" />
-                <Skeleton className="h-4 w-24" />
-              </CardHeader>
-              <CardContent>
-                <Skeleton className="h-20 w-full" />
-              </CardContent>
-            </Card>
-          ))}
-        </div>
+        <Card>
+          <CardContent className="p-0">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Turma</TableHead>
+                  <TableHead>Escola</TableHead>
+                  <TableHead>Curso/Série</TableHead>
+                  <TableHead>Turno</TableHead>
+                  <TableHead>Ano Letivo</TableHead>
+                  <TableHead className="text-center">Alunos</TableHead>
+                  <TableHead className="text-center">Capacidade</TableHead>
+                  <TableHead className="w-[100px]"></TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {Array.from({ length: 6 }).map((_, i) => (
+                  <TableRow key={i}>
+                    <TableCell><Skeleton className="h-5 w-24" /></TableCell>
+                    <TableCell><Skeleton className="h-5 w-32" /></TableCell>
+                    <TableCell><Skeleton className="h-5 w-28" /></TableCell>
+                    <TableCell><Skeleton className="h-5 w-20" /></TableCell>
+                    <TableCell><Skeleton className="h-5 w-16" /></TableCell>
+                    <TableCell><Skeleton className="h-5 w-12 mx-auto" /></TableCell>
+                    <TableCell><Skeleton className="h-5 w-12 mx-auto" /></TableCell>
+                    <TableCell><Skeleton className="h-5 w-8" /></TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
       ) : filteredClasses.length === 0 ? (
         <Card>
           <CardContent className="py-10 text-center text-muted-foreground">
@@ -451,136 +506,202 @@ export default function ClassesList() {
           </CardContent>
         </Card>
       ) : (
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-          {filteredClasses.map((cls) => (
-            <Card
-              key={`${cls.schoolId}-${cls.id}`}
-              className="relative overflow-hidden bg-gradient-to-br from-white via-purple-50/30 to-white border-purple-200/50 hover:border-purple-400 hover:shadow-xl transition-all duration-300 group hover:scale-[1.02] cursor-pointer"
-              onClick={() => {
-                const classId =
-                  typeof cls.id === 'string' ? cls.id : cls.id.toString()
-                navigate(`/academico/turmas/${classId}`)
-              }}
-            >
-              <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-purple-500/10 to-transparent rounded-full blur-2xl opacity-0 group-hover:opacity-100 transition-opacity" />
-              <CardHeader className="pb-2 relative z-10">
-                <div className="flex justify-between items-start">
-                  <div className="space-y-1">
-                    <CardTitle className="text-xl group-hover:text-purple-600 transition-colors flex items-center gap-2">
-                      <div className="p-1.5 rounded-md bg-gradient-to-br from-purple-100 to-purple-200">
-                        <Users className="h-4 w-4 text-purple-600" />
-                      </div>
-                      {cls.name}
-                      {cls.isMultiGrade && (
-                        <Badge className="text-[10px] h-5 bg-gradient-to-r from-purple-500/20 to-purple-600/20 text-purple-700 border-purple-300">
-                          Multi
-                        </Badge>
-                      )}
-                    </CardTitle>
-                    <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                      <School className="h-3 w-3" />
-                      <span className="truncate max-w-[180px]">
-                        {cls.schoolName}
-                      </span>
-                    </div>
-                  </div>
-                  {canManage(cls.schoolId?.toString()) && (
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button
-                          variant="ghost"
-                          className="h-8 w-8 p-0"
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          <span className="sr-only">Abrir menu</span>
-                          <MoreHorizontal className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            openEditDialog(cls)
-                          }}
-                        >
-                          <Edit className="mr-2 h-4 w-4" /> Editar
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          className="text-destructive"
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            const classId =
-                              typeof cls.id === 'string'
-                                ? parseInt(cls.id)
-                                : cls.id
-                            setDeleteId(classId)
-                          }}
-                        >
-                          <Trash2 className="mr-2 h-4 w-4" /> Excluir
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  )}
-                </div>
-              </CardHeader>
-              <CardContent className="relative z-10">
-                <div className="space-y-4">
-                  <div className="grid grid-cols-2 gap-2 text-sm">
-                    <div className="flex flex-col p-2 rounded-md bg-purple-50/50">
-                      <span className="text-muted-foreground text-xs">
-                        Série
-                      </span>
-                      <span className="font-medium text-purple-700">
-                        {cls.gradeName}
-                      </span>
-                    </div>
-                    <div className="flex flex-col p-2 rounded-md bg-purple-50/50">
-                      <span className="text-muted-foreground text-xs">
-                        Turno
-                      </span>
-                      <span className="font-medium text-purple-700">
-                        {cls.shift}
-                      </span>
-                    </div>
-                    <div className="flex flex-col p-2 rounded-md bg-purple-50/50">
-                      <span className="text-muted-foreground text-xs">
-                        Ano Letivo
-                      </span>
-                      <span className="font-medium text-purple-700">
-                        {cls.yearName}
-                      </span>
-                    </div>
-                    <div className="flex flex-col p-2 rounded-md bg-purple-50/50">
-                      <span className="text-muted-foreground text-xs">
-                        Capacidade
-                      </span>
-                      <span className="font-medium text-purple-700">
-                        {cls.capacity} alunos
-                      </span>
-                    </div>
-                  </div>
+        <Card>
+          <CardContent className="p-0">
+            <Table>
+              <TableHeader>
+                <TableRow className="bg-muted/50">
+                  <TableHead className="font-semibold text-center">Turma</TableHead>
+                  <TableHead className="font-semibold text-center">Escola</TableHead>
+                  <TableHead className="font-semibold text-center">Curso/Série</TableHead>
+                  <TableHead className="font-semibold text-center">Turno</TableHead>
+                  <TableHead className="font-semibold text-center">Ano Letivo</TableHead>
+                  <TableHead className="font-semibold text-center">Alunos</TableHead>
+                  <TableHead className="font-semibold text-center">Capacidade</TableHead>
+                  <TableHead className="w-[100px]"></TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {paginatedClasses.map((cls) => {
+                  const occupancyRate = cls.capacity
+                    ? Math.round(((cls.stats?.totalStudents || 0) / cls.capacity) * 100)
+                    : 0
+                  const occupancyColor = occupancyRate >= 90
+                    ? 'text-red-600 bg-red-50'
+                    : occupancyRate >= 70
+                      ? 'text-amber-600 bg-amber-50'
+                      : 'text-green-600 bg-green-50'
 
-                  <div className="flex items-center gap-2 text-sm pt-2 border-t border-purple-200/50">
-                    <div className="p-1.5 rounded-md bg-gradient-to-br from-purple-100 to-purple-200">
-                      <Users className="h-4 w-4 text-purple-600" />
-                    </div>
-                    <span className="font-medium">
-                      {cls.stats?.totalStudents || 0} Alunos
-                    </span>
-                    {cls.capacity && (
-                      <span className="text-xs text-muted-foreground ml-auto">
-                        {Math.round(
-                          ((cls.stats?.totalStudents || 0) / cls.capacity) * 100,
-                        )}
-                        % ocupado
-                      </span>
-                    )}
-                  </div>
+                  return (
+                    <TableRow
+                      key={`${cls.schoolId}-${cls.id}`}
+                      className="cursor-pointer hover:bg-purple-50/50 transition-colors group"
+                      onClick={() => {
+                        const classId = typeof cls.id === 'string' ? cls.id : cls.id.toString()
+                        navigate(`/academico/turmas/${classId}`)
+                      }}
+                    >
+                      <TableCell className="text-center">
+                        <div className="flex items-center justify-center gap-2">
+                          <div className="p-1.5 rounded-md bg-gradient-to-br from-purple-100 to-purple-200">
+                            <Users className="h-4 w-4 text-purple-600" />
+                          </div>
+                          <div className="flex flex-col items-start">
+                            <span className="font-medium group-hover:text-purple-600 transition-colors">
+                              {cls.name}
+                            </span>
+                            {cls.code && (
+                              <span className="text-xs text-muted-foreground">
+                                {cls.code}
+                              </span>
+                            )}
+                          </div>
+                          {cls.isMultiGrade && (
+                            <Badge variant="outline" className="text-[10px] h-5 border-purple-300 text-purple-600">
+                              Multi
+                            </Badge>
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-center">
+                        <div className="flex items-center justify-center gap-1 text-sm text-muted-foreground">
+                          <School className="h-3.5 w-3.5" />
+                          <span className="truncate max-w-[200px]">{cls.schoolName}</span>
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-center">
+                        <span className="text-sm">{cls.gradeName || '-'}</span>
+                      </TableCell>
+                      <TableCell className="text-center">
+                        <Badge variant="outline" className="font-normal">
+                          {cls.shift || '-'}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-center">
+                        <span className="text-sm">{cls.yearName || '-'}</span>
+                      </TableCell>
+                      <TableCell className="text-center">
+                        <Badge className={`${occupancyColor} border-0`}>
+                          {cls.stats?.totalStudents || 0}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-center">
+                        <span className="text-sm text-muted-foreground">{cls.capacity}</span>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-1 justify-end">
+                          {canManage(cls.schoolId?.toString()) && (
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button
+                                  variant="ghost"
+                                  className="h-8 w-8 p-0"
+                                  onClick={(e) => e.stopPropagation()}
+                                >
+                                  <span className="sr-only">Abrir menu</span>
+                                  <MoreHorizontal className="h-4 w-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                <DropdownMenuItem
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    openEditDialog(cls)
+                                  }}
+                                >
+                                  <Pencil className="mr-2 h-4 w-4" /> Editar
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                  className="text-destructive"
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    const classId = typeof cls.id === 'string' ? parseInt(cls.id) : cls.id
+                                    setDeleteId(classId)
+                                  }}
+                                >
+                                  <Trash2 className="mr-2 h-4 w-4" /> Excluir
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          )}
+                          <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:text-purple-600 transition-colors" />
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  )
+                })}
+              </TableBody>
+            </Table>
+          </CardContent>
+
+          {/* Paginação */}
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between px-4 py-3 border-t">
+              <div className="text-sm text-muted-foreground">
+                Mostrando {((currentPage - 1) * itemsPerPage) + 1} a {Math.min(currentPage * itemsPerPage, filteredClasses.length)} de {filteredClasses.length} turmas
+              </div>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(1)}
+                  disabled={currentPage === 1}
+                >
+                  Primeira
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                  disabled={currentPage === 1}
+                >
+                  Anterior
+                </Button>
+                <div className="flex items-center gap-1">
+                  {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                    let pageNum: number
+                    if (totalPages <= 5) {
+                      pageNum = i + 1
+                    } else if (currentPage <= 3) {
+                      pageNum = i + 1
+                    } else if (currentPage >= totalPages - 2) {
+                      pageNum = totalPages - 4 + i
+                    } else {
+                      pageNum = currentPage - 2 + i
+                    }
+                    return (
+                      <Button
+                        key={pageNum}
+                        variant={currentPage === pageNum ? 'default' : 'outline'}
+                        size="sm"
+                        className="w-8 h-8 p-0"
+                        onClick={() => setCurrentPage(pageNum)}
+                      >
+                        {pageNum}
+                      </Button>
+                    )
+                  })}
                 </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                  disabled={currentPage === totalPages}
+                >
+                  Próxima
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(totalPages)}
+                  disabled={currentPage === totalPages}
+                >
+                  Última
+                </Button>
+              </div>
+            </div>
+          )}
+        </Card>
       )}
 
       <ClassFormDialogUnified
@@ -604,9 +725,18 @@ export default function ClassesList() {
                 code: editingClass.code,
                 shift: editingClass.shift || 'Manhã',
                 capacity: editingClass.capacity || 35,
+                school_id: editingClass.school_id,
                 course_id: editingClass.course_id,
                 education_grade_id: editingClass.education_grade_id,
                 academic_period_id: editingClass.academic_period_id,
+                is_multi_grade: editingClass.is_multi_grade,
+                education_modality: editingClass.education_modality,
+                tipo_regime: editingClass.tipo_regime,
+                operating_hours: editingClass.operating_hours,
+                min_students: editingClass.min_students,
+                max_dependency_subjects: editingClass.max_dependency_subjects,
+                operating_days: editingClass.operating_days,
+                regent_teacher_id: editingClass.regent_teacher_id,
               }
             : undefined
         }
