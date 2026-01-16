@@ -23,7 +23,6 @@ import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { useEffect, useMemo } from 'react'
 import { useTeacherStore } from '@/stores/useTeacherStore.supabase'
-import { validateModalidadeCode, validateTipoRegimeCode } from '@/lib/validations'
 import type { School } from '@/lib/database-types'
 import {
   safeArray,
@@ -33,10 +32,21 @@ import {
 } from '@/lib/array-utils'
 import { cn } from '@/lib/utils'
 
+// Mapeamento de turnos para compatibilidade com dados existentes
+const SHIFT_MAPPING: Record<string, string> = {
+  'Manhã': 'Manhã',
+  'Matutino': 'Manhã',
+  'Tarde': 'Tarde',
+  'Vespertino': 'Tarde',
+  'Noite': 'Noite',
+  'Noturno': 'Noite',
+  'Integral': 'Integral',
+}
+
 const classroomSchema = z.object({
   name: z.string().min(2, 'Nome da turma obrigatório'),
   acronym: z.string().optional(),
-  shift: z.enum(['Matutino', 'Vespertino', 'Noturno', 'Integral']),
+  shift: z.enum(['Manhã', 'Tarde', 'Noite', 'Integral']),
   etapaEnsinoId: z.string().min(1, 'Etapa de Ensino obrigatória'),
   serieAnoId: z.string().optional(),
   gradeId: z.string().optional(),
@@ -47,24 +57,8 @@ const classroomSchema = z.object({
   isMultiGrade: z.boolean().default(false),
   maxCapacity: z.coerce.number().min(1, 'Capacidade mínima é 1 aluno').optional(),
   regentTeacherId: z.string().optional(),
-  educationModality: z
-    .string()
-    .optional()
-    .refine(
-      (val) => !val || validateModalidadeCode(val).valid,
-      (val) => ({
-        message: validateModalidadeCode(val || '').error || 'Código de modalidade inválido',
-      }),
-    ),
-  tipoRegime: z
-    .string()
-    .optional()
-    .refine(
-      (val) => !val || validateTipoRegimeCode(val).valid,
-      (val) => ({
-        message: validateTipoRegimeCode(val || '').error || 'Código de tipo de regime inválido',
-      }),
-    ),
+  educationModality: z.string().optional(),
+  tipoRegime: z.string().optional(),
   schoolId: z.string().optional(),
   yearId: z.string().optional(),
 })
@@ -131,7 +125,7 @@ export function ClassroomDialog({
     defaultValues: {
       name: '',
       acronym: '',
-      shift: 'Matutino',
+      shift: 'Manhã',
       gradeId: '',
       operatingHours: '',
       minStudents: 0,
@@ -169,10 +163,14 @@ export function ClassroomDialog({
             ? flattenGrades.find((s) => s.id === serieAnoId)?.etapaEnsinoId || ''
             : ''
 
+        // Mapeia o turno para o valor padronizado
+        const rawShift = initialData.shift as string || 'Manhã'
+        const mappedShift = (SHIFT_MAPPING[rawShift] || 'Manhã') as 'Manhã' | 'Tarde' | 'Noite' | 'Integral'
+
         form.reset({
           name: initialData.name as string || '',
           acronym: initialData.acronym as string || '',
-          shift: (initialData.shift as 'Matutino' | 'Vespertino' | 'Noturno' | 'Integral') || 'Matutino',
+          shift: mappedShift,
           etapaEnsinoId: (initialData.etapaEnsinoId as string) || etapaEnsinoIdFromSerieAno,
           serieAnoId: (initialData.serieAnoId || initialData.gradeId) as string || '',
           gradeId: (initialData.gradeId || initialData.serieAnoId) as string || '',
@@ -192,7 +190,7 @@ export function ClassroomDialog({
         form.reset({
           name: '',
           acronym: '',
-          shift: 'Matutino',
+          shift: 'Manhã',
           etapaEnsinoId: '',
           serieAnoId: '',
           gradeId: '',
@@ -407,9 +405,9 @@ export function ClassroomDialog({
                         value={field.value}
                         onChange={(e) => field.onChange(e.target.value)}
                       >
-                        <option value="Matutino">Matutino</option>
-                        <option value="Vespertino">Vespertino</option>
-                        <option value="Noturno">Noturno</option>
+                        <option value="Manhã">Manhã</option>
+                        <option value="Tarde">Tarde</option>
+                        <option value="Noite">Noite</option>
                         <option value="Integral">Integral</option>
                       </select>
                     </FormControl>

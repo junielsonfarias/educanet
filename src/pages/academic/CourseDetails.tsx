@@ -84,6 +84,7 @@ interface SerieAnoFormData {
 interface SubjectFormData {
   name?: string;
   workload?: number;
+  display_order?: number;
 }
 
 export default function CourseDetails() {

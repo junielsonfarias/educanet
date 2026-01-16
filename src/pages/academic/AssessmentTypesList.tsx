@@ -81,6 +81,7 @@ export default function AssessmentTypesList() {
     replaces_lowest: data.replacesLowest,
     is_mandatory: data.isMandatory,
     applicable_period_type: data.applicablePeriodType,
+    applicable_grade_ids: data.applicableGradeIds || [],
   })
 
   // Converter dados do service para o formato do formulário (snake_case -> camelCase)
@@ -97,6 +98,7 @@ export default function AssessmentTypesList() {
     replacesLowest: type.replaces_lowest || false,
     isMandatory: type.is_mandatory !== false,
     applicablePeriodType: type.applicable_period_type || 'bimester',
+    applicableGradeIds: type.applicable_grade_ids || [],
   })
 
   const handleCreate = async (data: AssessmentTypeFormData) => {
@@ -296,6 +298,7 @@ export default function AssessmentTypesList() {
                     <TableHead>Peso</TableHead>
                     <TableHead>Nota Máx.</TableHead>
                     <TableHead>Período</TableHead>
+                    <TableHead>Séries</TableHead>
                     <TableHead>Tipo</TableHead>
                     <TableHead>Média</TableHead>
                     <TableHead className="text-right">Ações</TableHead>
@@ -346,6 +349,26 @@ export default function AssessmentTypesList() {
                         <Badge variant="outline" className="text-xs">
                           {getPeriodLabel(type.applicable_period_type)}
                         </Badge>
+                      </TableCell>
+                      <TableCell>
+                        {type.applicable_grade_ids && type.applicable_grade_ids.length > 0 ? (
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Badge variant="secondary" className="cursor-help">
+                                {type.applicable_grade_ids.length} série(s)
+                              </Badge>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p className="text-xs">
+                                Vinculado a {type.applicable_grade_ids.length} série(s) específica(s)
+                              </p>
+                            </TooltipContent>
+                          </Tooltip>
+                        ) : (
+                          <Badge variant="outline" className="text-green-600 border-green-300">
+                            Todas
+                          </Badge>
+                        )}
                       </TableCell>
                       <TableCell>
                         {type.is_recovery ? (

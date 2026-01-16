@@ -699,6 +699,106 @@ class GradeService extends BaseService<Grade> {
   }
 
   /**
+   * Buscar notas formatadas para exibição no boletim/desempenho
+   * Retorna no formato esperado pelos componentes de UI
+   */
+  async getStudentAssessmentsFormatted(studentProfileId: number): Promise<any[]> {
+    try {
+      // Buscar student_enrollment_ids do aluno
+      const { data: enrollments, error: enrollmentError } = await supabase
+        .from('student_enrollments')
+        .select(`
+          id,
+          academic_year_id,
+          school_id
+        `)
+        .eq('student_profile_id', studentProfileId)
+        .is('deleted_at', null);
+
+      if (enrollmentError) throw handleSupabaseError(enrollmentError);
+      if (!enrollments || enrollments.length === 0) return [];
+
+      const enrollmentIds = enrollments.map(e => e.id);
+
+      // Buscar notas com todos os relacionamentos necessários
+      const { data: grades, error: gradesError } = await supabase
+        .from('grades')
+        .select(`
+          id,
+          grade_value,
+          created_at,
+          student_enrollment_id,
+          evaluation_instance:evaluation_instances(
+            id,
+            title,
+            evaluation_date,
+            evaluation_type,
+            academic_period_id,
+            education_grade_id,
+            assessment_type_id,
+            class_teacher_subject:class_teacher_subjects(
+              id,
+              class_id,
+              subject_id,
+              class:classes(
+                id,
+                name,
+                academic_year_id
+              )
+            ),
+            assessment_type:assessment_types(
+              id,
+              name,
+              is_recovery,
+              replaces_lowest
+            )
+          )
+        `)
+        .in('student_enrollment_id', enrollmentIds)
+        .is('deleted_at', null);
+
+      if (gradesError) throw handleSupabaseError(gradesError);
+
+      // Transformar para o formato esperado pelos componentes
+      // IMPORTANTE: Manter IDs como tipos mistos (string para compatibilidade com componentes legados)
+      const formattedAssessments = (grades || []).map((grade: any) => {
+        const evalInstance = grade.evaluation_instance;
+        const cts = evalInstance?.class_teacher_subject;
+        const classData = cts?.class;
+        const assessmentType = evalInstance?.assessment_type;
+
+        // Determinar categoria (regular ou recuperação)
+        const isRecovery = assessmentType?.is_recovery || false;
+        const category = isRecovery ? 'recuperation' : 'regular';
+
+        return {
+          id: String(grade.id),
+          // IDs mantidos como string para compatibilidade com diferentes sistemas
+          studentId: studentProfileId, // Número
+          subjectId: cts?.subject_id || null, // Número
+          yearId: classData?.academic_year_id || null, // Número
+          classroomId: cts?.class_id || null, // Número
+          periodId: evalInstance?.academic_period_id || null, // Número
+          assessmentTypeId: evalInstance?.assessment_type_id || null, // Número
+          category,
+          date: evalInstance?.evaluation_date || grade.created_at,
+          value: grade.grade_value,
+          evaluationInstanceId: evalInstance?.id,
+          evaluationTitle: evalInstance?.title,
+          // Campos adicionais úteis
+          isRecovery,
+          replacesLowest: assessmentType?.replaces_lowest || false,
+        };
+      });
+
+      return formattedAssessments;
+    } catch (error) {
+      console.error('Error in GradeService.getStudentAssessmentsFormatted:', error);
+      throw error;
+    }
+  }
+
+  /**
    * Verificar se aluno foi aprovado no período
    */
   async checkApproval(

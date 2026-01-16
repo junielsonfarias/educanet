@@ -77,7 +77,7 @@ export default function StudentDetails() {
     currentStudent,
   } = useStudentStore()
   const { schools } = useSchoolStore()
-  const { assessments, assessmentTypes } = useAssessmentStore()
+  const { assessments, assessmentTypes, fetchStudentAssessments, fetchAssessmentTypes } = useAssessmentStore()
   const { etapasEnsino } = useCourseStore()
   const { projects } = useProjectStore()
   const { currentUser } = useUserStore()
@@ -88,6 +88,11 @@ export default function StudentDetails() {
   const [isEnrollmentDialogOpen, setIsEnrollmentDialogOpen] = useState(false)
   const [isProjectDialogOpen, setIsProjectDialogOpen] = useState(false)
   const [isTransferDialogOpen, setIsTransferDialogOpen] = useState(false)
+
+  // Carregar tipos de avaliação ao montar
+  useEffect(() => {
+    fetchAssessmentTypes()
+  }, [fetchAssessmentTypes])
 
   // Carregar dados do aluno ao montar ou quando ID mudar
   useEffect(() => {
@@ -101,6 +106,19 @@ export default function StudentDetails() {
 
   // Buscar do estado local ou do currentStudent
   const student = getStudent(id || '') || currentStudent
+
+  // Carregar notas/avaliações do aluno quando o aluno for carregado
+  useEffect(() => {
+    if (student?.id) {
+      const studentProfileId = typeof student.id === 'string'
+        ? parseInt(student.id, 10)
+        : student.id
+      if (!isNaN(studentProfileId)) {
+        fetchStudentAssessments(studentProfileId)
+      }
+    }
+  }, [student?.id, fetchStudentAssessments])
+
   const isAdminOrSupervisor =
     currentUser?.role === 'admin' || currentUser?.role === 'supervisor'
 

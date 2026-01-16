@@ -9,9 +9,116 @@ import { supabase } from '../client';
 import { handleSupabaseError } from '../helpers';
 import type { Teacher, TeacherFullInfo, Person } from '@/lib/database-types';
 
+export interface TeacherWithAssignments extends Teacher {
+  person: Person;
+  subjects: { id: number; name: string }[];
+  schools: { id: number; name: string }[];
+  totalClasses: number;
+  isActive: boolean;
+}
+
 class TeacherService extends BaseService<Teacher> {
   constructor() {
     super('teachers');
+  }
+
+  /**
+   * Buscar todos os professores com seus vínculos (escolas, disciplinas)
+   * Usado na listagem principal de professores
+   */
+  async getAllWithAssignments(): Promise<TeacherWithAssignments[]> {
+    try {
+      // 1. Buscar todos os professores com pessoa
+      const { data: teachers, error } = await supabase
+        .from('teachers')
+        .select(`
+          *,
+          person:people(*)
+        `)
+        .is('deleted_at', null);
+
+      if (error) throw handleSupabaseError(error);
+
+      if (!teachers || teachers.length === 0) {
+        return [];
+      }
+
+      // 2. Buscar todas as alocações de professores
+      const teacherIds = teachers.map(t => t.id);
+      const { data: assignments } = await supabase
+        .from('class_teacher_subjects')
+        .select(`
+          teacher_id,
+          subject:subjects(id, name),
+          class:classes(
+            id,
+            school:schools(id, name)
+          )
+        `)
+        .in('teacher_id', teacherIds)
+        .is('deleted_at', null);
+
+      // 3. Agrupar vínculos por professor
+      const assignmentsByTeacher = new Map<number, {
+        subjects: Map<number, { id: number; name: string }>;
+        schools: Map<number, { id: number; name: string }>;
+        totalClasses: number;
+      }>();
+
+      for (const assignment of assignments || []) {
+        if (!assignment.teacher_id) continue;
+
+        if (!assignmentsByTeacher.has(assignment.teacher_id)) {
+          assignmentsByTeacher.set(assignment.teacher_id, {
+            subjects: new Map(),
+            schools: new Map(),
+            totalClasses: 0
+          });
+        }
+
+        const teacherData = assignmentsByTeacher.get(assignment.teacher_id)!;
+        teacherData.totalClasses++;
+
+        // Adicionar disciplina (única)
+        const subject = assignment.subject as { id: number; name: string } | null;
+        if (subject && !teacherData.subjects.has(subject.id)) {
+          teacherData.subjects.set(subject.id, subject);
+        }
+
+        // Adicionar escola (única)
+        const cls = assignment.class as { id: number; school: { id: number; name: string } | null } | null;
+        if (cls?.school && !teacherData.schools.has(cls.school.id)) {
+          teacherData.schools.set(cls.school.id, cls.school);
+        }
+      }
+
+      // 4. Montar resultado final
+      const result = teachers.map((teacher: Record<string, unknown>) => {
+        const teacherAssignments = assignmentsByTeacher.get(teacher.id as number);
+
+        return {
+          ...teacher,
+          subjects: teacherAssignments ? Array.from(teacherAssignments.subjects.values()) : [],
+          schools: teacherAssignments ? Array.from(teacherAssignments.schools.values()) : [],
+          totalClasses: teacherAssignments?.totalClasses || 0,
+          isActive: (teacherAssignments?.totalClasses || 0) > 0
+        };
+      });
+
+      // 5. Ordenar por nome
+      result.sort((a: Record<string, unknown>, b: Record<string, unknown>) => {
+        const personA = a.person as Record<string, unknown> | null;
+        const personB = b.person as Record<string, unknown> | null;
+        const nameA = `${personA?.first_name || ''} ${personA?.last_name || ''}`.trim();
+        const nameB = `${personB?.first_name || ''} ${personB?.last_name || ''}`.trim();
+        return nameA.localeCompare(nameB, 'pt-BR');
+      });
+
+      return result as TeacherWithAssignments[];
+    } catch (error) {
+      console.error('Error in TeacherService.getAllWithAssignments:', error);
+      throw error;
+    }
   }
 
   /**
@@ -109,37 +216,50 @@ class TeacherService extends BaseService<Teacher> {
     academicYearId?: number;
   }): Promise<any[]> {
     try {
-      let query = supabase
+      // Buscar alocações do professor (incluindo workload_hours)
+      const { data, error } = await supabase
         .from('class_teacher_subjects')
         .select(`
-          *,
+          id,
+          teacher_id,
+          class_id,
+          subject_id,
+          workload_hours,
+          created_at,
           class:classes(
             *,
             course:courses(*),
             school:schools(*),
-            academic_year:academic_years(*)
+            academic_period:academic_periods(*, academic_year:academic_years(*))
           ),
           subject:subjects(*)
         `)
         .eq('teacher_id', teacherId)
-        .is('deleted_at', null);
-
-      if (options?.academicYearId) {
-        query = query.eq('class.academic_year_id', options.academicYearId);
-      }
-
-      const { data, error } = await query.order('id');
+        .is('deleted_at', null)
+        .order('id');
 
       if (error) throw handleSupabaseError(error);
 
+      let result = data || [];
+
+      // Filtrar por ano letivo se especificado
+      if (options?.academicYearId) {
+        result = result.filter((item: Record<string, unknown>) => {
+          const cls = item.class as Record<string, unknown> | null;
+          const period = cls?.academic_period as Record<string, unknown> | null;
+          const year = period?.academic_year as Record<string, unknown> | null;
+          return year?.id === options.academicYearId;
+        });
+      }
+
       // Ordenar por nome da turma client-side
-      const sorted = (data || []).sort((a: Record<string, unknown>, b: Record<string, unknown>) => {
+      result.sort((a: Record<string, unknown>, b: Record<string, unknown>) => {
         const nameA = (a.class as Record<string, unknown>)?.name as string || '';
         const nameB = (b.class as Record<string, unknown>)?.name as string || '';
         return nameA.localeCompare(nameB, 'pt-BR');
       });
 
-      return sorted;
+      return result;
     } catch (error) {
       console.error('Error in TeacherService.getTeacherClasses:', error);
       throw error;

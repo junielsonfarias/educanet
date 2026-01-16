@@ -51,6 +51,7 @@ interface AssessmentState {
     periodId?: number;
     subjectId?: number;
   }) => Promise<void>;
+  fetchStudentAssessments: (studentProfileId: number) => Promise<void>;
   fetchClassGrades: (classId: number, options?: {
     evaluationId?: number;
     subjectId?: number;
@@ -136,6 +137,22 @@ export const useAssessmentStore = create<AssessmentState>((set, get) => ({
       set({ grades, loading: false });
     } catch (error: unknown) {
       const message = error?.message || 'Erro ao carregar notas do aluno';
+      set({ error: message, loading: false });
+      toast.error(message);
+    }
+  },
+
+  /**
+   * Buscar notas do aluno no formato esperado pelos componentes de UI
+   * Popula o campo 'assessments' usado por StudentPerformanceCard, ReportCard, etc.
+   */
+  fetchStudentAssessments: async (studentProfileId: number) => {
+    set({ loading: true, error: null });
+    try {
+      const assessments = await gradeService.getStudentAssessmentsFormatted(studentProfileId);
+      set({ assessments, loading: false });
+    } catch (error: unknown) {
+      const message = (error as Error)?.message || 'Erro ao carregar avaliações do aluno';
       set({ error: message, loading: false });
       toast.error(message);
     }

@@ -564,6 +564,7 @@ class CourseService extends BaseService {
     workload?: number;
     is_mandatory?: boolean;
     semester?: number;
+    display_order?: number;
   }): Promise<Record<string, unknown>> {
     try {
       // Buscar ou criar a disciplina
@@ -579,6 +580,13 @@ class CourseService extends BaseService {
 
       if (existingSubject) {
         subject = existingSubject;
+        // Atualizar display_order se foi fornecido
+        if (data.display_order !== undefined) {
+          await supabase
+            .from('subjects')
+            .update({ display_order: data.display_order })
+            .eq('id', existingSubject.id);
+        }
       } else {
         // Criar nova disciplina
         const { data: { user } } = await supabase.auth.getUser();
@@ -599,6 +607,7 @@ class CourseService extends BaseService {
           .insert({
             name: data.name,
             workload_hours: data.workload,
+            display_order: data.display_order || 0,
             created_by: createdBy
           })
           .select()
@@ -659,6 +668,7 @@ class CourseService extends BaseService {
   async updateSubjectInSeries(courseSubjectId: number, data: {
     name?: string;
     workload?: number;
+    display_order?: number;
   }): Promise<Record<string, unknown>> {
     try {
       // Buscar o course_subject para obter subject_id
@@ -670,11 +680,16 @@ class CourseService extends BaseService {
 
       if (csError) throw handleSupabaseError(csError);
 
-      // Atualizar a disciplina se necessário
-      if (data.name) {
+      // Preparar updates para a tabela subjects
+      const subjectUpdates: Record<string, unknown> = {};
+      if (data.name) subjectUpdates.name = data.name;
+      if (data.display_order !== undefined) subjectUpdates.display_order = data.display_order;
+
+      // Atualizar a disciplina se houver alterações
+      if (Object.keys(subjectUpdates).length > 0) {
         await supabase
           .from('subjects')
-          .update({ name: data.name })
+          .update(subjectUpdates)
           .eq('id', courseSubject.subject_id);
       }
 

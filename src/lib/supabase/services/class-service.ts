@@ -43,6 +43,7 @@ export interface ClassWithFullInfo extends Class {
   operating_days?: string[];
   regent_teacher_id?: number;
   education_grade_id?: number;
+  academic_year_id?: number;
   // Relacionamentos
   school?: School;
   course?: Course;
@@ -93,8 +94,16 @@ class ClassService extends BaseService<Class> {
       // Buscar estatísticas
       const stats = await this.getClassStats(id);
 
-      // Extrair academic_year do academic_period para compatibilidade
-      const academic_year = data?.academic_period?.academic_year || null;
+      // Buscar academic_year diretamente se tiver academic_year_id
+      let academic_year = data?.academic_period?.academic_year || null;
+      if (!academic_year && data?.academic_year_id) {
+        const { data: yearData } = await supabase
+          .from('academic_years')
+          .select('*')
+          .eq('id', data.academic_year_id)
+          .single();
+        academic_year = yearData;
+      }
 
       return {
         ...data,
@@ -146,24 +155,24 @@ class ClassService extends BaseService<Class> {
         }
       }
 
-      // Buscar períodos acadêmicos com anos letivos SEMPRE (evita problemas de join)
+      // Buscar TODOS os anos letivos de uma vez (otimização)
+      const { data: allYears, error: yearsError } = await supabase
+        .from('academic_years')
+        .select('id, year');
+
+      const yearMap = new Map<number, { id: number; name: string }>();
+      if (!yearsError && allYears) {
+        for (const yr of allYears) {
+          // Converter o ano (number) para nome (string)
+          yearMap.set(yr.id, { id: yr.id, name: String(yr.year) });
+        }
+      }
+
+      // Buscar períodos acadêmicos (para compatibilidade com turmas antigas)
       const periodIds = [...new Set((data || []).map((cls: any) => cls.academic_period_id).filter(Boolean))];
       const academicPeriodMap = new Map<number, { id: number; name: string; type: string; academic_year_id: number; academic_year: { id: number; name: string } | null }>();
 
       if (periodIds.length > 0) {
-        // Buscar TODOS os anos letivos (tabela tem 'year' como número, não 'name')
-        const { data: allYears, error: yearsError } = await supabase
-          .from('academic_years')
-          .select('id, year');
-
-        const yearMap = new Map<number, { id: number; name: string }>();
-        if (!yearsError && allYears) {
-          for (const yr of allYears) {
-            // Converter o ano (number) para nome (string)
-            yearMap.set(yr.id, { id: yr.id, name: String(yr.year) });
-          }
-        }
-
         // Buscar períodos
         const { data: periods, error: periodsError } = await supabase
           .from('academic_periods')
@@ -181,7 +190,6 @@ class ClassService extends BaseService<Class> {
               academic_year_id: period.academic_year_id,
               academic_year: year || null
             });
-
           }
         }
       }
@@ -191,9 +199,20 @@ class ClassService extends BaseService<Class> {
         const totalStudents = studentCounts.get(cls.id) || 0;
         const capacity = cls.capacity || cls.max_students || 35;
 
-        // Buscar período e ano letivo do mapa
+        // Prioridade: academic_year_id direto > academic_period > null
+        let academic_year: { id: number; name: string } | null = null;
+
+        // Primeiro tenta pegar do campo direto academic_year_id
+        if (cls.academic_year_id) {
+          academic_year = yearMap.get(cls.academic_year_id) || null;
+        }
+
+        // Se não tiver, tenta pegar do período acadêmico
         const periodData = cls.academic_period_id ? academicPeriodMap.get(cls.academic_period_id) : null;
-        const academic_year = periodData?.academic_year || null;
+        if (!academic_year && periodData?.academic_year) {
+          academic_year = periodData.academic_year;
+        }
+
         const academic_period = periodData ? {
           id: periodData.id,
           name: periodData.name,
@@ -281,23 +300,21 @@ class ClassService extends BaseService<Class> {
 
   /**
    * Buscar turmas por ano letivo
+   * Usa o campo academic_year_id diretamente, com fallback para academic_period_id
    */
   async getByAcademicYear(academicYearId: number, options?: {
     schoolId?: number;
     shift?: string;
   }): Promise<ClassWithDetails[]> {
     try {
-      // Buscar períodos do ano letivo
+      // Buscar períodos do ano letivo (para compatibilidade com turmas antigas)
       const { data: periods } = await supabase
         .from('academic_periods')
         .select('id')
         .eq('academic_year_id', academicYearId);
       const periodIds = (periods || []).map(p => p.id);
 
-      if (periodIds.length === 0) {
-        return [];
-      }
-
+      // Buscar turmas que têm academic_year_id diretamente OU academic_period_id vinculado ao ano
       let query = supabase
         .from('classes')
         .select(`
@@ -307,8 +324,14 @@ class ClassService extends BaseService<Class> {
           academic_period:academic_periods(*, academic_year:academic_years(*)),
           education_grade:education_grades(*)
         `)
-        .in('academic_period_id', periodIds)
         .is('deleted_at', null);
+
+      // Filtrar por ano letivo direto OU por período acadêmico
+      if (periodIds.length > 0) {
+        query = query.or(`academic_year_id.eq.${academicYearId},academic_period_id.in.(${periodIds.join(',')})`);
+      } else {
+        query = query.eq('academic_year_id', academicYearId);
+      }
 
       if (options?.schoolId) {
         query = query.eq('school_id', options.schoolId);
@@ -341,7 +364,11 @@ class ClassService extends BaseService<Class> {
         .select(`
           id,
           enrollment_date,
+          exit_date,
           status,
+          original_order,
+          is_transfer_entry,
+          transfer_id,
           student_enrollment:student_enrollments(
             id,
             enrollment_date,
@@ -349,6 +376,9 @@ class ClassService extends BaseService<Class> {
             student_profile:student_profiles(
               id,
               student_registration_number,
+              is_pcd,
+              cid_code,
+              cid_description,
               person:people(
                 id,
                 first_name,
@@ -361,11 +391,14 @@ class ClassService extends BaseService<Class> {
         .eq('class_id', classId)
         .is('deleted_at', null);
 
-      // Por padrao inclui todos os status existentes no banco
+      // Por padrao inclui ativos e transferidos para mostrar historico
       if (options?.status) {
         query = query.eq('status', options.status);
+      } else if (options?.includeTransferred) {
+        // Incluir Ativo e Transferido
+        query = query.in('status', ['Ativo', 'Transferido']);
       } else {
-        // Filtrar apenas status Ativo e Transferido (que existem no ENUM atual)
+        // Padrao: apenas ativos
         query = query.eq('status', 'Ativo');
       }
 
@@ -395,24 +428,77 @@ class ClassService extends BaseService<Class> {
             class_enrollment_id: item.id,
             class_enrollment_status: item.status,
             class_enrollment_date: item.enrollment_date,
+            class_exit_date: item.exit_date,
+            original_order: item.original_order,
+            is_transfer_entry: item.is_transfer_entry,
+            transfer_id: item.transfer_id,
             student_enrollment_id: enrollment?.id,
             student_enrollment_status: enrollment?.enrollment_status
           };
         })
         .filter(Boolean);
 
-      // Ordenar alfabeticamente por nome
+      // Ordenar com logica especifica:
+      // 1. Alunos originais (nao transferidos de entrada) por nome alfabetico
+      // 2. Alunos que vieram por transferencia (is_transfer_entry=true) por data de entrada, no final
       const sortedStudents = students.sort((a: any, b: any) => {
+        // Se um eh entrada por transferencia e outro nao, o original vem primeiro
+        if (a.is_transfer_entry !== b.is_transfer_entry) {
+          return a.is_transfer_entry ? 1 : -1;
+        }
+
+        // Se ambos sao do mesmo tipo, ordenar diferente:
+        if (a.is_transfer_entry) {
+          // Entradas por transferencia: ordenar por data de entrada (mais antigo primeiro)
+          const dateA = new Date(a.class_enrollment_date || 0).getTime();
+          const dateB = new Date(b.class_enrollment_date || 0).getTime();
+          if (dateA !== dateB) return dateA - dateB;
+        }
+
+        // Alunos originais ou desempate: ordenar por nome alfabetico
         const nameA = a?.person?.full_name || '';
         const nameB = b?.person?.full_name || '';
-        return nameA.localeCompare(nameB);
+        return nameA.localeCompare(nameB, 'pt-BR');
       });
 
       // Atribuir numeros de ordem
-      return sortedStudents.map((student, index) => ({
-        ...student,
-        order_number: index + 1
-      }));
+      // Para alunos originais: usar original_order se existir, senao sequencial
+      // Para transferidos de saida: manter seu numero original
+      // Para entradas por transferencia: continuar numeracao no final
+      let nextOrder = 0;
+      const originalStudents = sortedStudents.filter((s: any) => !s.is_transfer_entry);
+      const transferEntries = sortedStudents.filter((s: any) => s.is_transfer_entry);
+
+      // Primeiro, processar alunos originais
+      originalStudents.forEach((student: any) => {
+        if (student.original_order) {
+          student.order_number = student.original_order;
+          if (student.original_order > nextOrder) {
+            nextOrder = student.original_order;
+          }
+        }
+      });
+
+      // Para alunos originais sem original_order, atribuir sequencial
+      originalStudents.forEach((student: any) => {
+        if (!student.order_number) {
+          nextOrder++;
+          student.order_number = nextOrder;
+        }
+      });
+
+      // Para entradas por transferencia, continuar a numeracao
+      transferEntries.forEach((student: any) => {
+        nextOrder++;
+        student.order_number = nextOrder;
+      });
+
+      // Combinar e reordenar pela numeracao final
+      const finalList = [...originalStudents, ...transferEntries].sort((a: any, b: any) => {
+        return (a.order_number || 999) - (b.order_number || 999);
+      });
+
+      return finalList;
     } catch (error) {
       console.error('Error in ClassService.getClassStudents:', error);
       throw error;
@@ -446,7 +532,7 @@ class ClassService extends BaseService<Class> {
   }
 
   /**
-   * Buscar disciplinas de uma turma
+   * Buscar disciplinas de uma turma com professores e carga horária
    */
   async getClassSubjects(classId: number): Promise<any[]> {
     try {
@@ -454,6 +540,7 @@ class ClassService extends BaseService<Class> {
         .from('class_teacher_subjects')
         .select(`
           id,
+          workload_hours,
           subject:subjects(*),
           teacher:teachers(
             id,
@@ -478,7 +565,17 @@ class ClassService extends BaseService<Class> {
             });
           }
           if (item.teacher) {
-            subjectsMap.get(subjectId).teachers.push(item.teacher);
+            const teacher = item.teacher as Record<string, unknown>;
+            const person = teacher.person as Record<string, unknown> | undefined;
+            const fullName = person
+              ? `${person.first_name || ''} ${person.last_name || ''}`.trim()
+              : 'Professor não identificado';
+            subjectsMap.get(subjectId).teachers.push({
+              id: teacher.id,
+              class_teacher_subject_id: item.id,
+              workload_hours: item.workload_hours,
+              person: { full_name: fullName }
+            });
           }
         }
       });
@@ -999,7 +1096,8 @@ class ClassService extends BaseService<Class> {
     code?: string;
     school_id: number;
     course_id: number;
-    academic_period_id: number;
+    academic_year_id?: number;
+    academic_period_id?: number; // Mantido para compatibilidade, mas preferir academic_year_id
     education_grade_id?: number;
     homeroom_teacher_id?: number;
     capacity?: number;
@@ -1035,7 +1133,8 @@ class ClassService extends BaseService<Class> {
           code: data.code || null,
           school_id: data.school_id,
           course_id: data.course_id,
-          academic_period_id: data.academic_period_id,
+          academic_year_id: data.academic_year_id || null,
+          academic_period_id: data.academic_period_id || null,
           education_grade_id: data.education_grade_id,
           homeroom_teacher_id: data.homeroom_teacher_id,
           capacity: data.capacity || 35,
@@ -1078,6 +1177,70 @@ class ClassService extends BaseService<Class> {
       if (error) throw handleSupabaseError(error);
     } catch (error) {
       console.error('Error in ClassService.updateClassGrade:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Atualizar turma com todos os campos
+   */
+  async updateClass(classId: number, data: {
+    name?: string;
+    code?: string | null;
+    school_id?: number;
+    course_id?: number;
+    academic_year_id?: number | null;
+    academic_period_id?: number | null;
+    education_grade_id?: number | null;
+    homeroom_teacher_id?: number | null;
+    capacity?: number;
+    shift?: string;
+    // Campos do Censo Escolar
+    is_multi_grade?: boolean;
+    education_modality?: string | null;
+    tipo_regime?: string | null;
+    operating_hours?: string | null;
+    min_students?: number | null;
+    max_dependency_subjects?: number | null;
+    operating_days?: string[] | null;
+    regent_teacher_id?: number | null;
+  }): Promise<Record<string, unknown>> {
+    try {
+      const updateData: Record<string, unknown> = {
+        updated_at: new Date().toISOString()
+      };
+
+      // Adicionar apenas campos fornecidos
+      if (data.name !== undefined) updateData.name = data.name;
+      if (data.code !== undefined) updateData.code = data.code;
+      if (data.school_id !== undefined) updateData.school_id = data.school_id;
+      if (data.course_id !== undefined) updateData.course_id = data.course_id;
+      if (data.academic_year_id !== undefined) updateData.academic_year_id = data.academic_year_id;
+      if (data.academic_period_id !== undefined) updateData.academic_period_id = data.academic_period_id;
+      if (data.education_grade_id !== undefined) updateData.education_grade_id = data.education_grade_id;
+      if (data.homeroom_teacher_id !== undefined) updateData.homeroom_teacher_id = data.homeroom_teacher_id;
+      if (data.capacity !== undefined) updateData.capacity = data.capacity;
+      if (data.shift !== undefined) updateData.shift = data.shift;
+      if (data.is_multi_grade !== undefined) updateData.is_multi_grade = data.is_multi_grade;
+      if (data.education_modality !== undefined) updateData.education_modality = data.education_modality;
+      if (data.tipo_regime !== undefined) updateData.tipo_regime = data.tipo_regime;
+      if (data.operating_hours !== undefined) updateData.operating_hours = data.operating_hours;
+      if (data.min_students !== undefined) updateData.min_students = data.min_students;
+      if (data.max_dependency_subjects !== undefined) updateData.max_dependency_subjects = data.max_dependency_subjects;
+      if (data.operating_days !== undefined) updateData.operating_days = data.operating_days;
+      if (data.regent_teacher_id !== undefined) updateData.regent_teacher_id = data.regent_teacher_id;
+
+      const { data: updatedClass, error } = await supabase
+        .from('classes')
+        .update(updateData)
+        .eq('id', classId)
+        .select()
+        .single();
+
+      if (error) throw handleSupabaseError(error);
+      return updatedClass;
+    } catch (error) {
+      console.error('Error in ClassService.updateClass:', error);
       throw error;
     }
   }
@@ -1153,6 +1316,47 @@ class ClassService extends BaseService<Class> {
         throw handleSupabaseError(error);
       }
 
+      // Buscar informações dos professores separadamente para evitar problemas com FKs
+      let homeroomTeacherName: string | null = null;
+      let assistantTeacherName: string | null = null;
+      let regentTeacherName: string | null = null;
+
+      if (data?.homeroom_teacher_id) {
+        const { data: teacher } = await supabase
+          .from('teachers')
+          .select('id, person:people(first_name, last_name)')
+          .eq('id', data.homeroom_teacher_id)
+          .single();
+        if (teacher?.person) {
+          const person = teacher.person as { first_name?: string; last_name?: string };
+          homeroomTeacherName = `${person.first_name || ''} ${person.last_name || ''}`.trim() || null;
+        }
+      }
+
+      if (data?.assistant_teacher_id) {
+        const { data: teacher } = await supabase
+          .from('teachers')
+          .select('id, person:people(first_name, last_name)')
+          .eq('id', data.assistant_teacher_id)
+          .single();
+        if (teacher?.person) {
+          const person = teacher.person as { first_name?: string; last_name?: string };
+          assistantTeacherName = `${person.first_name || ''} ${person.last_name || ''}`.trim() || null;
+        }
+      }
+
+      if (data?.regent_teacher_id) {
+        const { data: teacher } = await supabase
+          .from('teachers')
+          .select('id, person:people(first_name, last_name)')
+          .eq('id', data.regent_teacher_id)
+          .single();
+        if (teacher?.person) {
+          const person = teacher.person as { first_name?: string; last_name?: string };
+          regentTeacherName = `${person.first_name || ''} ${person.last_name || ''}`.trim() || null;
+        }
+      }
+
       // Buscar regra de avaliação aplicável
       let evaluationRule = null;
       if (data?.education_grade_id || data?.course_id) {
@@ -1184,11 +1388,20 @@ class ClassService extends BaseService<Class> {
       // Extrair academic_year do academic_period para compatibilidade
       const academic_year = data?.academic_period?.academic_year || null;
 
+      // Determinar se é Anos Iniciais (Educação Infantil ou Ensino Fundamental I)
+      const educationLevel = data?.course?.education_level;
+      const isEarlyYears = educationLevel === 'Educação Infantil' || educationLevel === 'Ensino Fundamental I';
+
       return {
         ...data,
         academic_year,
         evaluation_rule: evaluationRule,
-        stats
+        stats,
+        is_early_years: isEarlyYears,
+        teacher_model: isEarlyYears ? 'Anos Iniciais' : 'Anos Finais',
+        homeroom_teacher_name: homeroomTeacherName,
+        assistant_teacher_name: assistantTeacherName,
+        regent_teacher_name: regentTeacherName
       };
     } catch (error) {
       console.error('Error in ClassService.getClassWithGradeInfo:', error);

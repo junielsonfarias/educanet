@@ -165,11 +165,12 @@ export function StudentPerformanceCard({
 
       // 4. Calculate
       const results = (gradeStructure.subjects || []).map((subject: any) => {
+        // Comparação flexível para tipos mistos (string/number)
         const subjectAssessments = assessments.filter(
           (a) =>
-            a.studentId === student.id &&
-            a.subjectId === subject.id &&
-            academicYear.id === a.yearId,
+            String(a.studentId) === String(student.id) &&
+            String(a.subjectId) === String(subject.id) &&
+            String(academicYear.id) === String(a.yearId),
         )
 
         const calculation = calculateGrades(

@@ -70,6 +70,7 @@ interface SerieAnoFormData {
 interface SubjectFormData {
   name?: string;
   workload?: number;
+  display_order?: number;
 }
 
 interface CourseState {
@@ -380,7 +381,8 @@ export const useCourseStore = create<CourseState>((set, get) => ({
     try {
       await courseService.addSubjectToSeries(courseId, serieId, {
         name: data.name || '',
-        workload: data.workload
+        workload: data.workload,
+        display_order: data.display_order
       });
 
       // Recarregar dados
@@ -400,7 +402,8 @@ export const useCourseStore = create<CourseState>((set, get) => ({
     try {
       await courseService.updateSubjectInSeries(subjectId, {
         name: data.name,
-        workload: data.workload
+        workload: data.workload,
+        display_order: data.display_order
       });
 
       // Recarregar dados

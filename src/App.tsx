@@ -34,7 +34,6 @@ import CoursesList from './pages/academic/CoursesList'
 import CourseDetails from './pages/academic/CourseDetails'
 import ClassesList from './pages/academic/ClassesList'
 import ClassDetails from './pages/academic/ClassDetails'
-import AssessmentInput from './pages/academic/AssessmentInput'
 import EvaluationAnalysis from './pages/academic/EvaluationAnalysis'
 import SchoolCalendar from './pages/calendar/SchoolCalendar'
 import ReportsDashboard from './pages/reports/ReportsDashboard'
@@ -55,6 +54,7 @@ import EvaluationRulesList from './pages/academic/EvaluationRulesList'
 import AssessmentTypesList from './pages/academic/AssessmentTypesList'
 import DigitalClassDiary from './pages/academic/DigitalClassDiary'
 import LessonPlanning from './pages/academic/LessonPlanning'
+import GradeEntry from './pages/grades/GradeEntry'
 import NotFound from './pages/NotFound'
 import Layout from './components/Layout'
 import PublicLayout from './components/PublicLayout'
@@ -288,10 +288,6 @@ const App = () => (
                                         element={<AssessmentTypesList />}
                                       />
                                       <Route
-                                        path="/avaliacao/lancamento"
-                                        element={<AssessmentInput />}
-                                      />
-                                      <Route
                                         path="/academico/analise-avaliacoes"
                                         element={<EvaluationAnalysis />}
                                       />
@@ -302,6 +298,12 @@ const App = () => (
                                       <Route
                                         path="/academico/planejamento"
                                         element={<LessonPlanning />}
+                                      />
+
+                                      {/* Grades */}
+                                      <Route
+                                        path="/notas/lancamento"
+                                        element={<GradeEntry />}
                                       />
 
                                       {/* Calendar */}

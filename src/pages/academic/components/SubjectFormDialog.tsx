@@ -24,6 +24,7 @@ import { Button } from '@/components/ui/button'
 const subjectSchema = z.object({
   name: z.string().min(2, 'Nome da disciplina é obrigatório'),
   workload: z.coerce.number().min(1, 'Carga horária deve ser maior que 0'),
+  display_order: z.coerce.number().min(0, 'Ordem deve ser maior ou igual a 0').optional(),
 })
 
 interface SubjectFormDialogProps {
@@ -46,6 +47,7 @@ export function SubjectFormDialog({
     defaultValues: {
       name: '',
       workload: 0,
+      display_order: 0,
     },
   })
 
@@ -55,11 +57,13 @@ export function SubjectFormDialog({
         form.reset({
           name: initialData.name,
           workload: initialData.workload || 0,
+          display_order: initialData.display_order || 0,
         })
       } else {
         form.reset({
           name: '',
           workload: 0,
+          display_order: 0,
         })
       }
     }
@@ -110,6 +114,19 @@ export function SubjectFormDialog({
                   <FormLabel>Carga Horária (horas)</FormLabel>
                   <FormControl>
                     <Input type="number" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="display_order"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Ordem de Exibição</FormLabel>
+                  <FormControl>
+                    <Input type="number" placeholder="Ex: 1, 2, 3..." {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>

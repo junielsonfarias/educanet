@@ -35,7 +35,7 @@ import {
   FormDescription,
 } from '@/components/ui/form'
 import { cn } from '@/lib/utils'
-import { classService, academicPeriodService, schoolCourseService, evaluationRulesService } from '@/lib/supabase/services'
+import { classService, schoolCourseService, evaluationRulesService } from '@/lib/supabase/services'
 import type { EducationGrade, SchoolCourseWithDetails, EvaluationRule } from '@/lib/supabase/services'
 import { useTeacherStore } from '@/stores/useTeacherStore.supabase'
 import type { School } from '@/lib/database-types'
@@ -48,7 +48,6 @@ const classFormSchema = z.object({
   capacity: z.coerce.number().min(1, 'Capacidade mínima é 1 aluno').default(35),
   courseId: z.string().min(1, 'Curso/Etapa de Ensino obrigatório'),
   gradeId: z.string().optional(),
-  periodId: z.string().min(1, 'Período acadêmico obrigatório'),
   // Campos do Censo Escolar
   isMultiGrade: z.boolean().default(false),
   educationModality: z.string().optional(),
@@ -57,6 +56,9 @@ const classFormSchema = z.object({
   minStudents: z.coerce.number().min(0).optional(),
   maxDependencySubjects: z.coerce.number().min(0).optional(),
   operatingDays: z.array(z.string()).default(['seg', 'ter', 'qua', 'qui', 'sex']),
+  // Professores
+  homeroomTeacherId: z.string().optional(),
+  assistantTeacherId: z.string().optional(),
   regentTeacherId: z.string().optional(),
   // Campos para criação global (menu admin)
   schoolId: z.string().optional(),
@@ -64,14 +66,6 @@ const classFormSchema = z.object({
 })
 
 type ClassFormData = z.infer<typeof classFormSchema>
-
-interface AcademicPeriod {
-  id: number
-  name: string
-  type: string
-  start_date: string
-  end_date: string
-}
 
 interface ClassFormDialogUnifiedProps {
   open: boolean
@@ -92,7 +86,7 @@ interface ClassFormDialogUnifiedProps {
     school_id?: number
     course_id?: number
     education_grade_id?: number
-    academic_period_id?: number
+    academic_year_id?: number
     is_multi_grade?: boolean
     education_modality?: string
     tipo_regime?: string
@@ -100,6 +94,8 @@ interface ClassFormDialogUnifiedProps {
     min_students?: number
     max_dependency_subjects?: number
     operating_days?: string[]
+    homeroom_teacher_id?: number
+    assistant_teacher_id?: number
     regent_teacher_id?: number
   }
 }
@@ -136,8 +132,6 @@ export function ClassFormDialogUnified({
   // Estado para dados carregados
   const [courses, setCourses] = useState<SchoolCourseWithDetails[]>([])
   const [grades, setGrades] = useState<EducationGrade[]>([])
-  const [allPeriods, setAllPeriods] = useState<AcademicPeriod[]>([])
-  const [filteredPeriods, setFilteredPeriods] = useState<AcademicPeriod[]>([])
   const [evaluationRule, setEvaluationRule] = useState<EvaluationRule | null>(null)
   const [loadingRule, setLoadingRule] = useState(false)
 
@@ -157,7 +151,6 @@ export function ClassFormDialogUnified({
       capacity: 35,
       courseId: '',
       gradeId: '',
-      periodId: '',
       isMultiGrade: false,
       educationModality: '',
       tipoRegime: '',
@@ -165,6 +158,8 @@ export function ClassFormDialogUnified({
       minStudents: 0,
       maxDependencySubjects: 0,
       operatingDays: ['seg', 'ter', 'qua', 'qui', 'sex'],
+      homeroomTeacherId: '',
+      assistantTeacherId: '',
       regentTeacherId: '',
       schoolId: '',
       yearId: '',
@@ -206,7 +201,6 @@ export function ClassFormDialogUnified({
           capacity: editingClass.capacity || 35,
           courseId: editingClass.course_id?.toString() || '',
           gradeId: editingClass.education_grade_id?.toString() || '',
-          periodId: editingClass.academic_period_id?.toString() || '',
           isMultiGrade: editingClass.is_multi_grade || false,
           educationModality: editingClass.education_modality || '',
           tipoRegime: editingClass.tipo_regime || '',
@@ -214,6 +208,8 @@ export function ClassFormDialogUnified({
           minStudents: editingClass.min_students || 0,
           maxDependencySubjects: editingClass.max_dependency_subjects || 0,
           operatingDays: editingClass.operating_days || ['seg', 'ter', 'qua', 'qui', 'sex'],
+          homeroomTeacherId: editingClass.homeroom_teacher_id?.toString() || '',
+          assistantTeacherId: editingClass.assistant_teacher_id?.toString() || '',
           regentTeacherId: editingClass.regent_teacher_id?.toString() || '',
           schoolId: editSchoolId,
           yearId: propAcademicYearId?.toString() || '',
@@ -226,7 +222,6 @@ export function ClassFormDialogUnified({
           capacity: 35,
           courseId: '',
           gradeId: '',
-          periodId: '',
           isMultiGrade: false,
           educationModality: '',
           tipoRegime: '',
@@ -234,6 +229,8 @@ export function ClassFormDialogUnified({
           minStudents: 0,
           maxDependencySubjects: 0,
           operatingDays: ['seg', 'ter', 'qua', 'qui', 'sex'],
+          homeroomTeacherId: '',
+          assistantTeacherId: '',
           regentTeacherId: '',
           schoolId: '',
           yearId: '',
@@ -288,11 +285,8 @@ export function ClassFormDialogUnified({
         form.setValue('yearId', '')
         form.setValue('courseId', '')
         form.setValue('gradeId', '')
-        form.setValue('periodId', '')
         setCourses([])
         setGrades([])
-        setAllPeriods([])
-        setFilteredPeriods([])
       }
     }
   }, [watchedSchoolId, isAdminMode, editingClass, form])
@@ -313,7 +307,6 @@ export function ClassFormDialogUnified({
       setGrades([])
       form.setValue('gradeId', '')
       setEvaluationRule(null)
-      setFilteredPeriods(allPeriods)
     }
   }, [watchedCourseId])
 
@@ -331,16 +324,6 @@ export function ClassFormDialogUnified({
       const coursesData = await schoolCourseService.getCoursesWithGrades(schoolId, yearId)
       setCourses(coursesData || [])
 
-      // Carregar períodos acadêmicos
-      const periodsData = await academicPeriodService.getByAcademicYear(yearId)
-      setAllPeriods(periodsData || [])
-      setFilteredPeriods(periodsData || [])
-
-      // Se editando, selecionar primeiro período se não houver
-      if (!editingClass?.academic_period_id && periodsData && periodsData.length > 0) {
-        form.setValue('periodId', periodsData[0].id.toString())
-      }
-
       // Se editando, carregar séries do curso
       if (editingClass?.course_id && coursesData) {
         const selectedCourse = coursesData.find(c => c.course_id === editingClass.course_id)
@@ -354,7 +337,6 @@ export function ClassFormDialogUnified({
       }
     } catch (error) {
       console.error('Erro ao carregar dados:', error)
-      // Toast desabilitado - React 19 incompatível
     } finally {
       setLoading(false)
     }
@@ -388,28 +370,8 @@ export function ClassFormDialogUnified({
         gradeId ? parseInt(gradeId) : undefined
       )
       setEvaluationRule(rule)
-
-      // Filtrar períodos pelo tipo da regra
-      if (rule?.academic_period_type) {
-        const filtered = allPeriods.filter(p => p.type === rule.academic_period_type)
-        setFilteredPeriods(filtered.length > 0 ? filtered : allPeriods)
-
-        // Verificar se período atual ainda é válido
-        const currentPeriodId = form.getValues('periodId')
-        if (currentPeriodId && filtered.length > 0) {
-          const periodStillValid = filtered.some(p => p.id.toString() === currentPeriodId)
-          if (!periodStillValid) {
-            form.setValue('periodId', filtered[0].id.toString())
-          }
-        } else if (filtered.length > 0 && !currentPeriodId) {
-          form.setValue('periodId', filtered[0].id.toString())
-        }
-      } else {
-        setFilteredPeriods(allPeriods)
-      }
     } catch (error) {
       console.error('Erro ao carregar regra:', error)
-      setFilteredPeriods(allPeriods)
     } finally {
       setLoadingRule(false)
     }
@@ -440,7 +402,7 @@ export function ClassFormDialogUnified({
         code: data.code?.trim() || null,
         school_id: finalSchoolId,
         course_id: parseInt(data.courseId),
-        academic_period_id: parseInt(data.periodId),
+        academic_year_id: finalYearId,
         education_grade_id: data.gradeId ? parseInt(data.gradeId) : null,
         capacity: data.capacity,
         shift: data.shift,
@@ -451,11 +413,13 @@ export function ClassFormDialogUnified({
         min_students: data.minStudents || null,
         max_dependency_subjects: data.maxDependencySubjects || null,
         operating_days: data.operatingDays.length > 0 ? data.operatingDays : null,
+        homeroom_teacher_id: data.homeroomTeacherId ? parseInt(data.homeroomTeacherId) : null,
+        assistant_teacher_id: data.assistantTeacherId ? parseInt(data.assistantTeacherId) : null,
         regent_teacher_id: data.regentTeacherId ? parseInt(data.regentTeacherId) : null,
       }
 
       if (editingClass) {
-        await classService.update(editingClass.id, classData)
+        await classService.updateClass(editingClass.id, classData)
         alert('Turma atualizada com sucesso!')
       } else {
         await classService.createClass({
@@ -715,48 +679,6 @@ export function ClassFormDialogUnified({
                 />
               </div>
 
-              {/* Período Acadêmico */}
-              <FormField
-                control={form.control}
-                name="periodId"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Período Acadêmico *</FormLabel>
-                    <FormControl>
-                      <select
-                        className={selectClassName}
-                        value={field.value || ''}
-                        onChange={(e) => field.onChange(e.target.value)}
-                      >
-                        <option value="">Selecione o período...</option>
-                        {filteredPeriods.map((period) => (
-                          <option key={period.id} value={period.id.toString()}>
-                            {period.name} ({period.type})
-                          </option>
-                        ))}
-                      </select>
-                    </FormControl>
-                    <FormDescription
-                      className={cn(
-                        "text-orange-500",
-                        filteredPeriods.length > 0 && "hidden"
-                      )}
-                    >
-                      Nenhum período acadêmico configurado.
-                    </FormDescription>
-                    <FormDescription
-                      className={cn(
-                        "text-blue-600 flex items-center gap-1",
-                        !(evaluationRule && filteredPeriods.length < allPeriods.length) && "hidden"
-                      )}
-                    >
-                      <Info className="h-3 w-3" />
-                      Períodos filtrados pelo tipo: {evaluationRule?.academic_period_type}
-                    </FormDescription>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
 
               {/* Card de Regra de Avaliação */}
               <div
@@ -931,39 +853,110 @@ export function ClassFormDialogUnified({
                 />
               </div>
 
-              {/* Professor Regente */}
-              <FormField
-                control={form.control}
-                name="regentTeacherId"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Professor Regente</FormLabel>
-                    <FormControl>
-                      <select
-                        className={selectClassName}
-                        value={field.value || ''}
-                        onChange={(e) => field.onChange(e.target.value)}
-                      >
-                        <option value="">Selecione o professor regente (opcional)</option>
-                        {activeTeachers.map((teacher) => {
-                          const teacherName = teacher.person
-                            ? `${teacher.person.first_name} ${teacher.person.last_name}`
-                            : 'Professor'
-                          return (
-                            <option key={teacher.id} value={teacher.id.toString()}>
-                              {teacherName}
-                            </option>
-                          )
-                        })}
-                      </select>
-                    </FormControl>
-                    <FormDescription>
-                      Professor responsável pela turma (opcional).
-                    </FormDescription>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+              {/* Professores */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                {/* Professor Titular */}
+                <FormField
+                  control={form.control}
+                  name="homeroomTeacherId"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Professor Titular</FormLabel>
+                      <FormControl>
+                        <select
+                          className={selectClassName}
+                          value={field.value || ''}
+                          onChange={(e) => field.onChange(e.target.value)}
+                        >
+                          <option value="">Selecione...</option>
+                          {activeTeachers.map((teacher) => {
+                            const teacherName = teacher.person
+                              ? `${teacher.person.first_name} ${teacher.person.last_name}`
+                              : 'Professor'
+                            return (
+                              <option key={teacher.id} value={teacher.id.toString()}>
+                                {teacherName}
+                              </option>
+                            )
+                          })}
+                        </select>
+                      </FormControl>
+                      <FormDescription>
+                        Leciona todas as disciplinas (Anos Iniciais)
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                {/* Professor Assistente */}
+                <FormField
+                  control={form.control}
+                  name="assistantTeacherId"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Professor Assistente</FormLabel>
+                      <FormControl>
+                        <select
+                          className={selectClassName}
+                          value={field.value || ''}
+                          onChange={(e) => field.onChange(e.target.value)}
+                        >
+                          <option value="">Selecione...</option>
+                          {activeTeachers.map((teacher) => {
+                            const teacherName = teacher.person
+                              ? `${teacher.person.first_name} ${teacher.person.last_name}`
+                              : 'Professor'
+                            return (
+                              <option key={teacher.id} value={teacher.id.toString()}>
+                                {teacherName}
+                              </option>
+                            )
+                          })}
+                        </select>
+                      </FormControl>
+                      <FormDescription>
+                        Auxiliar do titular (opcional)
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                {/* Professor Regente */}
+                <FormField
+                  control={form.control}
+                  name="regentTeacherId"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Professor Regente</FormLabel>
+                      <FormControl>
+                        <select
+                          className={selectClassName}
+                          value={field.value || ''}
+                          onChange={(e) => field.onChange(e.target.value)}
+                        >
+                          <option value="">Selecione...</option>
+                          {activeTeachers.map((teacher) => {
+                            const teacherName = teacher.person
+                              ? `${teacher.person.first_name} ${teacher.person.last_name}`
+                              : 'Professor'
+                            return (
+                              <option key={teacher.id} value={teacher.id.toString()}>
+                                {teacherName}
+                              </option>
+                            )
+                          })}
+                        </select>
+                      </FormControl>
+                      <FormDescription>
+                        Responsável pedagógico (opcional)
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
 
               {/* Dias de Funcionamento */}
               <FormField

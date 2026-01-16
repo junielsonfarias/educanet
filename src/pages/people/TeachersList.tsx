@@ -27,7 +27,7 @@ import {
 } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
-import { useTeacherStore } from '@/stores/useTeacherStore.supabase'
+import { useTeacherStore, type TeacherWithAssignments } from '@/stores/useTeacherStore.supabase'
 import { useNavigate } from 'react-router-dom'
 import { TeacherFormDialog } from './components/TeacherFormDialog'
 import type { TeacherFullInfo } from '@/lib/database-types'
@@ -55,7 +55,7 @@ export default function TeachersList() {
   } = useTeacherStore()
   const [searchTerm, setSearchTerm] = useState('')
   const [isDialogOpen, setIsDialogOpen] = useState(false)
-  const [editingTeacher, setEditingTeacher] = useState<TeacherFullInfo | null>(null)
+  const [editingTeacher, setEditingTeacher] = useState<TeacherWithAssignments | null>(null)
   const [deleteId, setDeleteId] = useState<number | null>(null)
 
   const navigate = useNavigate()
@@ -146,7 +146,7 @@ export default function TeachersList() {
     setIsDialogOpen(true)
   }
 
-  const openEditDialog = (teacher: TeacherFullInfo) => {
+  const openEditDialog = (teacher: TeacherWithAssignments) => {
     setEditingTeacher(teacher)
     setIsDialogOpen(true)
   }
@@ -202,7 +202,7 @@ export default function TeachersList() {
                 <TableRow>
                   <TableHead className="w-[80px]">Avatar</TableHead>
                   <TableHead>Nome</TableHead>
-                  <TableHead>Disciplina</TableHead>
+                  <TableHead>Disciplinas / Escolas</TableHead>
                   <TableHead className="hidden md:table-cell">
                     Contato
                   </TableHead>
@@ -233,8 +233,8 @@ export default function TeachersList() {
                     if (!teacher || !teacher.person) return null
                     const fullName = `${teacher.person.first_name || ''} ${teacher.person.last_name || ''}`.trim()
                     const initials = `${teacher.person.first_name?.[0] || ''}${teacher.person.last_name?.[0] || ''}`.toUpperCase()
-                    const isActive = teacher.employment_status === 'active'
-                    
+                    const isActive = teacher.isActive
+
                     return (
                       <TableRow
                         key={teacher.id}
@@ -262,9 +262,29 @@ export default function TeachersList() {
                           </div>
                         </TableCell>
                         <TableCell>
-                          <Badge variant="outline" className="font-normal">
-                            {teacher.school?.name || 'Sem escola'}
-                          </Badge>
+                          <div className="flex flex-col gap-1">
+                            {teacher.subjects.length > 0 ? (
+                              <div className="flex flex-wrap gap-1">
+                                {teacher.subjects.slice(0, 2).map(subject => (
+                                  <Badge key={subject.id} variant="outline" className="font-normal text-xs">
+                                    {subject.name}
+                                  </Badge>
+                                ))}
+                                {teacher.subjects.length > 2 && (
+                                  <Badge variant="secondary" className="font-normal text-xs">
+                                    +{teacher.subjects.length - 2}
+                                  </Badge>
+                                )}
+                              </div>
+                            ) : (
+                              <span className="text-xs text-muted-foreground">Sem disciplinas</span>
+                            )}
+                            {teacher.schools.length > 0 && (
+                              <span className="text-xs text-muted-foreground">
+                                {teacher.schools.map(s => s.name).join(', ')}
+                              </span>
+                            )}
+                          </div>
                         </TableCell>
                         <TableCell className="hidden md:table-cell">
                           <div className="flex flex-col text-sm">
@@ -291,7 +311,7 @@ export default function TeachersList() {
                                 isActive ? 'bg-white' : 'bg-white/80'
                               }`}
                             />
-                            {isActive ? 'Ativo' : 'Inativo'}
+                            {isActive ? 'Ativo' : 'Sem vínculo'}
                           </Badge>
                         </TableCell>
                         <TableCell className="text-right">

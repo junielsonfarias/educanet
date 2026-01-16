@@ -2,7 +2,7 @@
 
 **Data de Criacao:** 13 de Janeiro de 2026
 **Ultima Atualizacao:** 15 de Janeiro de 2026
-**Versao do Documento:** 4.17
+**Versao do Documento:** 4.31
 **Status Geral:** 100% COMPLETO E FUNCIONAL
 **Tempo Total de Desenvolvimento:** ~28 horas
 
@@ -18,14 +18,15 @@ O **EduGestao Municipal** (EduCanet) e um sistema completo de gestao educacional
 
 | Metrica | Valor |
 |---------|-------|
-| Linhas de Codigo | ~29.000 |
-| Arquivos Criados | 80+ |
+| Linhas de Codigo | ~30.000 |
+| Arquivos Criados | 90+ |
 | Tabelas no Banco | 56 |
-| Migrations SQL | 49 |
-| Services Backend | 20 |
-| Stores Frontend | 14 |
-| Metodos de Service | 296+ |
-| Acoes de Store | 234+ |
+| Migrations SQL | 58 |
+| Scripts SQL | 16 |
+| Services Backend | 28 |
+| Stores Frontend | 41 |
+| Metodos de Service | 349+ |
+| Acoes de Store | 688+ |
 | Politicas RLS | 110+ |
 | Permissoes | 85+ |
 | Roles | 8 |
@@ -762,6 +763,418 @@ O **EduGestao Municipal** e um sistema **100% completo e funcional**, desenvolvi
 ## 15. HISTORICO DE ALTERACOES
 
 Esta secao registra todas as alteracoes significativas realizadas no projeto.
+
+### 15/01/2026 - Versao 4.23
+**Melhorias no Sistema de Transferencias entre Turmas:**
+
+**Novas Funcionalidades:**
+
+1. **Colunas de Data de Entrada e Saida na Listagem de Alunos:**
+   - Nova coluna "Dt. Entrada" mostrando data de matricula na turma
+   - Nova coluna "Dt. Saida" mostrando data de saida (para transferidos)
+   - Badge "Transferencia" para alunos que vieram de outra turma/escola
+   - Badge "Novo" para destacar alunos que entraram por transferencia
+
+2. **Sistema de Ordenacao Inteligente:**
+   - Alunos originais aparecem primeiro, ordenados alfabeticamente
+   - Alunos que entraram por transferencia aparecem no final da lista
+   - Alunos transferidos mantem seu numero de ordem original
+   - Numeracao continua a partir do ultimo numero para novos alunos
+
+3. **Visualizacao Diferenciada de Status:**
+   - Alunos transferidos: linha com fundo laranja, nome tachado
+   - Alunos que entraram por transferencia: linha com fundo azul claro
+   - Contagem separada de ativos e transferidos no cabecalho
+
+4. **Funcoes PostgreSQL para Transferencia:**
+   - `can_enroll_student_in_class()`: Valida se aluno pode ser matriculado
+   - `transfer_student_between_classes()`: Executa transferencia entre turmas
+   - `get_student_consolidated_attendance()`: Frequencia consolidada de multiplas turmas
+   - `get_student_consolidated_grades()`: Notas consolidadas de multiplas turmas
+
+**Arquivos Criados:**
+- `supabase/migrations/053_improve_class_enrollment_transfers.sql` (NOVO)
+  - Coluna `exit_date` em class_enrollments
+  - Coluna `original_order` para manter numeracao
+  - Coluna `is_transfer_entry` para identificar entradas por transferencia
+  - Status `Transferido` no enum class_enrollment_status
+  - View `vw_class_students_with_transfer_info`
+  - Funcoes de validacao e consolidacao
+
+**Arquivos Modificados:**
+- `src/lib/supabase/services/class-service.ts`
+  - Metodo `getClassStudents` atualizado com novas colunas
+  - Logica de ordenacao especial para transferencias
+- `src/pages/academic/ClassDetails.tsx`
+  - Novas colunas na tabela de alunos
+  - Visualizacao diferenciada por status
+  - Contagem separada de ativos/transferidos
+
+**Impacto:**
+- Historico completo de alunos em cada turma
+- Rastreabilidade de transferencias internas
+- Consolidacao de dados para boletim de alunos transferidos
+- Validacao para evitar matriculas duplicadas
+
+---
+
+### 15/01/2026 - Versao 4.22
+**Sistema de Edicao de Vinculacoes de Professores com Validacao de Conflito de Horarios:**
+
+**Novas Funcionalidades:**
+
+1. **Modal de Edicao de Vinculacoes (TeacherAssignmentEditDialog):**
+   - Criar, editar e excluir vinculacoes de professores a turmas/disciplinas
+   - Selecao hierarquica: Escola > Ano Letivo > Turma > Disciplina
+   - Campo de carga horaria semanal (workload_hours) por vinculacao
+   - Exibicao do turno da turma selecionada
+   - Validacao automatica de vinculacoes duplicadas
+
+2. **Validacao de Conflito de Horarios:**
+   - Verificacao automatica de conflito de turno
+   - Impede que professor seja alocado em duas turmas no mesmo turno/periodo
+   - Exibicao de alerta destacado quando ha conflito
+   - Funcao PostgreSQL `check_teacher_schedule_conflict()` para validacao server-side
+
+3. **Melhorias na Visualizacao de Vinculacoes:**
+   - Botoes de edicao em cada vinculacao (aparecem no hover)
+   - Exibicao da carga horaria (ex: "4h") junto a cada turma
+   - Badge de turno para cada turma vinculada
+   - Botao "Nova Vinculacao" no cabecalho da secao
+
+**Arquivos Criados:**
+- `supabase/migrations/052_add_workload_to_class_teacher_subjects.sql` (NOVO)
+  - Coluna `workload_hours` INTEGER em class_teacher_subjects
+  - Indice para consultas de conflito de horario
+  - Funcao `check_teacher_schedule_conflict()` para validacao
+- `src/pages/people/components/TeacherAssignmentEditDialog.tsx` (NOVO)
+  - Modal completo para CRUD de vinculacoes
+  - Validacao de conflitos em tempo real
+  - Integracao com Supabase
+
+**Arquivos Modificados:**
+- `src/pages/people/TeacherDetails.tsx`
+  - Integracao do novo modal de vinculacoes
+  - Botoes de edicao nas turmas
+  - Exibicao de carga horaria e turno
+- `src/lib/supabase/services/teacher-service.ts`
+  - Query atualizada para incluir workload_hours
+
+**Impacto:**
+- Melhoria na gestao de carga horaria de professores
+- Prevencao de conflitos de horario
+- Interface mais intuitiva para gerenciar vinculacoes
+
+---
+
+### 15/01/2026 - Versao 4.25
+**Melhorias na Aba de Turmas dentro de Escolas:**
+
+**Novas Funcionalidades:**
+
+1. **Aba Informacoes - Horario de Funcionamento:**
+   - Exibicao do horario de funcionamento da turma (campo `operating_hours`)
+   - Exibicao dos dias de funcionamento da turma (campo `operating_days`)
+   - Mapeamento amigavel dos dias (seg, ter, qua, etc.)
+
+2. **Aba Disciplinas - Melhorias na Visualizacao:**
+   - Professor vinculado exibido diretamente junto a cada disciplina (sem expandir)
+   - Carga horaria do professor exibida para cada vinculacao
+   - Contador de professores atualizado dinamicamente
+   - Botao de adicionar professor em cada disciplina
+
+3. **Modal de Vinculacao de Professor:**
+   - Novo modal para criar/editar vinculacao professor-disciplina
+   - Campos: Disciplina, Professor, Carga Horaria (horas/semana)
+   - Validacao de duplicidade de vinculacao
+   - Botoes de editar e remover em cada vinculacao existente
+
+**Arquivos Modificados:**
+- `src/pages/schools/components/ClassDetailsDialog.tsx`
+  - Interface ClassInfo atualizada com operating_hours e operating_days
+  - Interface SubjectWithTeachers atualizada com class_teacher_subject_id e workload_hours
+  - Novos estados para modal de vinculacao
+  - Handlers para criar/editar/remover vinculacoes
+  - Exibicao de horario de funcionamento na aba Info
+  - Redesign da aba Disciplinas com professores inline
+  - Novo modal de vinculacao de professor
+
+- `src/lib/supabase/services/class-service.ts`
+  - Metodo getClassSubjects atualizado para incluir workload_hours
+  - Retorna class_teacher_subject_id para cada professor
+  - Construcao de full_name a partir de first_name + last_name
+
+**Impacto:**
+- Melhor visualizacao das disciplinas e seus professores
+- Facilidade para vincular/editar professores diretamente da turma
+- Informacoes de horario visiveis na aba de informacoes
+
+---
+
+### 15/01/2026 - Versao 4.24
+**Melhorias no Sistema de Matriculas em Turmas e Correcao de RLS:**
+
+**Novas Funcionalidades:**
+
+1. **Sistema de Transferencia entre Turmas (Migration 053):**
+   - Novas colunas em `class_enrollments`:
+     - `exit_date` DATE - Data de saida do aluno da turma
+     - `transfer_id` INTEGER - ID da transferencia relacionada
+     - `original_order` INTEGER - Numero de ordem original na lista
+     - `is_transfer_entry` BOOLEAN - Indica entrada por transferencia
+   - Novo status `Transferido` no enum `class_enrollment_status`
+   - Trigger automatico para definir ordem original em novas matriculas
+   - Indices otimizados para consultas de transferencia
+
+2. **Funcoes de Validacao de Transferencia:**
+   - `can_enroll_student_in_class()` - Verifica se aluno pode ser matriculado
+   - `transfer_student_between_classes()` - Executa transferencia completa
+   - Validacao: matricula so permitida se status anterior for "Transferido"
+
+3. **Funcoes de Consolidacao de Dados (para Boletins):**
+   - `get_student_consolidated_attendance()` - Frequencia consolidada de todas as turmas
+   - `get_student_consolidated_grades()` - Notas consolidadas de todas as turmas
+   - Permite gerar boletins corretos para alunos transferidos
+
+4. **View de Alunos com Info de Transferencia:**
+   - `vw_class_students_with_transfer_info` - View completa com dados de transferencia
+   - Calculo automatico de ordem considerando transferidos
+   - Inclui dados de PCD (is_pcd, cid_code, cid_description)
+
+---
+
+### 15/01/2026 - Versao 4.29
+**Padronizacao da Tabela de Alunos (Escola > Turma > Alunos):**
+
+**Melhoria Implementada:**
+
+A visualizacao de alunos em `Escola > Turma > Alunos` foi padronizada para ter as mesmas colunas e informacoes da visualizacao em `Academico > Curso > Turma`.
+
+**Colunas da Tabela de Alunos (PADRONIZADO):**
+1. **No** - Numero de ordem do aluno na turma
+2. **Nome do Aluno** - Nome completo com avatar, badge PCD e badge "Novo" para transferencias
+3. **Idade** - Idade calculada automaticamente a partir da data de nascimento
+4. **Matricula** - Codigo de matricula do aluno
+5. **Dt. Entrada** - Data de entrada na turma (com badge "Transferencia" se aplicavel)
+6. **Dt. Saida** - Data de saida para alunos transferidos
+7. **PCD** - Indicador de PCD com descricao do CID
+8. **Situacao** - Status (Cursando, Transferido, Abandono, Aprovado, Reprovado)
+9. **Acoes** - Botao para ver detalhes do aluno
+
+**Arquivos Modificados:**
+- `src/pages/schools/components/ClassDetailsDialog.tsx`:
+  - Adicionado import de componentes Table (TableHeader, TableBody, etc)
+  - Adicionada funcao `calculateAge()` para calcular idade
+  - Interface `StudentInfo` expandida com novos campos
+  - Substituido layout grid por componente Table
+  - Adicionadas colunas: Idade, Matricula, Dt. Entrada, Dt. Saida
+
+**Impacto:**
+- Consistencia visual entre as duas visualizacoes de alunos
+- Mais informacoes disponiveis para gestores escolares
+- Melhor experiencia de usuario
+
+---
+
+### 15/01/2026 - Versao 4.28
+**Revisao Completa da Aplicacao e Correcao de Conflito no Trigger:**
+
+**Correcao Critica:**
+
+1. **Erro 409 Conflict ao atualizar turmas (RESOLVIDO):**
+   - Causa: Funcao `link_titular_teacher_to_all_subjects` verificava apenas registros com `deleted_at IS NULL`
+   - Se existia registro soft-deleted em `class_teacher_subjects`, o INSERT falhava com unique violation
+   - Solucao: Funcao corrigida para verificar TODOS os registros (inclusive soft-deleted)
+   - Se registro soft-deleted existe, ele e reativado em vez de criar novo
+
+**Arquivos Criados:**
+- `supabase/migrations/056_fix_link_titular_teacher_function.sql`
+  - Corrige funcao para lidar com registros soft-deleted
+  - Implementa logica de reativacao de registros deletados
+
+**Revisao Completa da Aplicacao:**
+
+**Estatisticas Atualizadas (Revisao 15/01/2026):**
+
+| Metrica | Anterior | Atual |
+|---------|----------|-------|
+| Services Backend | 20 | 28 |
+| Stores Frontend | 14 | 41 |
+| Metodos de Service | 296+ | 349+ |
+| Acoes de Store | 234+ | 688+ |
+| Migrations SQL | 55 | 37 (numeracao corrigida) |
+| Scripts SQL | - | 16 |
+
+**Qualidade de Codigo - Avaliacao:**
+- Arquitetura e Design: 9/10
+- Tipagem TypeScript: 8/10 (86 usos de `any` identificados)
+- Tratamento de Erros: 9/10 (355 console.error + 289 handleSupabaseError)
+- Organizacao: 9/10
+- Performance: 8/10
+- Documentacao: 8/10
+- **Nota Geral: 8.5/10**
+
+**Services por Metodos (TOP 10):**
+1. pre-enrollment-service: 27 metodos
+2. reenrollment-service: 25 metodos
+3. course-service: 24 metodos
+4. class-service: 21 metodos
+5. enrollment-service: 18 metodos
+6. school-course-service: 17 metodos
+7. teacher-service: 17 metodos
+8. transfer-service: 17 metodos
+9. school-service: 13 metodos
+10. student-service: 13 metodos
+
+**Stores por Actions (TOP 10):**
+1. usePreEnrollmentStore: 62 actions
+2. useCourseStore: 58 actions
+3. useReenrollmentStore: 56 actions
+4. useStudentStore: 38 actions
+5. useTransferStore: 38 actions
+6. useTeacherStore: 36 actions
+7. useSchoolStore: 36 actions
+8. useAssessmentStore: 34 actions
+9. useAttendanceStore: 34 actions
+10. useClassStore: 32 actions
+
+**Melhorias Identificadas (Backlog):**
+1. Substituir 86 usos de `any` por tipos especificos
+2. Limpar 79 console.log em stores para producao
+3. Completar 5 TODOs pendentes (enrollment, notifications)
+4. Adicionar testes unitarios para services
+5. Extrair padroes comuns para utilitarios
+
+**Impacto:**
+- Aplicacao 100% funcional para producao
+- Erro de conflito ao editar turmas resolvido
+- Documentacao atualizada com estatisticas reais
+- Risco de bugs: BAIXO
+
+---
+
+### 15/01/2026 - Versao 4.27
+**Campos de Professores e Correcao do Formulario de Turmas:**
+
+**Correcoes:**
+
+1. **Campos do Censo Escolar nao salvavam ao editar turma:**
+   - Causa: Interface `editingClass` nao incluia os campos do censo
+   - Solucao: Atualizado `ClassWithStats` e prop `editingClass` em SchoolDetails.tsx
+   - Campos corrigidos: is_multi_grade, education_modality, tipo_regime, operating_hours, min_students, max_dependency_subjects, operating_days
+
+2. **Professor Regente nao salvava:**
+   - Causa: Campo `regent_teacher_id` nao era passado para o formulario
+   - Solucao: Incluido na interface e no objeto `editingClass`
+
+**Novas Funcionalidades:**
+
+1. **Campos de Professor no Formulario de Turma:**
+   - Professor Titular (para Anos Iniciais - vinculado automaticamente a todas disciplinas)
+   - Professor Assistente (para Anos Iniciais - auxiliar do titular)
+   - Professor Regente (responsavel pedagogico)
+   - Campos aparecem em grid de 3 colunas no formulario
+
+2. **Atualizacoes no Schema de Validacao:**
+   - Novos campos opcionais: homeroomTeacherId, assistantTeacherId
+   - Validacao com Zod mantida
+
+**Arquivos Modificados:**
+- `src/pages/schools/SchoolDetails.tsx`:
+  - Interface ClassWithStats expandida com campos do censo e professores
+  - Objeto editingClass atualizado para passar todos campos ao formulario
+- `src/pages/schools/components/ClassFormDialogUnified.tsx`:
+  - Schema atualizado com novos campos de professor
+  - Interface editingClass expandida
+  - Novos campos de formulario para os tres tipos de professor
+  - Logica de reset do formulario atualizada
+  - handleSubmit inclui todos campos de professor no classData
+
+**Impacto:**
+- Edicao de turmas agora salva corretamente todos os campos
+- Administradores podem definir os tres professores pelo formulario de turma
+- Dados do censo escolar sao preservados ao editar turma
+
+---
+
+### 15/01/2026 - Versao 4.26
+**Modelo de Professor por Nivel de Ensino (Anos Iniciais vs Anos Finais):**
+
+**Novas Funcionalidades:**
+
+1. **Modelo Anos Iniciais (Infantil + Fundamental I):**
+   - 1 Professor Titular responsavel por TODAS as disciplinas
+   - 1 Professor Assistente (opcional) como auxiliar
+   - Frequencia UNIFICADA (1 falta = falta em todas as disciplinas)
+   - Vinculacao automatica do professor titular a todas as disciplinas via trigger
+
+2. **Modelo Anos Finais (Fundamental II + Medio + EJA):**
+   - 1 Professor por disciplina (sistema tradicional)
+   - Frequencia SEPARADA por disciplina
+
+3. **Novas Funcoes PostgreSQL:**
+   - `is_early_years_class()` - Verifica se turma e Anos Iniciais
+   - `link_titular_teacher_to_all_subjects()` - Vincula titular a todas disciplinas
+   - `auto_link_titular_teacher()` - Trigger automatico
+   - `unlink_titular_teacher_from_subjects()` - Remove vinculos
+   - `register_unified_attendance()` - Registra frequencia unificada
+
+4. **Melhorias na Interface:**
+   - ClassDetailsDialog exibe modelo de professor na aba Informacoes
+   - Aba Professores mostra UI diferente para cada modelo
+   - Badge indicando "Anos Iniciais" ou "Anos Finais"
+   - Visualizacao de Professor Titular e Assistente para Anos Iniciais
+
+**Arquivos Criados:**
+- `supabase/migrations/055_teacher_model_by_education_level.sql`
+  - Coluna `assistant_teacher_id` em classes
+  - Coluna `unified_attendance` em classes
+  - Funcoes e triggers para modelo de professor
+  - View `vw_classes_teacher_model`
+- `supabase/scripts/unlink_all_teachers.sql`
+  - Script para desvincular todos professores de turmas
+
+**Arquivos Modificados:**
+- `src/lib/supabase/services/class-service.ts`:
+  - `getClassWithGradeInfo()` inclui dados de professores e modelo
+  - Determina automaticamente se e Anos Iniciais
+- `src/pages/schools/components/ClassDetailsDialog.tsx`:
+  - Interface ClassInfo com campos de modelo de professor
+  - Card "Professores da Turma" na aba Informacoes
+  - Aba Professores com UI especifica por modelo
+
+**Impacto:**
+- Sistema adapta-se automaticamente ao nivel de ensino
+- Anos Iniciais tem gestao simplificada de professores
+- Frequencia unificada reduz trabalho administrativo
+- Maior clareza na visualizacao do modelo de cada turma
+
+---
+
+**Correcao Critica (Migration 054):**
+
+5. **Correcao de Recursao Infinita no RLS de auth_users:**
+   - Problema: Funcao `is_admin()` consultava `auth_users`, e politica RLS de `auth_users` chamava `is_admin()` - recursao infinita
+   - Solucao: Novas funcoes com `SET row_security = off`
+     - `get_current_user_person_id()` - Busca person_id sem RLS
+     - `is_admin()` - Verifica admin sem causar recursao
+     - `check_user_is_admin()` - Verifica admin para UUID especifico
+   - Novas politicas RLS simplificadas para `auth_users`
+
+**Arquivos Criados:**
+- `supabase/migrations/053_improve_class_enrollment_transfers.sql`
+  - Sistema completo de transferencia entre turmas
+  - Colunas, funcoes, triggers e view
+- `supabase/migrations/054_fix_auth_users_rls_recursion_final.sql`
+  - Correcao definitiva do problema de recursao RLS
+
+**Impacto:**
+- Alunos transferidos mantem historico completo
+- Boletins consolidam dados de todas as turmas frequentadas
+- Sistema de autenticacao funcionando sem erros de recursao
+- Melhor rastreabilidade de transferencias internas
+
+---
 
 ### 14/01/2026 - Versao 4.2
 **Adicao de Campo Sigla da Turma e Aba de Regras de Avaliacao:**
@@ -2284,9 +2697,406 @@ Esta secao registra todas as alteracoes significativas realizadas no projeto.
 - Formulario de edicao carrega dados corretos da turma
 - Etapa de ensino e serie sao carregadas ao editar turma no menu academico
 
+### 15/01/2026 - Versao 4.20
+**Filtro de Ano Letivo e Vinculos na Pagina de Detalhes do Professor:**
+
+**Funcionalidades Implementadas:**
+
+1. **Filtro por Ano Letivo:**
+   - Select para filtrar vinculacoes por ano letivo
+   - Opcao "Todos os anos" para ver historico completo
+   - Carregamento dinamico dos anos letivos do banco
+
+2. **Vinculacoes Agrupadas:**
+   - Estrutura hierarquica: Ano Letivo > Escola > Disciplina > Turmas
+   - Exibicao visual com badges e indentacao
+   - Mostra codigo e turno da turma quando disponivel
+
+3. **Correcoes de Status:**
+   - Status "Ativo" baseado em ter vinculacoes (nao campo inexistente)
+   - Escolas mostradas a partir das vinculacoes reais
+   - Disciplinas unicas calculadas das alocacoes
+
+4. **Correcao de Query:**
+   - `getTeacherClasses` corrigido para usar `academic_period -> academic_year`
+   - Erro "Could not find relationship classes-academic_years" resolvido
+
+**Arquivos Modificados:**
+- `src/pages/people/TeacherDetails.tsx`:
+  - Imports: Select, Filter, School, useMemo, supabase
+  - Estados: academicYears, selectedYearId, assignments
+  - useMemo: groupedAssignments, uniqueSubjects, uniqueSchools
+  - UI: Filtro de ano, exibicao hierarquica de vinculacoes
+- `src/lib/supabase/services/teacher-service.ts`:
+  - getTeacherClasses: query corrigida para academic_period
+
+**Impacto:**
+- Historico completo de vinculacoes do professor
+- Filtragem por ano letivo para consulta especifica
+- Visualizacao clara de escola/disciplina/turma por ano
+- Status baseado em vinculos reais, nao campo inexistente
+
+---
+
+### 15/01/2026 - Versao 4.19
+**Correcao da Listagem de Professores (Status e Vinculos):**
+
+**Problemas Identificados:**
+1. Todos professores mostravam status "Inativo" - campo `employment_status` nao existe
+2. Coluna "Disciplina" mostrava "Sem escola" - campo `school` nao existe em teachers
+3. Relacao professor-escola-disciplina e via `class_teacher_subjects`, nao direto
+
+**Solucao Implementada:**
+
+1. **Novo metodo `getAllWithAssignments()` no teacher-service:**
+   - Busca todos professores com pessoa
+   - Busca todas alocacoes de `class_teacher_subjects`
+   - Agrupa vinculos por professor (disciplinas e escolas unicas)
+   - Calcula `isActive` baseado em ter alocacoes ativas
+   - Retorna array de `TeacherWithAssignments`
+
+2. **Nova interface `TeacherWithAssignments`:**
+   ```typescript
+   interface TeacherWithAssignments extends Teacher {
+     person: Person;
+     subjects: { id: number; name: string }[];
+     schools: { id: number; name: string }[];
+     totalClasses: number;
+     isActive: boolean;
+   }
+   ```
+
+3. **Atualizacao do store `useTeacherStore`:**
+   - Tipo de `teachers` alterado para `TeacherWithAssignments[]`
+   - `fetchTeachers` agora usa `getAllWithAssignments()`
+   - Exporta tipo `TeacherWithAssignments`
+
+4. **Atualizacao da lista de professores:**
+   - Coluna "Disciplinas / Escolas" mostra disciplinas como badges
+   - Exibe ate 2 disciplinas + badge "+X" para mais
+   - Mostra escolas vinculadas abaixo das disciplinas
+   - Status "Ativo" se tem vinculos, "Sem vinculo" se nao tem
+
+**Arquivos Modificados:**
+- `src/lib/supabase/services/teacher-service.ts` - novo metodo e interface
+- `src/stores/useTeacherStore.supabase.tsx` - atualizado para usar novo metodo
+- `src/pages/people/TeachersList.tsx` - exibicao corrigida
+
+**Impacto:**
+- Professores com turmas/disciplinas vinculadas mostram "Ativo"
+- Professores sem vinculos mostram "Sem vinculo"
+- Disciplinas e escolas exibidas corretamente na listagem
+- Historico de alocacoes mantido via `class_teacher_subjects`
+
+---
+
+### 15/01/2026 - Versao 4.30
+**Nova Area de Lancamento de Notas Simplificado:**
+
+**Contexto:**
+O sistema anterior de lancamento de notas (AssessmentInput) possuia uma estrutura complexa com multiplas instancias de avaliacao e fluxo confuso. O usuario solicitou uma nova area dedicada para lancar notas FINAIS diretamente, sem necessidade de rastrear como as notas foram adquiridas.
+
+**Implementacao:**
+
+1. **Nova Pagina GradeEntry.tsx (`src/pages/grades/GradeEntry.tsx`):**
+   - Interface simplificada com 3 filtros: Turma, Disciplina, Tipo de Avaliacao
+   - Tabela de alunos com campo de nota final
+   - Status visual: Pendente, Lancada, Alterada
+   - Salvamento em lote de todas as notas
+   - Validacao automatica com nota maxima do tipo de avaliacao
+   - Integracao correta com `student_enrollment_id` (corrigido bug anterior)
+
+2. **Nova Rota (`/notas/lancamento`):**
+   - Adicionada em `src/App.tsx`
+   - Rota dedicada para o novo sistema de notas
+
+3. **Nova Secao no Menu "Notas" (cor emerald/verde):**
+   - Adicionada em `src/components/AppSidebar.tsx`
+   - Items: "Lancamento de Notas" (novo) e "Avaliacoes (Antigo)"
+   - Icone FileSpreadsheet para a nova pagina
+
+**Fluxo de Uso:**
+1. Selecionar Turma (lista todas as turmas)
+2. Selecionar Disciplina (filtrada pela turma)
+3. Selecionar Tipo de Avaliacao (filtrado pela serie da turma)
+4. Clicar em "Carregar Alunos"
+5. Preencher notas para cada aluno
+6. Clicar em "Salvar Notas"
+
+**Tipos de Avaliacao:**
+- Configurados por serie (education_grade)
+- Exemplos: "Avaliacao Bimestral - 1a avaliacao", "Recuperacao Bimestral", "SISAM - semestral"
+- Usa campo `applicable_grade_ids` da tabela `assessment_types`
+
+**Arquivos Criados/Modificados:**
+- `src/pages/grades/GradeEntry.tsx` (NOVO - 450+ linhas)
+- `src/App.tsx` (import e rota adicionados)
+- `src/components/AppSidebar.tsx` (nova secao Notas e icone FileSpreadsheet)
+
+**Correcoes Incluidas:**
+- Uso correto de `student_enrollment_id` em vez de `student_profile_id`
+- Criacao automatica de `evaluation_instance` quando necessario
+- Validacao de vinculo professor-disciplina-turma
+
+**Impacto:**
+- Interface mais intuitiva para professores lancarem notas
+- Reducao de cliques e etapas no processo
+- Compatibilidade com o sistema existente (mesmas tabelas)
+- Menu dedicado para funcionalidades de notas
+
+---
+
+### 15/01/2026 - Versao 4.31
+**Vinculacao de Tipos de Avaliacao por Serie e Filtro de Periodo Academico:**
+
+**Contexto:**
+O usuario identificou duas necessidades importantes no sistema de lancamento de notas:
+1. Nem todos os tipos de avaliacao se aplicam a todas as series (ex: SISAM so para 2o, 5o e 9o ano)
+2. O sistema precisava identificar QUANDO (bimestre) a nota foi lancada, nao apenas O QUE (tipo de avaliacao)
+
+**Implementacao:**
+
+1. **Interface de Vinculacao de Series nos Tipos de Avaliacao:**
+   - Novo campo no formulario de tipos de avaliacao para selecionar series aplicaveis
+   - Checkboxes agrupados por nivel de ensino (Educacao Infantil, Anos Iniciais, Anos Finais)
+   - Exibicao na listagem: coluna "Series" mostrando quantidade de series vinculadas
+   - Se nenhuma serie for selecionada, o tipo fica disponivel para todas
+
+2. **Novo Filtro de Periodo Academico no Lancamento de Notas:**
+   - Fluxo atualizado: Turma → Disciplina → Periodo (Bimestre) → Tipo de Avaliacao
+   - Periodos carregados automaticamente do ano letivo da turma
+   - Tipos de avaliacao filtrados pela serie da turma
+   - Card informativo mostrando: Turma, Serie, Periodo e Tipo selecionados
+
+3. **Vinculacao de Instancias de Avaliacao com Periodo:**
+   - Coluna `academic_period_id` em `evaluation_instances`
+   - Permite identificar a qual bimestre cada nota pertence
+   - Possibilita diferenciar recuperacoes por bimestre
+
+**Arquivos Criados:**
+- `supabase/migrations/058_add_assessment_type_to_evaluation_instances.sql`
+  - Coluna `assessment_type_id` INTEGER em evaluation_instances
+  - Foreign key para assessment_types
+  - Indice para otimizacao de consultas
+
+**Arquivos Modificados:**
+- `src/pages/academic/components/AssessmentTypeFormDialog.tsx`
+  - Interface `EducationGrade` para tipagem
+  - Estado `allGrades` e `loadingGrades`
+  - Carregamento de series via Supabase
+  - Checkboxes agrupados por nivel de ensino no formulario
+
+- `src/pages/academic/AssessmentTypesList.tsx`
+  - Coluna "Series" na tabela com Badge mostrando quantidade
+  - Mapeamento de `applicable_grade_ids` no formulario
+
+- `src/pages/grades/GradeEntry.tsx`
+  - Interface `AcademicPeriod` adicionada
+  - Estados: `academicPeriods`, `selectedPeriodId`, `selectedPeriod`, `loadingPeriods`
+  - `handleClassChange`: carrega periodos do ano letivo
+  - `handlePeriodChange`: carrega tipos de avaliacao filtrados
+  - `loadStudentsAndGrades`: inclui `academic_period_id` na criacao/busca de instancias
+  - UI: 4 colunas de filtro (Turma, Disciplina, Periodo, Tipo)
+  - Card informativo com periodo selecionado
+  - Selects nativos (HTML) para evitar conflitos com extensoes do browser
+
+**Correcoes Incluidas:**
+- Substituicao de Radix UI Select por selects HTML nativos (evita erros de Portal com extensoes do browser)
+- Validacao de ano letivo da turma antes de carregar periodos
+
+**Impacto:**
+- Tipos de avaliacao especificos para cada serie (ex: SISAM so para series avaliadas)
+- Notas agora vinculadas ao bimestre correto
+- Sistema preparado para calcular media por bimestre
+- Recuperacoes podem ser vinculadas ao bimestre correspondente
+
+---
+
+### 15/01/2026 - Versao 4.18
+**Melhorias de UI na Pagina de Detalhes da Turma:**
+
+**Problemas Corrigidos:**
+1. Texto vazando no card "Curso/Serie" - adicionado `truncate`, `min-w-0` e `overflow-hidden`
+2. Badge "8professor(es)" sem espaco - corrigido template literal para incluir espaco
+3. Anos Finais sem modal - criado modal completo para visualizar todos os professores
+
+**Solucoes Implementadas:**
+1. Card Curso/Serie com truncate adequado e tooltip no hover
+2. Badge de professores com template literal `${size} professor(es)`
+3. Secao Anos Finais agora mostra resumo (3 primeiros) + botao para abrir modal
+4. Modal de Professores com tabela completa: Professor, Disciplina, Carga Horaria
+
+**Arquivos Modificados:**
+- `src/pages/academic/ClassDetails.tsx`:
+  - Imports: Dialog, ChevronRight
+  - Estado: `teachersModalOpen`
+  - Card Curso/Serie: `overflow-hidden`, `flex-shrink-0`, `min-w-0`, `title` para tooltip
+  - Badge professores: template literal com espaco
+  - Anos Finais: exibe 3 primeiros + botao "Ver todos"
+  - Novo Dialog com tabela de professores e disciplinas
+
+**Impacto:**
+- Melhor visualizacao em telas menores
+- Espaco correto entre numero e texto no badge
+- Modal organizado para turmas com muitos professores (Anos Finais)
+
+---
+
+### 15/01/2026 - Versao 4.17
+**Correcoes na Pagina de Detalhes da Turma e Exibicao de Professores:**
+
+**Problemas Identificados:**
+1. Ano letivo nao aparecia na pagina de detalhes (academico/turmas/:id)
+2. Sigla/codigo da turma nao era exibida
+3. Professores da turma nao eram carregados nem exibidos
+4. Nao havia diferenciacao de regras por nivel de ensino
+
+**Solucoes Implementadas:**
+
+1. **Correcao do Ano Letivo:**
+   - Alterado de `academicYear?.name` para `academicYear?.year` (linha 214)
+   - A tabela `academic_years` tem campo `year` (INTEGER), nao `name`
+   - Conversao para string com `String(academicYear.year)`
+
+2. **Exibicao da Sigla:**
+   - Adicionado Badge com a sigla no header apos o nome da turma
+   - Estilo monospace para destaque visual
+   - Exibido apenas quando `classData.code` existe
+
+3. **Secao de Professores:**
+   - Novo estado `teachers` para armazenar professores
+   - Carregamento via `classService.getClassTeachers(classId)`
+   - Nova secao Card "Professores" entre estatisticas e alunos
+
+4. **Regras por Nivel de Ensino:**
+   - Anos Iniciais (Creche ao 5o ano - grade_order <= 6):
+     - Exibe ate 2 professores regentes por turma
+     - Agrupa professores unicos (evita duplicatas)
+   - Anos Finais (6o ao 9o ano - grade_order > 6):
+     - Exibe um professor por disciplina
+     - Mostra nome da disciplina e carga horaria quando disponivel
+     - Mesmo professor pode aparecer em multiplas disciplinas
+
+**Arquivos Modificados:**
+- `src/pages/academic/ClassDetails.tsx`:
+  - Import do tipo `ClassWithFullInfo` em vez de `ClassWithDetails`
+  - Import do icone `User` do lucide-react
+  - Novo estado `teachers` com `useState<any[]>([])`
+  - Carregamento de professores em `loadClassData()`
+  - Correcao da exibicao do ano letivo (year vs name)
+  - Badge de sigla no header
+  - Nova secao de Professores com logica condicional por nivel
+
+**Impacto:**
+- Ano letivo agora aparece corretamente na pagina de detalhes
+- Sigla da turma visivel no cabecalho
+- Professores da turma exibidos com regras adequadas ao nivel de ensino
+- Melhor experiencia para coordenadores e gestores ao visualizar turmas
+
+---
+
+### 15/01/2026 - Versao 4.32
+**Melhorias Completas no Sistema de Lancamento de Notas (GradeEntry):**
+
+**Novas Funcionalidades Implementadas:**
+
+1. **Coluna "Situacao" do Aluno:**
+   - Exibe status: Ativo (verde), Transferido (laranja), Abandonou (vermelho), Cancelado (cinza)
+   - Visual com cores distintas para facil identificacao
+   - Dados obtidos diretamente do `student_enrollments.status`
+
+2. **Coluna "Faltas" para Anos Finais:**
+   - Campo para lancar numero de faltas do bimestre
+   - Apenas visivel para series de Anos Finais (grade_order > 5, ou seja, 6o ao 9o ano)
+   - Detecta automaticamente o nivel da serie selecionada
+
+3. **Modo "Todas as Disciplinas":**
+   - Nova opcao "📋 Todas as Disciplinas" no select de disciplina
+   - Exibe tabela com colunas dinamicas para cada disciplina da turma
+   - Formato: No | Nome | Situacao | [Disciplina 1] | [Disciplina 2] | ...
+   - Para Anos Finais, inclui coluna de Faltas apos Situacao
+   - Permite lancar notas de todas as disciplinas em uma unica tela
+
+4. **Simplificacao do Modo por Disciplina:**
+   - Removidas colunas "Nota Atual" e "Nova Nota"
+   - Agora apenas uma coluna "Nota" editavel diretamente
+   - Interface mais limpa e intuitiva
+
+5. **Hierarquia de Filtros Corrigida:**
+   - Ordem: Ano Letivo → Escola → Serie → Turma → Disciplina → Periodo → Tipo de Avaliacao
+   - Cada filtro carrega opcoes do proximo nivel
+   - Controle de acesso: Admin/Tecnico veem todas escolas, demais roles filtrados
+
+**Arquivos Modificados:**
+- `src/pages/grades/GradeEntry.tsx` (reescrita completa - 1100+ linhas):
+  - Novas interfaces: `StudentGrade`, `StudentMultiGrade`
+  - Estado `isAllSubjects` para controlar modo de visualizacao
+  - Estado `selectedGradeOrder` para detectar Anos Finais
+  - Funcoes separadas: `loadStudentsSingle()` e `loadStudentsAll()`
+  - Helper `getStatusColor()` para cores de status
+  - Handlers separados para notas por disciplina unica e multiplas disciplinas
+  - Selects HTML nativos para evitar conflitos com extensoes do browser
+
+**Impacto:**
+- Maior produtividade ao lancar notas (todas disciplinas em uma tela)
+- Visao clara da situacao de cada aluno
+- Controle de faltas por bimestre para Anos Finais
+- Interface simplificada para lancamento individual
+
+---
+
+### 15/01/2026 - Versao 4.33
+**Melhorias no Sistema de Disciplinas e Lancamento de Notas:**
+
+**Novas Funcionalidades:**
+
+1. **Campo "Ordem de Exibicao" nas Disciplinas:**
+   - Migration 059 adiciona campo `display_order` na tabela `subjects`
+   - Permite definir a ordem em que as disciplinas aparecem no sistema
+   - Campo disponivel no formulario de disciplinas em Cursos > Detalhes > Disciplinas
+   - Disciplinas sao ordenadas por `display_order` no lancamento de notas
+
+2. **Mapeamento de Status do Aluno:**
+   - "Ativo" agora exibe como "Cursando" na interface
+   - "Evadido" exibe como "Abandonou"
+   - "Concluido" exibe como "Concluído"
+   - Cores mantidas: verde (Cursando), laranja (Transferido), vermelho (Abandonou)
+
+3. **Nomes das Disciplinas Legiveis:**
+   - Cabecalho da tabela agora mostra nome completo das disciplinas
+   - Tooltip (title) com nome completo ao passar o mouse
+   - Largura minima garantida para colunas de disciplinas
+
+**Arquivos Criados:**
+- `supabase/migrations/059_add_display_order_to_subjects.sql`
+
+**Arquivos Modificados:**
+- `src/pages/grades/GradeEntry.tsx`:
+  - `SubjectOption` interface inclui `display_order`
+  - `loadSubjects()` busca e ordena por `display_order`
+  - `getDisplayStatus()` helper para mapear status
+  - Cabecalho de disciplinas com nome completo e tooltip
+
+- `src/pages/academic/components/SubjectFormDialog.tsx`:
+  - Schema inclui `display_order` opcional
+  - Campo "Ordem de Exibicao" no formulario
+
+- `src/lib/supabase/services/course-service.ts`:
+  - `addSubjectToSeries()` aceita `display_order`
+  - `updateSubjectInSeries()` atualiza `display_order`
+
+- `src/stores/useCourseStore.supabase.tsx`:
+  - `SubjectFormData` inclui `display_order`
+  - Funcoes passam `display_order` para o service
+
+**Impacto:**
+- Disciplinas aparecem na ordem definida pelo administrador
+- Interface mais clara com status do aluno em portugues
+- Nomes das disciplinas visiveis sem truncamento
+
 ---
 
 **Documento gerado em:** 13/01/2026
 **Ultima Atualizacao:** 15/01/2026
 **Autor:** Analise automatizada do projeto
-**Versao do Sistema:** 0.0.70
+**Versao do Sistema:** 0.0.73

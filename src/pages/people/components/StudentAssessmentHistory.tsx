@@ -57,37 +57,36 @@ export function StudentAssessmentHistory({
   periods,
 }: StudentAssessmentHistoryProps) {
   // Flatten and link recovery assessments
+  // Mostrar todas as avaliações (regulares e recuperação)
   const historyData = (assessments || [])
-    .filter((a) => (a.category || 'regular') === 'regular') // Base list on regular assessments
     .map((assessment) => {
       const type = (assessmentTypes || []).find(
-        (t) => t.id === assessment.assessmentTypeId,
+        (t) => String(t.id) === String(assessment.assessmentTypeId),
       )
-      const subject = subjects.find((s) => 
-        s.id?.toString() === assessment.subjectId?.toString()
+      const subject = subjects.find((s) =>
+        String(s.id) === String(assessment.subjectId)
       )
-      const period = periods.find((p) => 
-        p.id?.toString() === assessment.periodId?.toString()
+      const period = periods.find((p) =>
+        String(p.id) === String(assessment.periodId)
       )
 
-      // Find linked recovery
-      const recovery = assessments.find(
-        (r) => r.relatedAssessmentId?.toString() === assessment.id?.toString(),
-      )
+      // Determinar se é recuperação
+      const isRecovery = assessment.category === 'recuperation' ||
+        (assessment as any).isRecovery === true
 
       return {
         id: assessment.id,
         date: assessment.date,
         subjectName: subject?.name || 'Disciplina Desconhecida',
         periodName: period?.name || 'Período Desconhecido',
-        typeName: type?.name || 'Avaliação',
+        typeName: type?.name || (assessment as any).evaluationTitle || 'Avaliação',
         originalGrade: Number(assessment.value) || 0,
-        recoveryGrade: recovery ? Number(recovery.value) : null,
-        recoveryDate: recovery ? recovery.date : null,
-        finalGrade: recovery
-          ? Math.max(Number(assessment.value) || 0, Number(recovery.value) || 0) // Assuming standard strategy for display
-          : Number(assessment.value) || 0,
-        isRecovered: !!recovery,
+        recoveryGrade: null, // Agora mostramos recuperação como linha separada
+        recoveryDate: null,
+        finalGrade: Number(assessment.value) || 0,
+        isRecovered: false,
+        isRecoveryAssessment: isRecovery,
+        category: assessment.category || 'regular',
       }
     })
     .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
@@ -135,7 +134,14 @@ export function StudentAssessmentHistory({
             </TableHeader>
             <TableBody>
               {historyData.map((item) => (
-                <TableRow key={item.id} className="hover:bg-muted/50">
+                <TableRow
+                  key={item.id}
+                  className={`hover:bg-muted/50 ${
+                    item.isRecoveryAssessment
+                      ? 'bg-orange-50/50'
+                      : ''
+                  }`}
+                >
                   <TableCell>
                     {format(parseISO(item.date), 'dd/MM/yyyy')}
                   </TableCell>
@@ -143,52 +149,48 @@ export function StudentAssessmentHistory({
                     {item.subjectName}
                   </TableCell>
                   <TableCell>{item.periodName}</TableCell>
-                  <TableCell>{item.typeName}</TableCell>
+                  <TableCell>
+                    <div className="flex items-center gap-2">
+                      {item.typeName}
+                      {item.isRecoveryAssessment && (
+                        <Badge
+                          variant="outline"
+                          className="bg-orange-100 text-orange-700 border-orange-200 text-xs"
+                        >
+                          Rec
+                        </Badge>
+                      )}
+                    </div>
+                  </TableCell>
                   <TableCell className="text-center">
-                    <span
-                      className={
-                        item.isRecovered
-                          ? 'line-through text-muted-foreground'
-                          : ''
-                      }
-                    >
+                    <span className={item.isRecoveryAssessment ? 'text-orange-700 font-medium' : ''}>
                       {item.originalGrade.toFixed(1)}
                     </span>
                   </TableCell>
                   <TableCell className="text-center">
-                    {item.recoveryGrade !== null ? (
-                      <div className="flex flex-col items-center">
-                        <Badge
-                          variant="outline"
-                          className="bg-orange-50 text-orange-700 border-orange-200"
-                        >
-                          {item.recoveryGrade.toFixed(1)}
-                        </Badge>
-                        <span className="text-[10px] text-muted-foreground mt-1">
-                          {item.recoveryDate
-                            ? format(parseISO(item.recoveryDate), 'dd/MM')
-                            : ''}
-                        </span>
-                      </div>
+                    {item.isRecoveryAssessment ? (
+                      <Badge
+                        variant="outline"
+                        className="bg-orange-50 text-orange-700 border-orange-200"
+                      >
+                        Substituir menor
+                      </Badge>
                     ) : (
                       '-'
                     )}
                   </TableCell>
                   <TableCell className="text-center font-bold">
-                    <div className="flex items-center justify-center gap-2">
-                      {item.isRecovered && (
-                        <ArrowRight className="h-3 w-3 text-muted-foreground" />
-                      )}
-                      <span
-                        className={
-                          item.isRecovered
-                            ? 'text-green-600'
-                            : 'text-foreground'
-                        }
-                      >
-                        {item.finalGrade.toFixed(1)}
-                      </span>
-                    </div>
+                    <span
+                      className={
+                        item.finalGrade >= 7
+                          ? 'text-green-600'
+                          : item.finalGrade >= 5
+                            ? 'text-yellow-600'
+                            : 'text-red-600'
+                      }
+                    >
+                      {item.finalGrade.toFixed(1)}
+                    </span>
                   </TableCell>
                 </TableRow>
               ))}

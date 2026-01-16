@@ -50,9 +50,9 @@ export function calculateGrades(
   for (const period of periods) {
     const periodLog: string[] = []
 
-    // Filter assessments for this period
+    // Filter assessments for this period (comparação flexível)
     const pAssessments = studentAssessments.filter(
-      (a) => a.periodId === period.id,
+      (a) => String(a.periodId) === String(period.id),
     )
 
     // Separate Regular and Recuperation
@@ -63,11 +63,11 @@ export function calculateGrades(
       (a) => a.category === 'recuperation',
     )
 
-    // Process Individual Linked Recoveries
+    // Process Individual Linked Recoveries (comparação flexível)
     const effectiveAssessments: CalculatedAssessment[] = regularAssessments.map(
       (reg) => {
         const linkedRecovery = recoveryAssessments.find(
-          (rec) => rec.relatedAssessmentId === reg.id,
+          (rec) => String(rec.relatedAssessmentId) === String(reg.id),
         )
         let effectiveValue = Number(reg.value)
         const originalValue = Number(reg.value)
@@ -126,10 +126,10 @@ export function calculateGrades(
 
       for (const [typeId, weight] of Object.entries(rule.typeWeights)) {
         const typeName =
-          assessmentTypes.find((t) => t.id === typeId)?.name || 'Desconhecido'
-        // Filter effective assessments by type
+          assessmentTypes.find((t) => String(t.id) === String(typeId))?.name || 'Desconhecido'
+        // Filter effective assessments by type (comparação flexível)
         const typeAssessments = effectiveAssessments.filter(
-          (a) => a.assessmentTypeId === typeId,
+          (a) => String(a.assessmentTypeId) === String(typeId),
         )
 
         if (typeAssessments.length > 0) {
@@ -155,9 +155,9 @@ export function calculateGrades(
       regularAverage = weightedSum
     } else {
       // Simple Average
-      // Filter out excluded types
+      // Filter out excluded types (comparação flexível)
       const validAssessments = effectiveAssessments.filter((a) => {
-        const type = assessmentTypes.find((t) => t.id === a.assessmentTypeId)
+        const type = assessmentTypes.find((t) => String(t.id) === String(a.assessmentTypeId))
         if (type?.excludeFromAverage) {
           periodLog.push(
             `Nota ${a.value} ignorada (Tipo: ${type?.name} não contabiliza na média)`,

@@ -29,11 +29,11 @@ import {
   UsersRound,
   BookMarked,
   Presentation,
-  ClipboardCheck,
   Award,
   Target,
   ChevronRight,
   Sparkles,
+  FileSpreadsheet,
 } from 'lucide-react'
 import {
   Sidebar,
@@ -133,11 +133,6 @@ const academicItems = [
     icon: PenTool,
   },
   {
-    title: 'Lançamento de Notas',
-    url: '/avaliacao/lancamento',
-    icon: ClipboardCheck,
-  },
-  {
     title: 'Análise e Comparação',
     url: '/academico/analise-avaliacoes',
     icon: Target,
@@ -151,6 +146,14 @@ const academicItems = [
     title: 'Tipos de Avaliação',
     url: '/academico/tipos-avaliacao',
     icon: ClipboardList,
+  },
+]
+
+const gradesItems = [
+  {
+    title: 'Lançamento de Notas',
+    url: '/notas/lancamento',
+    icon: FileSpreadsheet,
   },
 ]
 
@@ -319,6 +322,34 @@ export function AppSidebar() {
                         </div>
                       ) : (
                         <item.icon className="h-5 w-5 text-muted-foreground group-hover/item:text-purple-600 transition-colors" />
+                      )}
+                      <span>{item.title}</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+
+        <SidebarGroup>
+          <SidebarGroupLabel className="text-emerald-600 font-semibold">Notas</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {gradesItems.map((item) => (
+                <SidebarMenuItem key={item.title}>
+                  <SidebarMenuButton
+                    asChild
+                    isActive={isActive(item.url)}
+                    tooltip={item.title}
+                  >
+                    <Link to={item.url} className="flex items-center gap-3 group/item" aria-current={isActive(item.url) ? 'page' : undefined}>
+                      {isActive(item.url) ? (
+                        <div className="p-1.5 rounded-md bg-gradient-to-br from-emerald-500/20 to-emerald-600/20">
+                          <item.icon className="h-5 w-5 text-emerald-600" />
+                        </div>
+                      ) : (
+                        <item.icon className="h-5 w-5 text-muted-foreground group-hover/item:text-emerald-600 transition-colors" />
                       )}
                       <span>{item.title}</span>
                     </Link>

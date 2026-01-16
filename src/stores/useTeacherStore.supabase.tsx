@@ -7,6 +7,7 @@
 
 import { create } from 'zustand';
 import { teacherService } from '@/lib/supabase/services/teacher-service';
+import type { TeacherWithAssignments } from '@/lib/supabase/services/teacher-service';
 import type { Teacher, TeacherFullInfo, Person } from '@/lib/database-types';
 import { toast } from 'sonner';
 
@@ -25,11 +26,11 @@ interface TeacherStats {
 
 interface TeacherState {
   // Estado
-  teachers: TeacherFullInfo[];
+  teachers: TeacherWithAssignments[];
   currentTeacher: TeacherFullInfo | null;
   loading: boolean;
   error: string | null;
-  
+
   // Ações de busca
   fetchTeachers: () => Promise<void>;
   fetchTeachersBySchool: (schoolId: number, options?: { employmentStatus?: string }) => Promise<void>;
@@ -77,26 +78,11 @@ export const useTeacherStore = create<TeacherState>((set, get) => ({
   fetchTeachers: async () => {
     set({ loading: true, error: null });
     try {
-      const teachers = await teacherService.getAll({
-        sort: { column: 'id', ascending: true }
-      });
-
-      // Buscar informações completas
-      const teachersWithFullInfo = await Promise.all(
-        teachers.map(teacher => teacherService.getTeacherFullInfo(teacher.id))
-      );
-
-      // Ordenar por nome após buscar as informações completas
-      const sortedTeachers = teachersWithFullInfo
-        .filter(Boolean)
-        .sort((a, b) => {
-          const nameA = a?.person?.full_name || '';
-          const nameB = b?.person?.full_name || '';
-          return nameA.localeCompare(nameB, 'pt-BR');
-        }) as TeacherFullInfo[];
+      // Usar método otimizado que busca professores com vínculos
+      const teachers = await teacherService.getAllWithAssignments();
 
       set({
-        teachers: sortedTeachers,
+        teachers,
         loading: false
       });
     } catch (error: unknown) {
@@ -345,5 +331,5 @@ export const useTeacherStore = create<TeacherState>((set, get) => ({
 }));
 
 // Exportar tipos para uso em componentes
-export type { TeacherState, TeacherFullInfo };
+export type { TeacherState, TeacherFullInfo, TeacherWithAssignments };
 

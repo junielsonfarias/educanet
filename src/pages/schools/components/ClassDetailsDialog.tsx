@@ -51,6 +51,14 @@ import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Progress } from '@/components/ui/progress'
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table'
 import { classService, assessmentTypeService, evaluationRulesService, academicPeriodService } from '@/lib/supabase/services'
 import { gradeService } from '@/lib/supabase/services'
 import { evaluationInstanceService } from '@/lib/supabase/services/evaluation-instance-service'
@@ -72,6 +80,17 @@ interface ClassInfo {
   code?: string
   shift: string
   capacity: number
+  operating_hours?: string
+  operating_days?: string[]
+  unified_attendance?: boolean
+  is_early_years?: boolean
+  teacher_model?: string
+  homeroom_teacher_id?: number
+  homeroom_teacher_name?: string
+  assistant_teacher_id?: number
+  assistant_teacher_name?: string
+  regent_teacher_id?: number
+  regent_teacher_name?: string
   school?: { id: number; name: string; trade_name?: string }
   course?: { id: number; name: string; education_level: string }
   academic_year?: { id: number; year: number }
@@ -96,11 +115,13 @@ interface StudentInfo {
     last_name?: string
     cpf?: string
     birth_date?: string
+    date_of_birth?: string
     gender?: string
     photo_url?: string
   }
   registration_number?: string
   enrollment_code?: string
+  student_registration_number?: string
   // Campos PCD
   is_pcd?: boolean
   cid_code?: string
@@ -110,12 +131,27 @@ interface StudentInfo {
   class_enrollment_id?: number
   class_enrollment_status?: string
   class_enrollment_date?: string
+  class_exit_date?: string
+  is_transfer_entry?: boolean
   enrollment_order?: number
   is_consolidated?: boolean
   final_result?: string
   enrollment_notes?: string
   student_enrollment_id?: number
   order_number?: number
+}
+
+// Função para calcular idade a partir da data de nascimento
+const calculateAge = (dateOfBirth: string | null | undefined): number | null => {
+  if (!dateOfBirth) return null
+  const birthDate = new Date(dateOfBirth)
+  const today = new Date()
+  let age = today.getFullYear() - birthDate.getFullYear()
+  const monthDiff = today.getMonth() - birthDate.getMonth()
+  if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+    age--
+  }
+  return age
 }
 
 interface TeacherSubjectInfo {
@@ -139,7 +175,12 @@ interface SubjectWithTeachers {
   name: string
   code?: string
   workload_hours?: number
-  teachers: Array<{ person?: { full_name: string } }>
+  teachers: Array<{
+    id: number
+    class_teacher_subject_id: number
+    workload_hours?: number
+    person?: { full_name: string }
+  }>
 }
 
 export function ClassDetailsDialog({ classId, onClose, onUpdated, onEdit }: ClassDetailsDialogProps) {
@@ -158,6 +199,31 @@ export function ClassDetailsDialog({ classId, onClose, onUpdated, onEdit }: Clas
   // Filtros
   const [studentSearch, setStudentSearch] = useState('')
   const [expandedSubject, setExpandedSubject] = useState<number | null>(null)
+
+  // Modal de vinculação de professor
+  const [showTeacherAssignmentModal, setShowTeacherAssignmentModal] = useState(false)
+  const [selectedSubjectForAssignment, setSelectedSubjectForAssignment] = useState<number | null>(null)
+  const [editingTeacherAssignment, setEditingTeacherAssignment] = useState<{
+    id: number
+    teacher_id: number
+    subject_id: number
+    workload_hours?: number
+  } | null>(null)
+  const [availableTeachers, setAvailableTeachers] = useState<Array<{
+    id: number
+    person: { full_name: string }
+  }>>([])
+  const [availableSubjectsForAssignment, setAvailableSubjectsForAssignment] = useState<Array<{
+    id: number
+    name: string
+    code?: string
+  }>>([])
+  const [assignmentForm, setAssignmentForm] = useState({
+    teacher_id: '',
+    subject_id: '',
+    workload_hours: ''
+  })
+  const [savingAssignment, setSavingAssignment] = useState(false)
 
   // Modal de visualização de aluno
   const [selectedStudent, setSelectedStudent] = useState<StudentInfo | null>(null)
@@ -711,6 +777,160 @@ export function ClassDetailsDialog({ classId, onClose, onUpdated, onEdit }: Clas
     return name.includes(search) || enrollment.includes(search)
   })
 
+  // Handler para abrir modal de vinculação de professor
+  const handleOpenTeacherAssignmentModal = async () => {
+    setShowTeacherAssignmentModal(true)
+    try {
+      // Carregar professores disponíveis
+      const { data: teachersData } = await supabase
+        .from('teachers')
+        .select(`
+          id,
+          person:people(first_name, last_name)
+        `)
+        .is('deleted_at', null)
+        .order('person(first_name)')
+
+      const formattedTeachers = (teachersData || []).map((t: Record<string, unknown>) => {
+        const person = t.person as Record<string, unknown> | undefined
+        return {
+          id: t.id as number,
+          person: {
+            full_name: person
+              ? `${person.first_name || ''} ${person.last_name || ''}`.trim()
+              : 'Professor sem nome'
+          }
+        }
+      })
+      setAvailableTeachers(formattedTeachers)
+
+      // Carregar disciplinas disponíveis
+      const { data: subjectsData } = await supabase
+        .from('subjects')
+        .select('id, name, code')
+        .is('deleted_at', null)
+        .order('name')
+
+      setAvailableSubjectsForAssignment(subjectsData || [])
+
+      // Preencher formulário se estiver editando
+      if (editingTeacherAssignment) {
+        setAssignmentForm({
+          teacher_id: editingTeacherAssignment.teacher_id.toString(),
+          subject_id: editingTeacherAssignment.subject_id.toString(),
+          workload_hours: editingTeacherAssignment.workload_hours?.toString() || ''
+        })
+      } else if (selectedSubjectForAssignment) {
+        setAssignmentForm({
+          teacher_id: '',
+          subject_id: selectedSubjectForAssignment.toString(),
+          workload_hours: ''
+        })
+      } else {
+        setAssignmentForm({
+          teacher_id: '',
+          subject_id: '',
+          workload_hours: ''
+        })
+      }
+    } catch (error) {
+      console.error('Erro ao carregar dados para vinculação:', error)
+    }
+  }
+
+  // Efeito para carregar dados quando modal abre
+  useEffect(() => {
+    if (showTeacherAssignmentModal) {
+      handleOpenTeacherAssignmentModal()
+    }
+  }, [showTeacherAssignmentModal])
+
+  // Handler para salvar vinculação de professor
+  const handleSaveTeacherAssignment = async () => {
+    if (!assignmentForm.teacher_id || !assignmentForm.subject_id) {
+      return
+    }
+
+    setSavingAssignment(true)
+    try {
+      const payload = {
+        class_id: classId,
+        teacher_id: parseInt(assignmentForm.teacher_id),
+        subject_id: parseInt(assignmentForm.subject_id),
+        workload_hours: assignmentForm.workload_hours ? parseInt(assignmentForm.workload_hours) : null,
+        created_by: 1
+      }
+
+      if (editingTeacherAssignment) {
+        // Atualizar vinculação existente
+        const { error } = await supabase
+          .from('class_teacher_subjects')
+          .update({
+            teacher_id: payload.teacher_id,
+            workload_hours: payload.workload_hours,
+            updated_by: 1
+          })
+          .eq('id', editingTeacherAssignment.id)
+
+        if (error) throw error
+      } else {
+        // Verificar se já existe vinculação
+        const { data: existing } = await supabase
+          .from('class_teacher_subjects')
+          .select('id')
+          .eq('class_id', classId)
+          .eq('teacher_id', payload.teacher_id)
+          .eq('subject_id', payload.subject_id)
+          .is('deleted_at', null)
+          .maybeSingle()
+
+        if (existing) {
+          throw new Error('Este professor já está vinculado a esta disciplina nesta turma')
+        }
+
+        // Criar nova vinculação
+        const { error } = await supabase
+          .from('class_teacher_subjects')
+          .insert(payload)
+
+        if (error) throw error
+      }
+
+      // Recarregar dados e fechar modal
+      await loadClassData()
+      setShowTeacherAssignmentModal(false)
+      setEditingTeacherAssignment(null)
+      setSelectedSubjectForAssignment(null)
+    } catch (error: unknown) {
+      console.error('Erro ao salvar vinculação:', error)
+      alert(error instanceof Error ? error.message : 'Erro ao salvar vinculação')
+    } finally {
+      setSavingAssignment(false)
+    }
+  }
+
+  // Handler para remover vinculação de professor
+  const handleRemoveTeacherAssignment = async (assignmentId: number) => {
+    if (!confirm('Deseja remover esta vinculação de professor?')) {
+      return
+    }
+
+    try {
+      const { error } = await supabase
+        .from('class_teacher_subjects')
+        .update({ deleted_at: new Date().toISOString() })
+        .eq('id', assignmentId)
+
+      if (error) throw error
+
+      // Recarregar dados
+      await loadClassData()
+    } catch (error) {
+      console.error('Erro ao remover vinculação:', error)
+      alert('Erro ao remover vinculação')
+    }
+  }
+
   if (loading) {
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center">
@@ -977,6 +1197,32 @@ export function ClassDetailsDialog({ classId, onClose, onUpdated, onEdit }: Clas
                         <p className="font-medium">{classInfo.shift}</p>
                       </div>
                     </div>
+                    {classInfo.operating_hours && (
+                      <div className="flex items-center gap-3">
+                        <Clock className="h-4 w-4 text-muted-foreground" />
+                        <div>
+                          <p className="text-sm text-muted-foreground">Horário de Funcionamento</p>
+                          <p className="font-medium">{classInfo.operating_hours}</p>
+                        </div>
+                      </div>
+                    )}
+                    {classInfo.operating_days && classInfo.operating_days.length > 0 && (
+                      <div className="flex items-center gap-3">
+                        <Calendar className="h-4 w-4 text-muted-foreground" />
+                        <div>
+                          <p className="text-sm text-muted-foreground">Dias de Funcionamento</p>
+                          <p className="font-medium capitalize">
+                            {classInfo.operating_days.map(day => {
+                              const dayMap: Record<string, string> = {
+                                'seg': 'Seg', 'ter': 'Ter', 'qua': 'Qua',
+                                'qui': 'Qui', 'sex': 'Sex', 'sab': 'Sáb', 'dom': 'Dom'
+                              }
+                              return dayMap[day] || day
+                            }).join(', ')}
+                          </p>
+                        </div>
+                      </div>
+                    )}
                     <div className="flex items-center gap-3">
                       <Calendar className="h-4 w-4 text-muted-foreground" />
                       <div>
@@ -1017,6 +1263,95 @@ export function ClassDetailsDialog({ classId, onClose, onUpdated, onEdit }: Clas
                   </CardContent>
                 </Card>
               </div>
+
+              {/* Card: Modelo de Professor */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <GraduationCap className="h-4 w-4" />
+                    Professores da Turma
+                    <Badge variant={classInfo.is_early_years ? 'default' : 'secondary'} className="ml-auto">
+                      {classInfo.teacher_model || (classInfo.is_early_years ? 'Anos Iniciais' : 'Anos Finais')}
+                    </Badge>
+                  </CardTitle>
+                  <CardDescription>
+                    {classInfo.is_early_years
+                      ? 'Professor Titular leciona todas as disciplinas. Frequência unificada.'
+                      : 'Cada disciplina possui seu próprio professor. Frequência por disciplina.'}
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {classInfo.is_early_years ? (
+                    <div className="space-y-4">
+                      {/* Professor Titular */}
+                      <div className="flex items-center justify-between p-3 rounded-lg bg-blue-500/10 border border-blue-500/20">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-full bg-blue-500/20 flex items-center justify-center">
+                            <GraduationCap className="h-5 w-5 text-blue-500" />
+                          </div>
+                          <div>
+                            <p className="text-xs text-blue-600 font-medium uppercase">Professor Titular</p>
+                            <p className="font-medium">
+                              {classInfo.homeroom_teacher_name || 'Não definido'}
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              Responsável por todas as disciplinas
+                            </p>
+                          </div>
+                        </div>
+                        {classInfo.unified_attendance && (
+                          <Badge variant="outline" className="text-xs">
+                            Frequência Unificada
+                          </Badge>
+                        )}
+                      </div>
+
+                      {/* Professor Assistente */}
+                      <div className="flex items-center justify-between p-3 rounded-lg bg-orange-500/10 border border-orange-500/20">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-full bg-orange-500/20 flex items-center justify-center">
+                            <Users className="h-5 w-5 text-orange-500" />
+                          </div>
+                          <div>
+                            <p className="text-xs text-orange-600 font-medium uppercase">Professor Assistente</p>
+                            <p className="font-medium">
+                              {classInfo.assistant_teacher_name || 'Não definido'}
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              Auxiliar do professor titular
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/50">
+                        <BookOpen className="h-5 w-5 text-muted-foreground" />
+                        <div>
+                          <p className="text-sm">
+                            Esta turma utiliza o modelo de <strong>1 professor por disciplina</strong>.
+                          </p>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            Acesse a aba "Professores" para visualizar e gerenciar os professores de cada disciplina.
+                          </p>
+                        </div>
+                      </div>
+                      {classInfo.regent_teacher_name && (
+                        <div className="flex items-center gap-3 p-3 rounded-lg bg-purple-500/10 border border-purple-500/20">
+                          <div className="w-10 h-10 rounded-full bg-purple-500/20 flex items-center justify-center">
+                            <Award className="h-5 w-5 text-purple-500" />
+                          </div>
+                          <div>
+                            <p className="text-xs text-purple-600 font-medium uppercase">Professor Regente</p>
+                            <p className="font-medium">{classInfo.regent_teacher_name}</p>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
             </div>
           )}
 
@@ -1074,117 +1409,168 @@ export function ClassDetailsDialog({ classId, onClose, onUpdated, onEdit }: Clas
               ) : (
                 <Card>
                   <CardContent className="p-0">
-                    {/* Cabeçalho da tabela */}
-                    <div className="grid grid-cols-[50px_1fr_80px_120px_80px] gap-2 px-4 py-3 bg-muted/50 border-b text-sm font-medium text-muted-foreground">
-                      <div className="text-center">Nº</div>
-                      <div>Nome do Aluno</div>
-                      <div className="text-center">PCD</div>
-                      <div className="text-center">Situação</div>
-                      <div className="text-center">Ações</div>
-                    </div>
-                    <div className="divide-y">
-                      {filteredStudents.map((student) => {
-                        // Determinar badge de situação
-                        const getSituacaoBadge = () => {
-                          const status = student.class_enrollment_status || 'Ativo'
-                          switch(status) {
-                            case 'Ativo':
-                              return <Badge variant="default" className="bg-green-500 hover:bg-green-600">Cursando</Badge>
-                            case 'Transferido':
-                              return (
-                                <Badge variant="secondary" className="bg-orange-100 text-orange-700 hover:bg-orange-200">
-                                  Transf. {student.class_enrollment_date ? format(new Date(student.class_enrollment_date), 'dd/MM', { locale: ptBR }) : ''}
-                                </Badge>
-                              )
-                            case 'Abandono':
-                              return <Badge variant="destructive">Abandono</Badge>
-                            case 'Aprovado':
-                              return <Badge variant="default" className="bg-blue-500 hover:bg-blue-600">Aprovado</Badge>
-                            case 'Reprovado':
-                              return <Badge variant="destructive">Reprovado</Badge>
-                            default:
-                              return <Badge variant="outline">{status}</Badge>
+                    <Table>
+                      <TableHeader>
+                        <TableRow className="bg-muted/50">
+                          <TableHead className="w-[60px] text-center">Nº</TableHead>
+                          <TableHead>Nome do Aluno</TableHead>
+                          <TableHead className="w-[80px] text-center">Idade</TableHead>
+                          <TableHead className="w-[150px]">Matrícula</TableHead>
+                          <TableHead className="w-[110px] text-center">Dt. Entrada</TableHead>
+                          <TableHead className="w-[110px] text-center">Dt. Saída</TableHead>
+                          <TableHead className="w-[80px] text-center">PCD</TableHead>
+                          <TableHead className="w-[120px] text-center">Situação</TableHead>
+                          <TableHead className="w-[80px] text-center">Ações</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {filteredStudents.map((student) => {
+                          const person = student?.person
+                          const fullName = person?.full_name
+                            || (person ? `${person.first_name || ''} ${person.last_name || ''}`.trim() : 'Nome não informado')
+
+                          // Badge de situação
+                          const getSituacaoBadge = () => {
+                            const status = student.class_enrollment_status || 'Ativo'
+                            switch (status) {
+                              case 'Ativo':
+                                return <Badge className="bg-green-500 hover:bg-green-600">Cursando</Badge>
+                              case 'Transferido':
+                                return <Badge className="bg-orange-500 hover:bg-orange-600">Transferido</Badge>
+                              case 'Abandono':
+                                return <Badge variant="destructive">Abandono</Badge>
+                              case 'Aprovado':
+                                return <Badge className="bg-blue-500 hover:bg-blue-600">Aprovado</Badge>
+                              case 'Reprovado':
+                                return <Badge variant="destructive">Reprovado</Badge>
+                              default:
+                                return <Badge variant="outline">{status}</Badge>
+                            }
                           }
-                        }
 
-                        return (
-                          <div
-                            key={student.id || student.class_enrollment_id}
-                            className={`grid grid-cols-[50px_1fr_80px_120px_80px] gap-2 px-4 py-3 hover:bg-muted/50 items-center cursor-pointer transition-colors ${
-                              student.class_enrollment_status === 'Transferido' ? 'opacity-70' : ''
-                            }`}
-                            onClick={() => handleViewStudent(student)}
-                          >
-                            {/* Número de ordem */}
-                            <div className="text-center">
-                              <span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-muted text-sm font-medium">
-                                {student.order_number || '-'}
-                              </span>
-                            </div>
+                          const isTransferred = student.class_enrollment_status === 'Transferido'
+                          const isTransferEntry = student.is_transfer_entry === true
 
-                            {/* Nome e informações */}
-                            <div className="flex items-center gap-3 min-w-0">
-                              <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
-                                <span className="text-sm font-medium text-primary">
-                                  {student.person?.full_name?.charAt(0) || '?'}
-                                </span>
-                              </div>
-                              <div className="min-w-0">
-                                <div className="flex items-center gap-2">
-                                  <p className="font-medium truncate">
-                                    {student.person?.full_name || 'Nome não informado'}
-                                  </p>
-                                  {student.is_pcd && (
-                                    <Badge variant="outline" className="bg-cyan-50 text-cyan-700 border-cyan-200 text-xs flex-shrink-0">
-                                      <Accessibility className="h-3 w-3 mr-1" />
-                                      PCD
-                                    </Badge>
-                                  )}
+                          return (
+                            <TableRow
+                              key={student?.id || student?.class_enrollment_id}
+                              className={`hover:bg-muted/30 transition-colors cursor-pointer ${
+                                isTransferred ? 'bg-orange-50/50 opacity-80' : ''
+                              } ${isTransferEntry && !isTransferred ? 'bg-blue-50/30' : ''}`}
+                              onClick={() => handleViewStudent(student)}
+                            >
+                              <TableCell className="text-center">
+                                <Badge
+                                  variant="outline"
+                                  className={`font-mono ${isTransferred ? 'bg-orange-100 border-orange-300' : ''}`}
+                                >
+                                  {student.order_number || '-'}
+                                </Badge>
+                              </TableCell>
+                              <TableCell>
+                                <div className="flex items-center gap-3">
+                                  <div className={`h-8 w-8 rounded-full flex items-center justify-center text-xs font-medium ${
+                                    isTransferred
+                                      ? 'bg-orange-100 text-orange-600'
+                                      : isTransferEntry
+                                        ? 'bg-blue-100 text-blue-600'
+                                        : 'bg-primary/10 text-primary'
+                                  }`}>
+                                    {fullName.split(' ').map((n: string) => n[0]).slice(0, 2).join('').toUpperCase()}
+                                  </div>
+                                  <div className="min-w-0">
+                                    <div className="flex items-center gap-2">
+                                      <span className={`font-medium truncate ${isTransferred ? 'line-through text-muted-foreground' : ''}`}>
+                                        {fullName}
+                                      </span>
+                                      {student.is_pcd && (
+                                        <Badge variant="outline" className="bg-cyan-50 text-cyan-700 border-cyan-200 text-xs flex-shrink-0">
+                                          <Accessibility className="h-3 w-3 mr-1" />
+                                          PCD
+                                        </Badge>
+                                      )}
+                                      {isTransferEntry && !isTransferred && (
+                                        <Badge variant="outline" className="bg-blue-50 text-blue-600 border-blue-200 text-[10px] px-1 py-0">
+                                          Novo
+                                        </Badge>
+                                      )}
+                                    </div>
+                                  </div>
                                 </div>
-                                <p className="text-sm text-muted-foreground truncate">
-                                  {student.student_registration_number || student.registration_number || student.enrollment_code || 'Sem matrícula'}
-                                  {student.is_pcd && student.cid_code && (
-                                    <span className="ml-2 text-cyan-600">• CID: {student.cid_code}</span>
-                                  )}
-                                </p>
-                              </div>
-                            </div>
-
-                            {/* Badge PCD */}
-                            <div className="text-center">
-                              {student.is_pcd ? (
-                                <div className="flex flex-col items-center gap-1">
-                                  <Accessibility className="h-4 w-4 text-cyan-500" />
-                                  {student.has_medical_report && (
-                                    <span className="text-[10px] text-cyan-600">Laudo</span>
-                                  )}
-                                </div>
-                              ) : (
-                                <span className="text-muted-foreground">-</span>
-                              )}
-                            </div>
-
-                            {/* Situação */}
-                            <div className="text-center">
-                              {getSituacaoBadge()}
-                            </div>
-
-                            {/* Ações */}
-                            <div className="flex items-center justify-center gap-1" onClick={(e) => e.stopPropagation()}>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-8 w-8"
-                                title="Ver detalhes"
-                                onClick={() => handleViewStudent(student)}
-                              >
-                                <Eye className="h-4 w-4" />
-                              </Button>
-                            </div>
-                          </div>
-                        )
-                      })}
-                    </div>
+                              </TableCell>
+                              <TableCell className="text-center">
+                                {(() => {
+                                  const age = calculateAge(person?.date_of_birth || person?.birth_date)
+                                  return age !== null ? (
+                                    <span className="text-sm font-medium">{age} anos</span>
+                                  ) : (
+                                    <span className="text-muted-foreground text-sm">-</span>
+                                  )
+                                })()}
+                              </TableCell>
+                              <TableCell>
+                                <code className="text-xs bg-muted px-2 py-1 rounded">
+                                  {student?.student_registration_number || student?.registration_number || student?.enrollment_code || '-'}
+                                </code>
+                              </TableCell>
+                              <TableCell className="text-center">
+                                {student.class_enrollment_date ? (
+                                  <div className="flex flex-col items-center">
+                                    <span className="text-xs font-medium">
+                                      {format(new Date(student.class_enrollment_date), 'dd/MM/yyyy', { locale: ptBR })}
+                                    </span>
+                                    {student.is_transfer_entry && (
+                                      <Badge variant="outline" className="text-[9px] px-1 py-0 mt-0.5 bg-blue-50 text-blue-600 border-blue-200">
+                                        Transferência
+                                      </Badge>
+                                    )}
+                                  </div>
+                                ) : (
+                                  <span className="text-muted-foreground text-xs">-</span>
+                                )}
+                              </TableCell>
+                              <TableCell className="text-center">
+                                {student.class_exit_date ? (
+                                  <span className="text-xs font-medium text-orange-600">
+                                    {format(new Date(student.class_exit_date), 'dd/MM/yyyy', { locale: ptBR })}
+                                  </span>
+                                ) : (
+                                  <span className="text-muted-foreground text-xs">-</span>
+                                )}
+                              </TableCell>
+                              <TableCell className="text-center">
+                                {student.is_pcd ? (
+                                  <div className="flex flex-col items-center gap-1">
+                                    <Accessibility className="h-4 w-4 text-cyan-500" />
+                                    {student.cid_description && (
+                                      <span className="text-[10px] text-cyan-600 max-w-[80px] truncate" title={student.cid_description}>
+                                        {student.cid_description}
+                                      </span>
+                                    )}
+                                  </div>
+                                ) : (
+                                  <span className="text-muted-foreground">-</span>
+                                )}
+                              </TableCell>
+                              <TableCell className="text-center">
+                                {getSituacaoBadge()}
+                              </TableCell>
+                              <TableCell className="text-center" onClick={(e) => e.stopPropagation()}>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8"
+                                  title="Ver detalhes do aluno"
+                                  onClick={() => handleViewStudent(student)}
+                                >
+                                  <Eye className="h-4 w-4" />
+                                </Button>
+                              </TableCell>
+                            </TableRow>
+                          )
+                        })}
+                      </TableBody>
+                    </Table>
                   </CardContent>
                 </Card>
               )}
@@ -1201,94 +1587,264 @@ export function ClassDetailsDialog({ classId, onClose, onUpdated, onEdit }: Clas
           {/* Aba: Professores/Disciplinas */}
           {activeTab === 'teachers' && (
             <div className="space-y-4">
+              {/* Header com badge do modelo */}
               <div className="flex justify-between items-center">
-                <p className="text-sm text-muted-foreground">
-                  {subjects.length} disciplina(s) com {teacherSubjects.length} alocação(ões) de professor(es)
-                </p>
-                <Button disabled>
-                  <UserPlus className="h-4 w-4 mr-2" />
-                  Alocar Professor
-                </Button>
+                <div className="flex items-center gap-3">
+                  <Badge variant={classInfo?.is_early_years === true ? 'default' : 'secondary'}>
+                    {classInfo?.teacher_model || 'Anos Finais'}
+                  </Badge>
+                  <p className="text-sm text-muted-foreground">
+                    {classInfo?.is_early_years === true
+                      ? 'Professor Titular leciona todas as disciplinas'
+                      : `${subjects.length} disciplina(s) com ${subjects.reduce((acc, s) => acc + s.teachers.length, 0)} professor(es)`}
+                  </p>
+                </div>
+                {/* Botão de Alocar Professor - aparece para Anos Finais ou quando is_early_years não está definido */}
+                {classInfo?.is_early_years !== true && (
+                  <Button onClick={() => setShowTeacherAssignmentModal(true)}>
+                    <UserPlus className="h-4 w-4 mr-2" />
+                    Alocar Professor
+                  </Button>
+                )}
               </div>
 
-              {subjects.length === 0 ? (
-                <Card>
-                  <CardContent className="py-10 text-center">
-                    <BookOpen className="h-12 w-12 mx-auto mb-4 text-muted-foreground opacity-50" />
-                    <p className="text-muted-foreground">
-                      Nenhuma disciplina configurada para esta turma.
-                    </p>
-                    <p className="text-sm text-muted-foreground mt-2">
-                      Configure as disciplinas e aloque os professores responsáveis.
-                    </p>
-                  </CardContent>
-                </Card>
-              ) : (
-                <div className="space-y-3">
-                  {subjects.map((subject) => (
-                    <Card key={subject.id}>
-                      <CardContent className="p-0">
-                        <button
-                          className="w-full flex items-center justify-between p-4 hover:bg-muted/50 text-left"
-                          onClick={() => setExpandedSubject(
-                            expandedSubject === subject.id ? null : subject.id
-                          )}
-                        >
-                          <div className="flex items-center gap-3">
-                            <div className="p-2 rounded-lg bg-primary/10">
-                              <BookOpen className="h-4 w-4 text-primary" />
-                            </div>
-                            <div>
-                              <p className="font-medium">{subject.name}</p>
-                              <p className="text-sm text-muted-foreground">
-                                {subject.code ? `Código: ${subject.code}` : 'Sem código'}
-                                {subject.workload_hours && ` • ${subject.workload_hours}h/semana`}
-                              </p>
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-3">
-                            <Badge variant="secondary">
-                              {subject.teachers.length} professor(es)
-                            </Badge>
-                            {expandedSubject === subject.id ? (
-                              <ChevronDown className="h-4 w-4 text-muted-foreground" />
-                            ) : (
-                              <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                            )}
-                          </div>
-                        </button>
+              {/* Anos Iniciais: Exibir professor titular */}
+              {classInfo?.is_early_years === true ? (
+                <div className="space-y-4">
+                  {/* Card informativo */}
+                  <Card className="bg-blue-500/5 border-blue-500/20">
+                    <CardContent className="py-4">
+                      <div className="flex items-start gap-3">
+                        <AlertCircle className="h-5 w-5 text-blue-500 mt-0.5" />
+                        <div>
+                          <p className="text-sm font-medium text-blue-700">Modelo Anos Iniciais</p>
+                          <p className="text-sm text-muted-foreground mt-1">
+                            Neste modelo, o <strong>Professor Titular</strong> é responsável por lecionar todas as disciplinas da turma.
+                            O vínculo com as disciplinas é feito automaticamente quando o professor titular é definido na turma.
+                          </p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
 
-                        {expandedSubject === subject.id && subject.teachers.length > 0 && (
-                          <div className="border-t px-4 py-3 bg-muted/30">
-                            <p className="text-sm font-medium mb-2">Professores:</p>
-                            <div className="space-y-2">
-                              {subject.teachers.map((teacher, idx) => (
-                                <div key={idx} className="flex items-center gap-2">
-                                  <div className="w-8 h-8 rounded-full bg-orange-500/10 flex items-center justify-center">
-                                    <span className="text-xs font-medium text-orange-500">
-                                      {teacher.person?.full_name?.charAt(0) || '?'}
-                                    </span>
-                                  </div>
-                                  <span className="text-sm">
-                                    {teacher.person?.full_name || 'Professor não identificado'}
-                                  </span>
-                                </div>
-                              ))}
-                            </div>
+                  {/* Professor Titular */}
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-base flex items-center gap-2">
+                        <GraduationCap className="h-4 w-4" />
+                        Professor Titular
+                      </CardTitle>
+                      <CardDescription>
+                        Responsável por todas as {subjects.length} disciplinas da turma
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      {classInfo?.homeroom_teacher_name ? (
+                        <div className="flex items-center gap-4 p-4 rounded-lg bg-blue-500/10 border border-blue-500/20">
+                          <div className="w-12 h-12 rounded-full bg-blue-500/20 flex items-center justify-center">
+                            <span className="text-lg font-medium text-blue-500">
+                              {classInfo.homeroom_teacher_name.charAt(0)}
+                            </span>
                           </div>
-                        )}
-
-                        {expandedSubject === subject.id && subject.teachers.length === 0 && (
-                          <div className="border-t px-4 py-3 bg-muted/30">
-                            <p className="text-sm text-orange-500">
-                              Nenhum professor alocado para esta disciplina.
+                          <div className="flex-1">
+                            <p className="font-medium text-lg">{classInfo.homeroom_teacher_name}</p>
+                            <p className="text-sm text-muted-foreground">
+                              Leciona: {subjects.map(s => s.name).join(', ')}
                             </p>
                           </div>
-                        )}
+                          {classInfo.unified_attendance && (
+                            <Badge variant="outline">Frequência Unificada</Badge>
+                          )}
+                        </div>
+                      ) : (
+                        <div className="text-center py-6">
+                          <GraduationCap className="h-12 w-12 mx-auto mb-3 text-muted-foreground opacity-50" />
+                          <p className="text-muted-foreground">
+                            Nenhum professor titular definido.
+                          </p>
+                          <p className="text-sm text-muted-foreground mt-1">
+                            Edite a turma para definir o professor titular.
+                          </p>
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+
+                  {/* Professor Assistente */}
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-base flex items-center gap-2">
+                        <Users className="h-4 w-4" />
+                        Professor Assistente
+                      </CardTitle>
+                      <CardDescription>
+                        Auxiliar do professor titular (opcional)
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      {classInfo?.assistant_teacher_name ? (
+                        <div className="flex items-center gap-4 p-4 rounded-lg bg-orange-500/10 border border-orange-500/20">
+                          <div className="w-12 h-12 rounded-full bg-orange-500/20 flex items-center justify-center">
+                            <span className="text-lg font-medium text-orange-500">
+                              {classInfo.assistant_teacher_name.charAt(0)}
+                            </span>
+                          </div>
+                          <div className="flex-1">
+                            <p className="font-medium text-lg">{classInfo.assistant_teacher_name}</p>
+                            <p className="text-sm text-muted-foreground">
+                              Auxilia o professor titular em sala de aula
+                            </p>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="text-center py-6">
+                          <Users className="h-12 w-12 mx-auto mb-3 text-muted-foreground opacity-50" />
+                          <p className="text-muted-foreground">
+                            Nenhum professor assistente definido.
+                          </p>
+                          <p className="text-sm text-muted-foreground mt-1">
+                            Edite a turma para definir um professor assistente (opcional).
+                          </p>
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+
+                  {/* Lista de disciplinas (apenas visualização) */}
+                  {subjects.length > 0 && (
+                    <Card>
+                      <CardHeader>
+                        <CardTitle className="text-base flex items-center gap-2">
+                          <BookOpen className="h-4 w-4" />
+                          Disciplinas da Turma
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+                          {subjects.map((subject) => (
+                            <div
+                              key={subject.id}
+                              className="flex items-center gap-2 p-2 rounded-lg bg-muted/50"
+                            >
+                              <BookOpen className="h-4 w-4 text-muted-foreground" />
+                              <span className="text-sm">{subject.name}</span>
+                            </div>
+                          ))}
+                        </div>
                       </CardContent>
                     </Card>
-                  ))}
+                  )}
                 </div>
+              ) : (
+                /* Anos Finais: Exibir professores por disciplina */
+                <>
+                  {subjects.length === 0 ? (
+                    <Card>
+                      <CardContent className="py-10 text-center">
+                        <BookOpen className="h-12 w-12 mx-auto mb-4 text-muted-foreground opacity-50" />
+                        <p className="text-muted-foreground">
+                          Nenhuma disciplina configurada para esta turma.
+                        </p>
+                        <p className="text-sm text-muted-foreground mt-2">
+                          Configure as disciplinas e aloque os professores responsáveis.
+                        </p>
+                      </CardContent>
+                    </Card>
+                  ) : (
+                    <div className="space-y-3">
+                      {subjects.map((subject) => (
+                        <Card key={subject.id}>
+                          <CardContent className="p-4">
+                            <div className="flex items-start justify-between">
+                              <div className="flex items-center gap-3">
+                                <div className="p-2 rounded-lg bg-primary/10">
+                                  <BookOpen className="h-4 w-4 text-primary" />
+                                </div>
+                                <div>
+                                  <p className="font-medium">{subject.name}</p>
+                                  <p className="text-sm text-muted-foreground">
+                                    {subject.code ? `Código: ${subject.code}` : 'Sem código'}
+                                  </p>
+                                </div>
+                              </div>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => {
+                                  setSelectedSubjectForAssignment(subject.id)
+                                  setEditingTeacherAssignment(null)
+                                  setShowTeacherAssignmentModal(true)
+                                }}
+                              >
+                                <UserPlus className="h-4 w-4" />
+                              </Button>
+                            </div>
+
+                            {/* Lista de professores */}
+                            <div className="mt-3 space-y-2">
+                              {subject.teachers.length === 0 ? (
+                                <p className="text-sm text-orange-500 italic">
+                                  Nenhum professor alocado
+                                </p>
+                              ) : (
+                                subject.teachers.map((teacher, idx) => (
+                                  <div
+                                    key={idx}
+                                    className="flex items-center justify-between p-2 rounded-lg bg-muted/50 hover:bg-muted/70"
+                                  >
+                                    <div className="flex items-center gap-2">
+                                      <div className="w-8 h-8 rounded-full bg-orange-500/10 flex items-center justify-center">
+                                        <span className="text-xs font-medium text-orange-500">
+                                          {teacher.person?.full_name?.charAt(0) || '?'}
+                                        </span>
+                                      </div>
+                                      <div>
+                                        <p className="text-sm font-medium">
+                                          {teacher.person?.full_name || 'Professor não identificado'}
+                                        </p>
+                                        {teacher.workload_hours && (
+                                          <p className="text-xs text-muted-foreground">
+                                            Carga horária: {teacher.workload_hours}h/semana
+                                          </p>
+                                        )}
+                                      </div>
+                                    </div>
+                                    <div className="flex items-center gap-1">
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() => {
+                                          setSelectedSubjectForAssignment(subject.id)
+                                          setEditingTeacherAssignment({
+                                            id: teacher.class_teacher_subject_id,
+                                            teacher_id: teacher.id,
+                                            subject_id: subject.id,
+                                            workload_hours: teacher.workload_hours
+                                          })
+                                          setShowTeacherAssignmentModal(true)
+                                        }}
+                                      >
+                                        <Edit className="h-3.5 w-3.5" />
+                                      </Button>
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        className="text-destructive hover:text-destructive"
+                                        onClick={() => handleRemoveTeacherAssignment(teacher.class_teacher_subject_id)}
+                                      >
+                                        <Trash2 className="h-3.5 w-3.5" />
+                                      </Button>
+                                    </div>
+                                  </div>
+                                ))
+                              )}
+                            </div>
+                          </CardContent>
+                        </Card>
+                      ))}
+                    </div>
+                  )}
+                </>
               )}
             </div>
           )}
@@ -2000,6 +2556,123 @@ export function ClassDetailsDialog({ classId, onClose, onUpdated, onEdit }: Clas
               </Button>
               <Button variant="outline" onClick={() => setShowEnrollModal(false)}>
                 Fechar
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de vinculação de professor */}
+      {showTeacherAssignmentModal && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center">
+          <div
+            className="fixed inset-0 bg-black/50"
+            onClick={() => {
+              setShowTeacherAssignmentModal(false)
+              setEditingTeacherAssignment(null)
+              setSelectedSubjectForAssignment(null)
+            }}
+          />
+          <div className="relative z-[60] w-full max-w-md bg-background rounded-lg shadow-lg border mx-4 max-h-[90vh] flex flex-col">
+            {/* Header */}
+            <div className="flex items-center justify-between p-4 border-b flex-shrink-0">
+              <h3 className="text-lg font-semibold">
+                {editingTeacherAssignment ? 'Editar Vinculação' : 'Nova Vinculação de Professor'}
+              </h3>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => {
+                  setShowTeacherAssignmentModal(false)
+                  setEditingTeacherAssignment(null)
+                  setSelectedSubjectForAssignment(null)
+                }}
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+
+            {/* Content */}
+            <div className="flex-1 overflow-y-auto p-4 space-y-4">
+              {/* Disciplina */}
+              <div className="space-y-2">
+                <Label htmlFor="assignment-subject">Disciplina *</Label>
+                <select
+                  id="assignment-subject"
+                  className="w-full h-10 px-3 rounded-md border border-input bg-background text-sm"
+                  value={assignmentForm.subject_id}
+                  onChange={(e) => setAssignmentForm(prev => ({ ...prev, subject_id: e.target.value }))}
+                  disabled={!!editingTeacherAssignment || !!selectedSubjectForAssignment}
+                >
+                  <option value="">Selecione a disciplina</option>
+                  {availableSubjectsForAssignment.map((subject) => (
+                    <option key={subject.id} value={subject.id}>
+                      {subject.name} {subject.code ? `(${subject.code})` : ''}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Professor */}
+              <div className="space-y-2">
+                <Label htmlFor="assignment-teacher">Professor *</Label>
+                <select
+                  id="assignment-teacher"
+                  className="w-full h-10 px-3 rounded-md border border-input bg-background text-sm"
+                  value={assignmentForm.teacher_id}
+                  onChange={(e) => setAssignmentForm(prev => ({ ...prev, teacher_id: e.target.value }))}
+                >
+                  <option value="">Selecione o professor</option>
+                  {availableTeachers.map((teacher) => (
+                    <option key={teacher.id} value={teacher.id}>
+                      {teacher.person.full_name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Carga Horária */}
+              <div className="space-y-2">
+                <Label htmlFor="assignment-workload">Carga Horária (horas/semana)</Label>
+                <Input
+                  id="assignment-workload"
+                  type="number"
+                  min="1"
+                  max="40"
+                  placeholder="Ex: 4"
+                  value={assignmentForm.workload_hours}
+                  onChange={(e) => setAssignmentForm(prev => ({ ...prev, workload_hours: e.target.value }))}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Quantidade de horas semanais desta disciplina nesta turma
+                </p>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="flex justify-end gap-2 p-4 border-t flex-shrink-0">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setShowTeacherAssignmentModal(false)
+                  setEditingTeacherAssignment(null)
+                  setSelectedSubjectForAssignment(null)
+                }}
+              >
+                Cancelar
+              </Button>
+              <Button
+                onClick={handleSaveTeacherAssignment}
+                disabled={savingAssignment || !assignmentForm.teacher_id || !assignmentForm.subject_id}
+              >
+                {savingAssignment ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Salvando...
+                  </>
+                ) : (
+                  editingTeacherAssignment ? 'Salvar Alterações' : 'Vincular Professor'
+                )}
               </Button>
             </div>
           </div>

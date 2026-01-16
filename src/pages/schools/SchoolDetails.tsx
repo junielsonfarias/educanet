@@ -96,6 +96,18 @@ interface ClassWithStats {
     totalStudents: number
     occupancyRate: number
   }
+  // Campos do Censo Escolar
+  is_multi_grade?: boolean
+  education_modality?: string
+  tipo_regime?: string
+  operating_hours?: string
+  min_students?: number
+  max_dependency_subjects?: number
+  operating_days?: string[]
+  // Professores
+  homeroom_teacher_id?: number
+  assistant_teacher_id?: number
+  regent_teacher_id?: number
 }
 
 export default function SchoolDetails() {
@@ -960,7 +972,19 @@ export default function SchoolDetails() {
             capacity: editingClass.capacity,
             course_id: editingClass.course?.id,
             education_grade_id: editingClass.education_grade?.id,
-            academic_period_id: editingClass.academic_period?.id
+            academic_period_id: editingClass.academic_period?.id,
+            // Campos do Censo Escolar
+            is_multi_grade: editingClass.is_multi_grade,
+            education_modality: editingClass.education_modality,
+            tipo_regime: editingClass.tipo_regime,
+            operating_hours: editingClass.operating_hours,
+            min_students: editingClass.min_students,
+            max_dependency_subjects: editingClass.max_dependency_subjects,
+            operating_days: editingClass.operating_days,
+            // Professores
+            homeroom_teacher_id: editingClass.homeroom_teacher_id,
+            assistant_teacher_id: editingClass.assistant_teacher_id,
+            regent_teacher_id: editingClass.regent_teacher_id
           } : undefined}
         />
       )}
